@@ -77,10 +77,19 @@ namespace VisualMusicBlockLooper.Tests
             public long Ora { get; set; }
         }
 
+        private static readonly StrutturaTavolo UnaRiga = Crea(4, 1, 1, 1);
+
+        private static StrutturaTavolo Crea(int battiti, int righeCollegate, int a, int b)
+        {
+            Assert.That(StrutturaTavolo.TryCrea(battiti, righeCollegate, a, b, out StrutturaTavolo struttura), Is.True);
+            return struttura;
+        }
+
         private static CartoncinoNota Nota(int traccia, int stepIniziale, int durataStep, int idClip)
         {
             return new CartoncinoNota
             {
+                Riga = traccia,
                 Traccia = traccia,
                 StepIniziale = stepIniziale,
                 DurataStep = durataStep,
@@ -95,7 +104,7 @@ namespace VisualMusicBlockLooper.Tests
 
         private static StatoTavolo Stato(IReadOnlyList<CartoncinoNota> note, params ComandoRilevato[] comandi)
         {
-            return new StatoTavolo(note, comandi, null);
+            return new StatoTavolo(note, comandi, null, UnaRiga);
         }
 
         /// <summary>Restituisce <paramref name="n"/> voci "Clock".</summary>
@@ -397,6 +406,34 @@ namespace VisualMusicBlockLooper.Tests
             banco.Ingresso.RaiseClock();
 
             Assert.That(banco.Uscita.Registro, Is.EqualTo(new[] { "NotaOn:0:36:100", "NotaOff:0:36", "NotaOn:0:36:100" }));
+        }
+
+        [Test]
+        public void StrutturaPassataAlSequencer()
+        {
+            Banco banco = new Banco();
+            List<CartoncinoNota> note = new List<CartoncinoNota> { Nota(0, 0, 1, 0), Nota(1, 0, 1, 1) };
+            banco.Motore.AggiornaTavolo(new StatoTavolo(note, new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1)));
+
+            TickMaster(banco, 1);
+
+            Assert.That(banco.Uscita.Registro.Count(r => r.StartsWith("NotaOn")), Is.EqualTo(2));
+            Assert.That(banco.Motore.Struttura, Is.EqualTo(Crea(4, 1, 1, 1)));
+        }
+
+        [Test]
+        public void PosizioneDelMotore()
+        {
+            Banco banco = new Banco();
+            Assert.That(banco.Motore.Struttura, Is.SameAs(StrutturaTavolo.Default));
+            Assert.That(banco.Motore.Posizione.StepInMisura, Is.EqualTo(0));
+
+            banco.Motore.AggiornaTavolo(new StatoTavolo(null, new[] { Comando(TipoComando.Play) }, null, Crea(4, 3, 1, 3)));
+            TickMaster(banco, 31);
+
+            Assert.That(banco.Motore.Posizione.StepInMisura, Is.EqualTo(5));
+            Assert.That(banco.Motore.StepCorrente, Is.EqualTo(5));
+            Assert.That(banco.Motore.Posizione.RigheAttive, Is.EqualTo(new[] { 0, 3 }));
         }
 
         [Test]

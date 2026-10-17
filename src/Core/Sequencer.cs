@@ -13,34 +13,51 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Numero di tick di clock per ogni step.</summary>
         public const int TickPerStep = 6;
 
-        private readonly ConfigGriglia config;
         private readonly List<NotaInCorso> suonanti = new List<NotaInCorso>();
         private int contatoreTick;
+        private StrutturaTavolo ultimaStruttura;
 
         /// <summary>Crea il sequencer per la griglia data.</summary>
         /// <param name="config">Configurazione della griglia. Non può essere null (errore di programmazione).</param>
         /// <exception cref="ArgumentNullException">Lanciata se <paramref name="config"/> è null.</exception>
         public Sequencer(ConfigGriglia config)
         {
-            this.config = config ?? throw new ArgumentNullException(nameof(config));
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
         }
 
-        /// <summary>Step corrente della griglia; zero prima del primo tick.</summary>
-        public int StepCorrente { get; private set; }
+        /// <summary>Posizione nel giro, aggiornata a ogni confine di step; prima del primo tick è il passo 0 della struttura di default.</summary>
+        public PosizioneGiro Posizione { get; private set; } = StrutturaTavolo.Default.Posizione(0);
+
+        /// <summary>Step corrente all'interno della misura; zero prima del primo tick.</summary>
+        public int StepCorrente => Posizione.StepInMisura;
 
         /// <summary>
-        /// Avanza di un tick e restituisce gli eventi prodotti. L'ordine è: note-off per le note rimosse,
-        /// note-off per le note terminate, note-on per le note che iniziano; a parità ordine per traccia e clip.
-        /// Un argomento null equivale a una lista vuota. Non restituisce mai null.
+        /// Avanza di un tick e restituisce gli eventi prodotti. Se la struttura è cambiata rispetto all'ultimo tick
+        /// si spengono per prime tutte le note in corso. Poi: note-off per le note rimosse,
+        /// note-off per le note terminate, note-on per le note che iniziano (riga attiva e step giusto);
+        /// a parità ordine per traccia, clip e riga. Un argomento null equivale a una lista vuota. Non restituisce mai null.
         /// </summary>
         /// <param name="note">Note attualmente presenti sulla griglia.</param>
-        public IReadOnlyList<EventoNota> Tick(IReadOnlyList<CartoncinoNota> note)
+        /// <param name="struttura">Struttura del giro; null equivale a <see cref="StrutturaTavolo.Default"/>.</param>
+        public IReadOnlyList<EventoNota> Tick(IReadOnlyList<CartoncinoNota> note, StrutturaTavolo struttura = null)
         {
+            struttura = struttura ?? StrutturaTavolo.Default;
             List<CartoncinoNota> noteAttive = (note ?? new List<CartoncinoNota>())
                 .Where(n => n != null)
                 .ToList();
             HashSet<string> chiaviPresenti = new HashSet<string>(noteAttive.Select(n => n.Chiave));
             List<EventoNota> eventi = new List<EventoNota>();
+
+            if (ultimaStruttura != null && !ultimaStruttura.Equals(struttura))
+            {
+                eventi.AddRange(EventiDiSpegnimento(suonanti.ToList()));
+                suonanti.Clear();
+            }
+
+            ultimaStruttura = struttura;
 
             List<NotaInCorso> rimosse = suonanti.Where(s => !chiaviPresenti.Contains(s.Chiave)).ToList();
             suonanti.RemoveAll(s => !chiaviPresenti.Contains(s.Chiave));
@@ -54,24 +71,25 @@ namespace VisualMusicBlockLooper.Core
             }
 
             int passoAssoluto = tickCorrente / TickPerStep;
-            int stepIndex = passoAssoluto % config.Step;
-            StepCorrente = stepIndex;
+            PosizioneGiro posizione = struttura.Posizione(passoAssoluto);
+            Posizione = posizione;
 
             List<NotaInCorso> terminate = suonanti.Where(s => s.PassoFine <= passoAssoluto).ToList();
             suonanti.RemoveAll(s => s.PassoFine <= passoAssoluto);
             eventi.AddRange(EventiDiSpegnimento(terminate));
 
             foreach (CartoncinoNota nota in noteAttive
-                .Where(n => n.StepIniziale == stepIndex)
+                .Where(n => n.StepIniziale == posizione.StepInMisura && posizione.RigheAttive.Contains(n.Riga))
                 .OrderBy(n => n.Traccia)
-                .ThenBy(n => n.IdClip))
+                .ThenBy(n => n.IdClip)
+                .ThenBy(n => n.Riga))
             {
                 if (suonanti.Any(s => s.Chiave == nota.Chiave))
                 {
                     continue;
                 }
 
-                int durataClampata = Math.Min(Math.Max(nota.DurataStep, 1), config.Step - nota.StepIniziale);
+                int durataClampata = Math.Min(Math.Max(nota.DurataStep, 1), struttura.StepPerMisura - nota.StepIniziale);
                 suonanti.Add(new NotaInCorso(nota.Chiave, nota.Traccia, nota.IdClip, passoAssoluto + durataClampata));
                 eventi.Add(new EventoNota(nota.Traccia, nota.IdClip, true));
             }
@@ -80,7 +98,7 @@ namespace VisualMusicBlockLooper.Core
         }
 
         /// <summary>
-        /// Spegne tutte le note in corso e riporta il sequencer allo stato iniziale (contatore e step a zero).
+        /// Spegne tutte le note in corso e riporta il sequencer allo stato iniziale (contatore e posizione a zero).
         /// </summary>
         /// <param name="noteOffPendenti">Note-off delle note che stavano suonando, per traccia e clip. Mai null.</param>
         public void Ferma(out IReadOnlyList<EventoNota> noteOffPendenti)
@@ -88,7 +106,8 @@ namespace VisualMusicBlockLooper.Core
             noteOffPendenti = EventiDiSpegnimento(suonanti.ToList());
             suonanti.Clear();
             contatoreTick = 0;
-            StepCorrente = 0;
+            ultimaStruttura = null;
+            Posizione = StrutturaTavolo.Default.Posizione(0);
         }
 
         private static List<EventoNota> EventiDiSpegnimento(IEnumerable<NotaInCorso> note)

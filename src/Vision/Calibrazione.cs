@@ -7,13 +7,27 @@ using OpenCvSharp;
 
 namespace VisualMusicBlockLooper.Vision
 {
+    /// <summary>Esito del confronto tra la risoluzione della calibrazione e quella della camera.</summary>
+    public enum EsitoRisoluzione
+    {
+        /// <summary>Le risoluzioni coincidono (o quella della camera non è nota).</summary>
+        Compatibile,
+
+        /// <summary>La calibrazione non riporta la risoluzione per cui è stata calcolata.</summary>
+        Sconosciuta,
+
+        /// <summary>La calibrazione è stata calcolata per una risoluzione diversa.</summary>
+        Diversa
+    }
+
     /// <summary>
     /// Omografia che mappa i punti dell'immagine della camera sul sistema di coordinate del tavolo.
     /// La matrice 3x3 e' memorizzata in ordine row-major come double[9].
     /// </summary>
     public sealed class Calibrazione
     {
-        private const string Intestazione = "VMBL-CAL1";
+        private const string Intestazione = "VMBL-CAL2";
+        private const string IntestazioneVecchia = "VMBL-CAL1";
         private const int NumeroPuntiMinimi = 4;
         private const int ValoriMatrice = 9;
         private const double SogliaW = 1e-12;
@@ -24,13 +38,50 @@ namespace VisualMusicBlockLooper.Vision
 
         private readonly double[] matrice;
 
-        private Calibrazione(double[] matrice)
+        private Calibrazione(double[] matrice, int larghezza, int altezza)
         {
             this.matrice = matrice;
+            Larghezza = larghezza;
+            Altezza = altezza;
         }
 
-        public static Calibrazione Calcola(PuntoImmagine[] puntiCamera, PuntoTavolo[] puntiTavolo)
+        /// <summary>Larghezza in pixel dell'immagine per cui la calibrazione è stata calcolata; 0 se ignota.</summary>
+        public int Larghezza { get; }
+
+        /// <summary>Altezza in pixel dell'immagine per cui la calibrazione è stata calcolata; 0 se ignota.</summary>
+        public int Altezza { get; }
+
+        /// <summary>
+        /// Confronta la risoluzione della calibrazione con quella attuale della camera. Con una camera di
+        /// dimensione ignota (0) non si può confrontare e l'esito è <see cref="EsitoRisoluzione.Compatibile"/>.
+        /// </summary>
+        public EsitoRisoluzione VerificaRisoluzione(int larghezzaCamera, int altezzaCamera)
         {
+            if (larghezzaCamera <= 0 || altezzaCamera <= 0)
+            {
+                return EsitoRisoluzione.Compatibile;
+            }
+
+            if (Larghezza <= 0 || Altezza <= 0)
+            {
+                return EsitoRisoluzione.Sconosciuta;
+            }
+
+            return Larghezza == larghezzaCamera && Altezza == altezzaCamera
+                ? EsitoRisoluzione.Compatibile
+                : EsitoRisoluzione.Diversa;
+        }
+
+        /// <param name="larghezza">Larghezza in pixel dell'immagine dei punti camera (0 se ignota).</param>
+        /// <param name="altezza">Altezza in pixel dell'immagine dei punti camera (0 se ignota).</param>
+        public static Calibrazione Calcola(
+            PuntoImmagine[] puntiCamera, PuntoTavolo[] puntiTavolo, int larghezza = 0, int altezza = 0)
+        {
+            if (larghezza < 0 || altezza < 0 || (larghezza == 0) != (altezza == 0))
+            {
+                throw new ArgumentException("La risoluzione deve essere nulla (ignota) o con entrambe le dimensioni positive.", nameof(larghezza));
+            }
+
             if (puntiCamera == null)
             {
                 throw new ArgumentNullException(nameof(puntiCamera));
@@ -81,7 +132,7 @@ namespace VisualMusicBlockLooper.Vision
                 throw new ArgumentException("Punti di calibrazione degeneri: impossibile calcolare l'omografia.", nameof(puntiCamera));
             }
 
-            return new Calibrazione(valori);
+            return new Calibrazione(valori, larghezza, altezza);
         }
 
         public PuntoTavolo DaCameraATavolo(PuntoImmagine p)
@@ -107,7 +158,11 @@ namespace VisualMusicBlockLooper.Vision
 
             // "G17" garantisce il round-trip esatto di un double su net472.
             string valori = string.Join(";", matrice.Select(v => v.ToString("G17", CultureInfo.InvariantCulture)));
-            File.WriteAllText(percorso, Intestazione + Environment.NewLine + valori + Environment.NewLine, Encoding.UTF8);
+            string risoluzione = Larghezza.ToString(CultureInfo.InvariantCulture) + ";" + Altezza.ToString(CultureInfo.InvariantCulture);
+            File.WriteAllText(
+                percorso,
+                Intestazione + Environment.NewLine + valori + Environment.NewLine + risoluzione + Environment.NewLine,
+                Encoding.UTF8);
         }
 
         public static Calibrazione Carica(string percorso)
@@ -126,9 +181,25 @@ namespace VisualMusicBlockLooper.Vision
                 .Where(r => r.Trim().Length > 0)
                 .ToArray();
 
-            if (righe.Length != 2 || righe[0].Trim() != Intestazione)
+            bool nuovoFormato = righe.Length > 0 && righe[0].Trim() == Intestazione;
+            bool vecchioFormato = righe.Length > 0 && righe[0].Trim() == IntestazioneVecchia;
+            if ((!nuovoFormato && !vecchioFormato) || righe.Length != (nuovoFormato ? 3 : 2))
             {
                 throw new InvalidDataException("Formato del file di calibrazione non valido: intestazione o righe inattese.");
+            }
+
+            int larghezza = 0;
+            int altezza = 0;
+            if (nuovoFormato)
+            {
+                string[] dimensioni = righe[2].Trim().Split(';');
+                if (dimensioni.Length != 2
+                    || !int.TryParse(dimensioni[0], NumberStyles.None, CultureInfo.InvariantCulture, out larghezza)
+                    || !int.TryParse(dimensioni[1], NumberStyles.None, CultureInfo.InvariantCulture, out altezza)
+                    || (larghezza == 0) != (altezza == 0))
+                {
+                    throw new InvalidDataException("Risoluzione non valida nel file di calibrazione: attese due dimensioni intere positive (o 0;0).");
+                }
             }
 
             string[] parti = righe[1].Trim().Split(';');
@@ -154,7 +225,7 @@ namespace VisualMusicBlockLooper.Vision
                 throw new InvalidDataException("Matrice di calibrazione degenere nel file.");
             }
 
-            return new Calibrazione(valori);
+            return new Calibrazione(valori, larghezza, altezza);
         }
 
         private static double[] LeggiMatrice(Mat h)

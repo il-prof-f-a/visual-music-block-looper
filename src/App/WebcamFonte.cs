@@ -9,15 +9,29 @@ namespace VisualMusicBlockLooper.App
     /// <summary>Sorgente di immagini basata sulla prima webcam; conserva l'ultimo frame per l'anteprima.</summary>
     public sealed class WebcamFonte : IFonteImmagini, IDisposable
     {
+        /// <summary>Larghezza richiesta alla webcam.</summary>
+        public const int LarghezzaRichiesta = 1280;
+
+        /// <summary>Altezza richiesta alla webcam.</summary>
+        public const int AltezzaRichiesta = 720;
+
         private readonly object bloccoCamera = new object();
         private readonly VideoCapture cattura;
         private Mat ultimoFrame;
         private bool eliminata;
 
-        private WebcamFonte(VideoCapture cattura)
+        private WebcamFonte(VideoCapture cattura, int larghezza, int altezza)
         {
             this.cattura = cattura;
+            Larghezza = larghezza;
+            Altezza = altezza;
         }
+
+        /// <summary>Larghezza reale in pixel dei frame (0 se non determinabile).</summary>
+        public int Larghezza { get; }
+
+        /// <summary>Altezza reale in pixel dei frame (0 se non determinabile).</summary>
+        public int Altezza { get; }
 
         /// <summary>Apre la webcam con l'indice dato; restituisce null se non è disponibile.</summary>
         public static WebcamFonte Apri(int indice = 0)
@@ -31,7 +45,24 @@ namespace VisualMusicBlockLooper.App
                     return null;
                 }
 
-                return new WebcamFonte(cattura);
+                // Se il driver rifiuta la risoluzione richiesta si usa quella che concede.
+                cattura.Set(VideoCaptureProperties.FrameWidth, LarghezzaRichiesta);
+                cattura.Set(VideoCaptureProperties.FrameHeight, AltezzaRichiesta);
+                int larghezza = (int)cattura.Get(VideoCaptureProperties.FrameWidth);
+                int altezza = (int)cattura.Get(VideoCaptureProperties.FrameHeight);
+                if (larghezza <= 0 || altezza <= 0)
+                {
+                    using (Mat prova = new Mat())
+                    {
+                        if (cattura.Read(prova) && !prova.Empty())
+                        {
+                            larghezza = prova.Width;
+                            altezza = prova.Height;
+                        }
+                    }
+                }
+
+                return new WebcamFonte(cattura, Math.Max(larghezza, 0), Math.Max(altezza, 0));
             }
             catch (Exception)
             {

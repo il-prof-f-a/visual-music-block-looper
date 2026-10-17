@@ -4,12 +4,37 @@ using System.Threading;
 using NUnit.Framework;
 using VisualMusicBlockLooper.App;
 using VisualMusicBlockLooper.Core;
+using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.Tests
 {
     [TestFixture]
     public class ComponentiApplicazioneTests
     {
+        [Test]
+        public void ValutaRisoluzione_ApplicaAvvisiESceglieAttivazione()
+        {
+            Calibrazione uguale = CalibrazioneConRisoluzione(1280, 720);
+            Calibrazione diversa = CalibrazioneConRisoluzione(640, 480);
+            Calibrazione ignota = CalibrazioneConRisoluzione(0, 0);
+
+            Assert.That(ApplicazioneCalibrazione.ValutaRisoluzione(uguale, 1280, 720, out string a1), Is.True);
+            Assert.That(a1, Is.Null);
+            Assert.That(ApplicazioneCalibrazione.ValutaRisoluzione(diversa, 1280, 720, out string a2), Is.False);
+            Assert.That(a2, Is.EqualTo("Calibrazione per una risoluzione diversa: rifai la calibrazione"));
+            Assert.That(ApplicazioneCalibrazione.ValutaRisoluzione(ignota, 1280, 720, out string a3), Is.True);
+            Assert.That(a3, Is.EqualTo("Calibrazione senza risoluzione: ripetila per sicurezza"));
+        }
+
+        private static Calibrazione CalibrazioneConRisoluzione(int larghezza, int altezza)
+        {
+            return Calibrazione.Calcola(
+                new[] { new PuntoImmagine(0, 0), new PuntoImmagine(100, 0), new PuntoImmagine(100, 100), new PuntoImmagine(0, 100) },
+                new[] { new PuntoTavolo(0, 0), new PuntoTavolo(1, 0), new PuntoTavolo(1, 1), new PuntoTavolo(0, 1) },
+                larghezza,
+                altezza);
+        }
+
         private sealed class UscitaContaClock : IUscitaMidi
         {
             private int clock;

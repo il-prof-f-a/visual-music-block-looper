@@ -33,7 +33,11 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Area di default della griglia musicale.</summary>
         public static RettangoloTavolo AreaGrigliaDefault { get; } = new RettangoloTavolo(0.15, 0.04, 0.67, 0.92);
 
-        /// <summary>Layout con le sole zone comandi: le tre zone speciali restano vuote e non raggiungibili.</summary>
+        /// <summary>
+        /// Layout con le sole zone comandi: le tre zone speciali restano vuote e non raggiungibili.
+        /// Il sentinella (-1, -1, 0, 0) assume coordinate normalizzate (0..1): un centro di cartoncino
+        /// (sempre >= 0) non può cadere in una zona vuota con quelle coordinate.
+        /// </summary>
         public static LayoutTavolo ConSoloComandi(RettangoloTavolo comandi)
         {
             return new LayoutTavolo(ZonaVuota, ZonaVuota, ZonaVuota, comandi);

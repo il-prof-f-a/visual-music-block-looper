@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -215,6 +216,194 @@ namespace VisualMusicBlockLooper.Tests
                 form.Aggiorna(StatoCon(), 2, true);
                 form.Aggiorna(null, 0, false);
                 Assert.That(form.Visible, Is.False);
+            }
+            finally
+            {
+                form.Dispose();
+            }
+        }
+
+        // --- Tavolo con zone, gruppi e giro: geometria calcolata dall'area di default su 1280x720 ---
+        private const double GrigliaX = 0.15 * 1280;
+        private const double GrigliaY = 0.04 * 720;
+        private const double CellaL = 0.67 * 1280 / 16;
+        private const double CellaA = 0.92 * 720 / 6;
+
+        private static readonly int Bianco = Color.White.ToArgb();
+
+        private static ConfigGriglia ConfigTavolo()
+        {
+            return new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+        }
+
+        private static StatoTavolo StatoStruttura(int battiti, int collegate, int a, int b)
+        {
+            Assert.That(StrutturaTavolo.TryCrea(battiti, collegate, a, b, out StrutturaTavolo s), Is.True);
+            return new StatoTavolo(null, null, null, s);
+        }
+
+        private static Bitmap DisegnaTavolo(StatoTavolo stato, PosizioneGiro posizione, bool inEsecuzione)
+        {
+            var bmp = new Bitmap(Dimensione.Width, Dimensione.Height);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                new RenderGuida(ConfigTavolo(), LayoutTavolo.Default).Disegna(g, Dimensione, stato, posizione, inEsecuzione);
+            }
+
+            return bmp;
+        }
+
+        private static Point CentroTavolo(int riga, int colonna)
+        {
+            return new Point((int)(GrigliaX + (colonna + 0.5) * CellaL), (int)(GrigliaY + (riga + 0.5) * CellaA));
+        }
+
+        private static bool BordoSinistroDisegnato(Bitmap bmp, RettangoloTavolo zona)
+        {
+            int xAtteso = (int)Math.Round(zona.X * 1280);
+            int y = (int)Math.Round((zona.Y + zona.Altezza / 2) * 720);
+            for (int x = xAtteso - 2; x <= xAtteso + 2; x++)
+            {
+                if (bmp.GetPixel(x, y).ToArgb() != Bianco) return true;
+            }
+
+            return false;
+        }
+
+        [Test]
+        public void ZoneDisegnate()
+        {
+            using (Bitmap bmp = DisegnaTavolo(null, new PosizioneGiro(0, 0, new[] { 0 }), false))
+            {
+                Assert.That(BordoSinistroDisegnato(bmp, LayoutTavolo.Default.Misura), Is.True);
+                Assert.That(BordoSinistroDisegnato(bmp, LayoutTavolo.Default.Collegamento), Is.True);
+                Assert.That(BordoSinistroDisegnato(bmp, LayoutTavolo.Default.Ab), Is.True);
+            }
+        }
+
+        [Test]
+        public void EtichettaMisuraDisegnata()
+        {
+            using (Bitmap bmp = DisegnaTavolo(null, new PosizioneGiro(0, 0, new[] { 0 }), false))
+            {
+                RettangoloTavolo z = LayoutTavolo.Default.Misura;
+                int x0 = (int)(z.X * 1280) + 6, x1 = (int)((z.X + z.Larghezza) * 1280) - 6;
+                int y0 = (int)(z.Y * 720) + 6, y1 = (int)((z.Y + z.Altezza) * 720) - 6;
+                bool trovato = false;
+                for (int y = y0; y <= y1 && !trovato; y++)
+                {
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        if (bmp.GetPixel(x, y).ToArgb() != Bianco) { trovato = true; break; }
+                    }
+                }
+
+                Assert.That(trovato, Is.True);
+            }
+        }
+
+        [Test]
+        public void SenzaLayout_NessunaZonaDisegnata()
+        {
+            using (Bitmap bmp = Disegna(ConfigTavolo(), null, 0, false))
+            {
+                Assert.That(BordoSinistroDisegnato(bmp, LayoutTavolo.Default.Misura), Is.False);
+            }
+        }
+
+        [Test]
+        public void ColonneOltreLaMisuraOscurate()
+        {
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(3, 6, 1, 6), new PosizioneGiro(0, 0, new[] { 3 }), false))
+            {
+                Point p = CentroTavolo(0, 12);
+                Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
+                Point q = CentroTavolo(0, 4);
+                Assert.That(bmp.GetPixel(q.X, q.Y).ToArgb(), Is.EqualTo(Bianco));
+            }
+        }
+
+        [Test]
+        public void RigheFuoriDaAbAttenuate()
+        {
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 3, 2, 3), new PosizioneGiro(0, 0, new[] { 1, 4 }), false))
+            {
+                int attenuato = Color.FromArgb(255, 240, 240, 240).ToArgb();
+                Point p0 = CentroTavolo(0, 5), p1 = CentroTavolo(1, 5), p3 = CentroTavolo(3, 5), p4 = CentroTavolo(4, 5);
+                Assert.That(bmp.GetPixel(p0.X, p0.Y).ToArgb(), Is.EqualTo(attenuato));
+                Assert.That(bmp.GetPixel(p1.X, p1.Y).ToArgb(), Is.EqualTo(Bianco));
+                Assert.That(bmp.GetPixel(p3.X, p3.Y).ToArgb(), Is.EqualTo(attenuato));
+                Assert.That(bmp.GetPixel(p4.X, p4.Y).ToArgb(), Is.EqualTo(Bianco));
+            }
+        }
+
+        [Test]
+        public void PlayheadSoloNelleRigheAttive()
+        {
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 2), new PosizioneGiro(3, 0, new[] { 1, 3, 5 }), true))
+            {
+                foreach (int riga in new[] { 1, 3, 5 })
+                {
+                    Point p = CentroTavolo(riga, 3);
+                    Color c = bmp.GetPixel(p.X, p.Y);
+                    Assert.That(c.R, Is.EqualTo(255), "riga " + riga);
+                    Assert.That(c.B, Is.LessThan(200), "riga " + riga);
+                }
+
+                foreach (int riga in new[] { 0, 2, 4 })
+                {
+                    Point p = CentroTavolo(riga, 3);
+                    Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Bianco), "riga " + riga);
+                }
+            }
+        }
+
+        [Test]
+        public void OverloadVecchio_TutteLeRigheAttive()
+        {
+            using (Bitmap bmp = Disegna(ConfigTavolo(), null, 3, true))
+            {
+                for (int riga = 0; riga < 6; riga++)
+                {
+                    Point p = CentroTavolo(riga, 3);
+                    Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.Not.EqualTo(Bianco), "riga " + riga);
+                }
+            }
+        }
+
+        [Test]
+        public void BarreDiGruppo()
+        {
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 2), new PosizioneGiro(0, 0, new[] { 0, 2, 4 }), false))
+            {
+                int x = (int)(GrigliaX - 10);
+                int unione = (int)Math.Round(GrigliaY + CellaA);
+                int stacco = (int)Math.Round(GrigliaY + 2 * CellaA);
+                Assert.That(bmp.GetPixel(x, unione).ToArgb(), Is.EqualTo(Color.FromArgb(255, 70, 130, 180).ToArgb()));
+                Assert.That(bmp.GetPixel(x, stacco).ToArgb(), Is.EqualTo(Bianco));
+                Assert.That(bmp.GetPixel(x, stacco + 4).ToArgb(), Is.EqualTo(Color.FromArgb(255, 120, 170, 210).ToArgb()));
+            }
+        }
+
+        [Test]
+        public void StrutturaDelloStatoUsata()
+        {
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(2, 6, 1, 6), new PosizioneGiro(0, 0, new[] { 0 }), false))
+            {
+                Point p = CentroTavolo(2, 9);
+                Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
+            }
+        }
+
+        [Test]
+        public void FormProiettore_ConservaLaStrutturaNellaCopia()
+        {
+            var form = new FormProiettore(ConfigTavolo(), LayoutTavolo.Default);
+            try
+            {
+                StatoTavolo origine = StatoStruttura(3, 2, 1, 2);
+                form.Aggiorna(origine, 0, false);
+                Assert.That(form.StatoCorrente.Struttura, Is.EqualTo(origine.Struttura));
             }
             finally
             {

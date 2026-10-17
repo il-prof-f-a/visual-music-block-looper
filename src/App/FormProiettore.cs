@@ -18,13 +18,13 @@ namespace VisualMusicBlockLooper.App
         private readonly object bloccoStato = new object();
         private readonly RenderGuida renderGuida;
         private StatoTavolo stato;
-        private int stepCorrente;
+        private PosizioneGiro posizione;
         private bool inEsecuzione;
 
         /// <summary>Crea la form per la griglia indicata. Non viene mostrata.</summary>
-        public FormProiettore(ConfigGriglia config)
+        public FormProiettore(ConfigGriglia config, LayoutTavolo layout = null)
         {
-            renderGuida = new RenderGuida(config ?? throw new ArgumentNullException(nameof(config)));
+            renderGuida = new RenderGuida(config ?? throw new ArgumentNullException(nameof(config)), layout);
 
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
@@ -55,6 +55,12 @@ namespace VisualMusicBlockLooper.App
         /// </summary>
         public void Aggiorna(StatoTavolo nuovoStato, int nuovoStep, bool nuovaEsecuzione)
         {
+            Aggiorna(nuovoStato, new PosizioneGiro(nuovoStep, 0, TutteLeRighe()), nuovaEsecuzione);
+        }
+
+        /// <summary>Come <see cref="Aggiorna(StatoTavolo, int, bool)"/>, con la posizione completa del giro.</summary>
+        public void Aggiorna(StatoTavolo nuovoStato, PosizioneGiro nuovaPosizione, bool nuovaEsecuzione)
+        {
             StatoTavolo copia = CopiaStato(nuovoStato);
 
             lock (bloccoStato)
@@ -65,7 +71,7 @@ namespace VisualMusicBlockLooper.App
                 }
 
                 stato = copia;
-                stepCorrente = nuovoStep;
+                posizione = nuovaPosizione;
                 inEsecuzione = nuovaEsecuzione;
             }
 
@@ -108,17 +114,34 @@ namespace VisualMusicBlockLooper.App
         protected override void OnPaint(PaintEventArgs e)
         {
             StatoTavolo statoCorrente;
-            int stepDisegnato;
+            PosizioneGiro posizioneDisegnata;
             bool esecuzione;
 
             lock (bloccoStato)
             {
                 statoCorrente = stato;
-                stepDisegnato = stepCorrente;
+                posizioneDisegnata = posizione;
                 esecuzione = inEsecuzione;
             }
 
-            renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, stepDisegnato, esecuzione);
+            renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
+        }
+
+        /// <summary>Stato attualmente proiettato (copia interna), null se non ancora impostato.</summary>
+        public StatoTavolo StatoCorrente
+        {
+            get
+            {
+                lock (bloccoStato)
+                {
+                    return stato;
+                }
+            }
+        }
+
+        private static int[] TutteLeRighe()
+        {
+            return new[] { 0, 1, 2, 3, 4, 5 };
         }
 
         private static StatoTavolo CopiaStato(StatoTavolo origine)
@@ -131,7 +154,8 @@ namespace VisualMusicBlockLooper.App
             return new StatoTavolo(
                 new List<CartoncinoNota>(origine.Note),
                 new List<ComandoRilevato>(origine.Comandi),
-                new List<ErroreTavolo>(origine.Errori));
+                new List<ErroreTavolo>(origine.Errori),
+                origine.Struttura);
         }
     }
 }

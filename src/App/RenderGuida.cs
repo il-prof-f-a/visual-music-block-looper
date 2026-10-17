@@ -19,12 +19,41 @@ namespace VisualMusicBlockLooper.App
         private static readonly Color ColoreErrore = Color.FromArgb(255, 220, 30, 30);
         private static readonly Color ColoreErroreFondo = Color.FromArgb(60, 255, 120, 120);
 
-        private readonly ConfigGriglia config;
+        private static readonly Color ColoreColonnaOltreMisura = Color.FromArgb(255, 215, 215, 215);
+        private static readonly Color ColoreRigaFuoriAb = Color.FromArgb(255, 240, 240, 240);
+        private static readonly Color ColoreBarraA = Color.FromArgb(255, 70, 130, 180);
+        private static readonly Color ColoreBarraB = Color.FromArgb(255, 120, 170, 210);
+        private static readonly Color ColoreContornoZona = Color.FromArgb(255, 128, 128, 128);
+        private static readonly Color ColoreTesto = Color.DarkGray;
 
-        /// <summary>Crea il renderer per la griglia data. Non può essere null.</summary>
-        public RenderGuida(ConfigGriglia config)
+        private const int LarghezzaBarra = 6;
+        private const int DistanzaBarra = 10;
+
+        private readonly ConfigGriglia config;
+        private readonly LayoutTavolo layout;
+
+        /// <summary>
+        /// Crea il renderer per la griglia data. Con <paramref name="layout"/> null non vengono
+        /// disegnate le zone speciali.
+        /// </summary>
+        public RenderGuida(ConfigGriglia config, LayoutTavolo layout = null)
         {
             this.config = config ?? throw new ArgumentNullException(nameof(config));
+            this.layout = layout;
+        }
+
+        /// <summary>
+        /// Disegna la guida con tutte le righe attive (playhead su ogni riga della colonna indicata).
+        /// </summary>
+        public void Disegna(Graphics g, Size dimensione, StatoTavolo stato, int stepCorrente, bool inEsecuzione)
+        {
+            var righe = new int[Math.Max(config.Tracce, 0)];
+            for (int i = 0; i < righe.Length; i++)
+            {
+                righe[i] = i;
+            }
+
+            Disegna(g, dimensione, stato, new PosizioneGiro(stepCorrente, 0, righe), inEsecuzione);
         }
 
         /// <summary>
@@ -33,17 +62,29 @@ namespace VisualMusicBlockLooper.App
         /// <param name="g">Superficie di disegno.</param>
         /// <param name="dimensione">Dimensione in pixel della superficie.</param>
         /// <param name="stato">Stato del tavolo, può essere null.</param>
-        /// <param name="stepCorrente">Step indicato dal playhead.</param>
+        /// <param name="posizione">Posizione del giro: colonna del playhead e righe attive.</param>
         /// <param name="inEsecuzione">True se la sequenza è in esecuzione: il playhead viene riempito.</param>
-        public void Disegna(Graphics g, Size dimensione, StatoTavolo stato, int stepCorrente, bool inEsecuzione)
+        public void Disegna(Graphics g, Size dimensione, StatoTavolo stato, PosizioneGiro posizione, bool inEsecuzione)
         {
             if (g == null)
             {
                 throw new ArgumentNullException(nameof(g));
             }
 
+            if (posizione == null)
+            {
+                throw new ArgumentNullException(nameof(posizione));
+            }
+
             g.SmoothingMode = SmoothingMode.None;
             g.Clear(Color.White);
+
+            StrutturaTavolo struttura = stato?.Struttura ?? StrutturaTavolo.Default;
+
+            if (layout != null)
+            {
+                DisegnaZone(g, dimensione, struttura);
+            }
 
             if (config.Tracce <= 0 || config.Step <= 0)
             {
@@ -52,56 +93,145 @@ namespace VisualMusicBlockLooper.App
 
             Rectangle griglia = InPixel(config.Area, dimensione);
 
-            DisegnaCelleLibere(g, griglia);
-            DisegnaPlayhead(g, griglia, stepCorrente, inEsecuzione);
-            DisegnaNote(g, griglia, stato);
+            DisegnaCelle(g, griglia, struttura);
+            DisegnaBarreGruppo(g, griglia, struttura);
+            DisegnaPlayhead(g, griglia, posizione, inEsecuzione);
+            DisegnaNote(g, griglia, stato, struttura);
             DisegnaErrori(g, dimensione, stato);
         }
 
-        private void DisegnaCelleLibere(Graphics g, Rectangle griglia)
+        private void DisegnaCelle(Graphics g, Rectangle griglia, StrutturaTavolo struttura)
         {
             using (var penna = new Pen(ColoreGriglia, 1))
+            using (var fondoOltreMisura = new SolidBrush(ColoreColonnaOltreMisura))
+            using (var fondoFuoriAb = new SolidBrush(ColoreRigaFuoriAb))
             {
                 for (int traccia = 0; traccia < config.Tracce; traccia++)
                 {
+                    int posizioneNelGruppo = traccia % struttura.RigheCollegate + 1;
+                    bool fuoriAb = posizioneNelGruppo < struttura.AInizio || posizioneNelGruppo > struttura.AFine;
+
                     for (int step = 0; step < config.Step; step++)
                     {
-                        g.DrawRectangle(penna, CellaRect(griglia, traccia, step));
+                        Rectangle cella = CellaRect(griglia, traccia, step);
+                        if (step >= struttura.StepPerMisura)
+                        {
+                            g.FillRectangle(fondoOltreMisura, cella);
+                        }
+                        else if (fuoriAb)
+                        {
+                            g.FillRectangle(fondoFuoriAb, cella);
+                        }
+
+                        g.DrawRectangle(penna, cella);
                     }
                 }
             }
         }
 
-        private void DisegnaPlayhead(Graphics g, Rectangle griglia, int stepCorrente, bool inEsecuzione)
+        private void DisegnaBarreGruppo(Graphics g, Rectangle griglia, StrutturaTavolo struttura)
         {
-            if (stepCorrente < 0 || stepCorrente >= config.Step)
+            int sinistra = griglia.X - DistanzaBarra - LarghezzaBarra / 2;
+            using (var carattere = new Font(FontFamily.GenericSansSerif, 9))
+            using (var pennelloTesto = new SolidBrush(Color.DarkSlateGray))
+            using (var formato = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center })
             {
-                return;
-            }
-
-            var colonna = Rectangle.FromLTRB(
-                BordoX(griglia, stepCorrente),
-                griglia.Y,
-                BordoX(griglia, stepCorrente + 1),
-                griglia.Bottom);
-
-            if (inEsecuzione)
-            {
-                using (var pennello = new SolidBrush(ColorePlayhead))
+                for (int gruppo = 0; gruppo < struttura.NumeroGruppi; gruppo++)
                 {
-                    g.FillRectangle(pennello, colonna);
+                    int primaRiga = gruppo * struttura.RigheCollegate;
+                    if (primaRiga >= config.Tracce)
+                    {
+                        break;
+                    }
+
+                    int ultimaRiga = Math.Min(primaRiga + struttura.RigheCollegate, config.Tracce);
+                    // Un pixel di scarto sopra e sotto: tra gruppi consecutivi resta un vuoto di 2 px.
+                    var barra = Rectangle.FromLTRB(
+                        sinistra, BordoY(griglia, primaRiga) + 1, sinistra + LarghezzaBarra, BordoY(griglia, ultimaRiga) - 1);
+                    using (var pennello = new SolidBrush(gruppo % 2 == 0 ? ColoreBarraA : ColoreBarraB))
+                    {
+                        g.FillRectangle(pennello, barra);
+                    }
                 }
-            }
-            else
-            {
-                using (var penna = new Pen(ColoreContornoPlayhead, 1))
+
+                for (int riga = 0; riga < config.Tracce; riga++)
                 {
-                    g.DrawRectangle(penna, colonna);
+                    var testo = new RectangleF(
+                        sinistra - 40, BordoY(griglia, riga), 37, BordoY(griglia, riga + 1) - BordoY(griglia, riga));
+                    g.DrawString((riga + 1).ToString(), carattere, pennelloTesto, testo, formato);
                 }
             }
         }
 
-        private void DisegnaNote(Graphics g, Rectangle griglia, StatoTavolo stato)
+        private void DisegnaZone(Graphics g, Size dimensione, StrutturaTavolo struttura)
+        {
+            DisegnaZona(g, dimensione, layout.Misura, "MISURA", struttura.BattitiPerMisura + "/4");
+            DisegnaZona(g, dimensione, layout.Collegamento, "COLLEGA", struttura.RigheCollegate + " righe");
+            DisegnaZona(g, dimensione, layout.Ab, "A-B", struttura.AInizio + "-" + struttura.AFine);
+            DisegnaZona(g, dimensione, layout.Comandi, "COMANDI", null);
+        }
+
+        private static void DisegnaZona(Graphics g, Size dimensione, RettangoloTavolo zona, string etichetta, string valore)
+        {
+            if (zona.Larghezza <= 0 || zona.Altezza <= 0)
+            {
+                return;
+            }
+
+            Rectangle area = InPixel(zona, dimensione);
+            using (var penna = new Pen(ColoreContornoZona, 2))
+            using (var pennelloTesto = new SolidBrush(ColoreTesto))
+            using (var carattere = new Font(FontFamily.GenericSansSerif, 10, FontStyle.Bold))
+            using (var carattereValore = new Font(FontFamily.GenericSansSerif, 11))
+            using (var formato = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near })
+            {
+                g.DrawRectangle(penna, area);
+
+                var testoEtichetta = new RectangleF(area.X + 4, area.Y + 6, Math.Max(area.Width - 8, 1), Math.Max(area.Height - 12, 1));
+                g.DrawString(etichetta, carattere, pennelloTesto, testoEtichetta, formato);
+
+                if (valore != null)
+                {
+                    float sotto = g.MeasureString(etichetta, carattere).Height + 10;
+                    var testoValore = new RectangleF(
+                        area.X + 4, area.Y + sotto, Math.Max(area.Width - 8, 1), Math.Max(area.Height - sotto - 4, 1));
+                    g.DrawString(valore, carattereValore, pennelloTesto, testoValore, formato);
+                }
+            }
+        }
+
+        private void DisegnaPlayhead(Graphics g, Rectangle griglia, PosizioneGiro posizione, bool inEsecuzione)
+        {
+            int colonna = posizione.StepInMisura;
+            if (colonna < 0 || colonna >= config.Step || posizione.RigheAttive == null)
+            {
+                return;
+            }
+
+            using (var pennello = new SolidBrush(ColorePlayhead))
+            using (var penna = new Pen(ColoreContornoPlayhead, 1))
+            {
+                foreach (int riga in posizione.RigheAttive)
+                {
+                    if (riga < 0 || riga >= config.Tracce)
+                    {
+                        continue;
+                    }
+
+                    Rectangle cella = CellaRect(griglia, riga, colonna);
+                    if (inEsecuzione)
+                    {
+                        g.FillRectangle(pennello, cella);
+                    }
+                    else
+                    {
+                        g.DrawRectangle(penna, cella);
+                    }
+                }
+            }
+        }
+
+        private void DisegnaNote(Graphics g, Rectangle griglia, StatoTavolo stato, StrutturaTavolo struttura)
         {
             if (stato == null)
             {
@@ -115,13 +245,13 @@ namespace VisualMusicBlockLooper.App
                 {
                     if (nota == null
                         || nota.Traccia < 0 || nota.Traccia >= config.Tracce
-                        || nota.StepIniziale < 0 || nota.StepIniziale >= config.Step)
+                        || nota.StepIniziale < 0 || nota.StepIniziale >= Math.Min(config.Step, struttura.StepPerMisura))
                     {
                         continue;
                     }
 
                     // Durata troncata a fine griglia: oltre il bordo la nota non viene disegnata.
-                    int durata = Math.Min(Math.Max(nota.DurataStep, 1), config.Step - nota.StepIniziale);
+                    int durata = Math.Min(Math.Max(nota.DurataStep, 1), Math.Min(config.Step, struttura.StepPerMisura) - nota.StepIniziale);
                     var area = Rectangle.FromLTRB(
                         BordoX(griglia, nota.StepIniziale),
                         BordoY(griglia, nota.Traccia),

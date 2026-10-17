@@ -30,6 +30,9 @@ namespace VisualMusicBlockLooper.Midi
             this.configurazione = configurazione;
         }
 
+        /// <summary>Configurazione da cui la mappatura è derivata (nomi delle porte compresi).</summary>
+        public ConfigurazioneMidi Configurazione => configurazione;
+
         /// <summary>Carica la mappatura da un file JSON.</summary>
         /// <param name="percorso">Percorso del file di configurazione.</param>
         public static MappaturaMidiJson Carica(string percorso)

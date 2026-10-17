@@ -25,6 +25,7 @@ namespace VisualMusicBlockLooper.Core
         private readonly TapTempo tapTempo = new TapTempo();
         private readonly List<OneShotPendente> oneShotPendenti = new List<OneShotPendente>();
         private List<CartoncinoNota> noteCorrenti = new List<CartoncinoNota>();
+        private StrutturaTavolo struttura = StrutturaTavolo.Default;
         private long ultimoClock;
 
         /// <summary>
@@ -76,6 +77,7 @@ namespace VisualMusicBlockLooper.Core
             lock (bloccoLock)
             {
                 noteCorrenti = stato == null ? new List<CartoncinoNota>() : new List<CartoncinoNota>(stato.Note);
+                struttura = stato?.Struttura ?? StrutturaTavolo.Default;
                 if (stato == null)
                 {
                     return;
@@ -182,6 +184,30 @@ namespace VisualMusicBlockLooper.Core
                 lock (bloccoLock)
                 {
                     return sequencer.StepCorrente;
+                }
+            }
+        }
+
+        /// <summary>Posizione nel giro (thread-safe); passo 0 prima del primo tick o dopo l'arresto.</summary>
+        public PosizioneGiro Posizione
+        {
+            get
+            {
+                lock (bloccoLock)
+                {
+                    return sequencer.Posizione;
+                }
+            }
+        }
+
+        /// <summary>Ultima struttura ricevuta con <see cref="AggiornaTavolo"/> (thread-safe); di default <see cref="StrutturaTavolo.Default"/>.</summary>
+        public StrutturaTavolo Struttura
+        {
+            get
+            {
+                lock (bloccoLock)
+                {
+                    return struttura;
                 }
             }
         }
@@ -319,7 +345,7 @@ namespace VisualMusicBlockLooper.Core
 
         private void AvanzaSequencer()
         {
-            foreach (EventoNota evento in sequencer.Tick(noteCorrenti))
+            foreach (EventoNota evento in sequencer.Tick(noteCorrenti, struttura))
             {
                 int canale = mappatura.Canale(evento.Traccia);
                 int nota = mappatura.Nota(evento.IdClip);

@@ -13,7 +13,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 | Ableton Live | Con preferenze MIDI accessibili (sezione Link/Tempo/MIDI). |
 | Webcam | All'avvio si apre la webcam indicata in `configurazione.json` (la prima, se il file non c'è). Si cambia dalla lista "Webcam" della finestra di controllo. Non deve essere usata da altre app (Teams, OBS, Zoom). |
 | Proiettore | Su secondo schermo, meglio in modalità "solo secondo schermo" (estendi). |
-| Cartoncini | Stampati a 100% da `assets/cartoncini/` (6 colori x 8 clip, 5 comandi). |
+| Cartoncini | Stampati a 100% da `assets/cartoncini/` (6 colori x 8 clip, 5 comandi, 22 speciali per misura, collegamento e A-B). |
 
 ## 2. Installazione loopMIDI
 
@@ -97,8 +97,8 @@ Passi in Ableton:
 
 Riferimenti per il controllo, tutti sulla guida proiettata:
 
-- La griglia è di **6 tracce x 16 step**; la traccia è determinata dalla riga (dal centro verticale del cartoncino) e il colore del cartoncino deve corrispondere alla riga.
-- Lo step iniziale è determinato dal bordo sinistro del cartoncino. La durata è la larghezza in passi (30 mm per passo).
+- La griglia è di **6 righe x 16 colonne**. La riga è determinata dal centro verticale del cartoncino; il colore determina lo strumento (canale MIDI) e non è più legato alla riga. Nella stessa riga si possono mescolare colori diversi (sezione 12).
+- Lo step iniziale è determinato dal bordo sinistro del cartoncino. La durata è la larghezza in passi (30 mm per passo nei cartoncini stampati: la scala con la nuova griglia è in sezione 12).
 - La nota viene riconosciuta (verde sulla guida) dopo circa 3 frame consecutivi e rimossa dopo circa 5 frame di assenza.
 
 Procedura:
@@ -106,7 +106,7 @@ Procedura:
 1. Posare un cartoncino rosso `nota-rosso-0.png` nel primo step della riga 1. La guida lo mostra verde.
 2. Premere **Avvia** (modo Master). Ad ogni passaggio del playhead la nota viene inviata: in Ableton il clip deve partire e la nota MIDI 36 canale 1 deve apparire nel monitor MIDI.
 3. Rimuovere il cartoncino: la nota si spegne (note-off) alla fine della sua durata.
-4. Ripetere la verifica per ciascuno dei sei colori (una traccia per colore).
+4. Ripetere la verifica per ciascuno dei sei colori (un canale per colore). Con il default le sei righe suonano in sequenza: per sentire più righe insieme posare il cartoncino «1 riga» (sezione 12).
 5. Errori: un cartoncino non valido sulla griglia è segnato in rosso sulla guida (vedi sezione 9).
 
 ## 8. Modo Master e Slave
@@ -153,9 +153,10 @@ La guida segnala in rosso (contorno e fondo chiaro) i cartoncini scartati. Il mo
 |---|---|---|
 | Payload non valido | QR non leggibile o payload non previsto (nota nella zona comandi, comando nella griglia). | Verificare il cartoncino e la sua posizione. |
 | Colore mancante | Il colore non è abbastanza saturo (saturazione < 35%) o troppo scuro (valore < 25%). Succede con il proiettore sovraesposto. | Ridurre la luce ambiente, abbassare la luminosità del proiettore, usare cartoncini stampati più saturi. |
-| Colore incoerente | Il colore non corrisponde alla riga del cartoncino. | Spostare il cartoncino nella riga del suo colore. |
-| Sovrapposto | Due note sulla stessa traccia si sovrappongono nei passi. | Spostare o accorciare una delle due note. |
-| Fuori griglia | Cartoncino fuori dalla griglia (ad esempio oltre la riga 6 o prima del primo step). | Riposizionare il cartoncino. |
+| Sovrapposto | Due note dello stesso colore sulla stessa riga si sovrappongono nei passi, oppure due cartoncini speciali nella stessa zona. | Spostare o accorciare una delle due note; lasciare un solo cartoncino per zona. |
+| Fuori griglia | Cartoncino fuori dalla griglia (ad esempio oltre la riga 6 o prima del primo step), oppure una nota posata nella colonna sinistra. | Riposizionare il cartoncino. |
+| Impostazione non valida | Cartoncino speciale con un valore non ammesso (ad esempio `MISURA 5`), o A-B non compatibile con il collegamento (ad esempio B oltre le righe collegate). Il parametro torna al default. | Usare un cartoncino della tabella di sezione 12. |
+| Fuori misura | Nota che inizia in una colonna oscurata (in 3/4 dalla colonna 13, in 2/4 dalla colonna 9). | Spostare la nota nelle colonne attive, o usare 4/4. |
 
 Colori di riferimento (corpo, RGB): Rosso 220/40/40, Arancione 255/140/0, Giallo 250/210/0, Verde 40/160/70, Blu 30/90/200, Viola 130/50/170. La classificazione è per tonalità HSV (intervalli in `ClassificatoreColore`): prima della prova completa, verificare il riconoscimento con un cartoncino per colore, sotto la luce reale del proiettore.
 
@@ -164,7 +165,7 @@ Colori di riferimento (corpo, RGB): Rosso 220/40/40, Arancione 255/140/0, Giallo
 Latenza attesa, dalla struttura del codice (da verificare sul banco):
 
 - Ciclo di cattura: circa 66 ms per fotogramma (circa 15 fps).
-- Stabilizzazione: una nota diventa stabile dopo 3 frame consecutivi (circa 200 ms), e resta attiva finché non è assente per 5 frame.
+- Stabilizzazione: una nota diventa stabile dopo 3 frame consecutivi (circa 200 ms), e resta attiva finché non è assente per 5 frame. La struttura (misura, collegamento, A-B) cambia solo dopo 3 frame consecutivi con lo stesso valore: un cartoncino speciale coperto per un frame o due non fa tornare al default.
 - Clock Master: un tick ogni 60000 / (BPM x 24) ms. A 120 BPM un passo (6 tick) dura circa 125 ms.
 
 Misura suggerita (con registrazione audio):
@@ -188,6 +189,64 @@ Misura suggerita (con registrazione audio):
 | Colore sbagliato o non riconosciuto | Vedi sezione 9 (proiettore sovraesposto, saturazione bassa). | Vedi tabella della sezione 9. |
 | Ableton non parte o non segue il clock | Sync non abilitato sulla porta `VMBL`. | Verificare le preferenze MIDI di Ableton (sezione 8). |
 
+## 12. Modello a righe e cartoncini speciali
+
+Il tavolo non ha più «sei tracce con un colore fisso per riga». Il modello è questo:
+
+- **Riga = misura.** Ogni riga contiene una misura: 4/4 (16 sedicesimi, default), 3/4 (12) o 2/4 (8). Con 3/4 e 2/4 le colonne oltre la misura sono oscurate e le note che vi iniziano sono scartate (`FuoriMisura`).
+- **Colore = strumento.** Il colore del cartoncino sceglie il canale MIDI (mappatura di sezione 6). Nella stessa riga si possono mescolare colori diversi. Due cartoncini dello stesso colore non possono sovrapporsi nei passi; colori diversi sì.
+- **Gruppi.** Il collegamento divide le 6 righe in gruppi consecutivi. Dentro un gruppo le righe suonano in sequenza, misura dopo misura. Gruppi diversi suonano in contemporanea, sempre sincronizzati.
+- **A-B.** Il giro ripete solo le righe da A a B, numerate dentro il gruppo a partire da 1. Si usa con collegamento 2, 3 o 6.
+
+### Cartoncini speciali e dove posarli
+
+Sono 22 cartoncini (`assets/cartoncini/speciale-*.png`). Si posano nella colonna a sinistra della griglia, con il centro del cartoncino nella zona giusta:
+
+| Zona | Cartoncini | Valori |
+|---|---|---|
+| Misura (in alto) | `speciale-misura-2`, `-3`, `-4` | 2/4, 3/4, 4/4 |
+| Collegamento (al centro) | `speciale-link-1`, `-2`, `-3`, `-6` | 1, 2, 3 o 6 righe per gruppo |
+| A-B (in basso) | `speciale-ab-1-2` ... `speciale-ab-5-6` (15 file) | coppie A-B con 1 ≤ A < B ≤ 6 |
+
+- Per ogni zona vale un solo cartoncino. Se ne sono posati più d'uno vale quello più in alto (poi quello più a sinistra); gli altri sono segnalati come sovrapposti e ignorati.
+- Un A-B con B oltre le righe collegate (per esempio `AB 2-5` con collegamento 3), o con collegamento a 1 riga, è scartato come `ImpostazioneNonValida` e si usa il default dell'A-B.
+- Un cartoncino di nota posato nelle zone speciali è segnalato come `FuoriGriglia`; un cartoncino speciale nella griglia o nella zona comandi è segnalato come `PayloadNonValido`.
+
+### Default
+
+Senza cartoncini speciali (o con cartoncini non validi) vale il **default**: **4/4**, **6 righe collegate in sequenza**, **A-B 1-6**. Le sei righe suonano una dopo l'altra, misura per misura, e il giro dura sei misure.
+
+> **Attenzione: il default è cambiato.** Il comportamento precedente suonava le sei righe in parallelo, ognuna in loop su una sola misura. Per ottenerlo ora posare il cartoncino `speciale-link-1.png` nella zona Collegamento.
+
+### Esempi da provare
+
+| Cartoncini posati | Cosa deve accadere (numeri di riga come nella guida, da 1) |
+|---|---|
+| Nessuno | 4/4, sei righe in sequenza: 1, poi 2, ..., poi 6, poi di nuovo 1. |
+| `speciale-link-1` | 4/4, sei righe in parallelo, ciascuna una misura in loop (il comportamento precedente). |
+| `speciale-link-2` | Tre coppie. Misura 1: righe 1, 3, 5 insieme. Misura 2: righe 2, 4, 6 insieme. Poi di nuovo. |
+| `speciale-link-3` + `speciale-ab-2-3` | Due terne. Il giro dura due misure: misura 1 con le righe 2 e 5, misura 2 con le righe 3 e 6. Le righe 1 e 4 non suonano mai. |
+| `speciale-misura-3` | Misure da 3/4: le colonne 13-16 sono oscurate, le note che vi iniziano sono scartate. |
+
+### Scala fisica dei cartoncini
+
+La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step proiettato è circa il 16% più stretto. I PNG committati restano a **30 mm per passo**. Per allineare la scala fisica ricalcolare `VMBL_PASSO_MM` (circa 30 x 0,84, quindi **circa 25 mm** invece di 30 mm) e rigenerare il materiale, come indicato in `assets/cartoncini/LEGGIMI.md`. Il valore da usare va verificato sul tavolo, con un righello e con la proiezione reale: **da verificare sul tavolo**.
+
+### Cosa mostra la proiezione
+
+- **Zone a sinistra della griglia**, con etichetta e valore attivo: «MISURA» con 4/4, 3/4 o 2/4; «COLLEGA» con il numero di righe; «A-B» con l'intervallo. La zona «COMANDI» è indicata come riferimento.
+- **Barre di gruppo** sul lato sinistro della griglia: le righe dello stesso gruppo sono unite da una barra.
+- **Numeri di riga** da 1 a 6, a sinistra della griglia, per leggere A-B.
+- **Colonne oltre la misura** in grigio scuro (note non utilizzabili); **righe fuori da A-B** in grigio chiaro (non suonano).
+- **Playhead** (colonna arancione) solo sulle righe attive: una per gruppo. Da fermo è un contorno.
+- **Note riconosciute** in verde; **cartoncini scartati** con contorno rosso (anche `ImpostazioneNonValida` e `FuoriMisura`).
+
+## 13. Problemi noti
+
+- **Comando ONESHOT con più QR visibili.** Il cartoncino `comando-oneshot-36.png` ha un payload più lungo (`VMBL1;C;ONESHOT;36`) che richiede il QR di versione 2 con correzione M. Quando più QR sono visibili insieme, la lettura multipla di OpenCV può scartarlo. Al banco: verificare il ONESHOT con gli altri cartoncini nel campo, e se serve posarlo da solo.
+- **Cartoncini speciali: livello di correzione L.** I cartoncini speciali usano la correzione d'errore L, che li mantiene nella versione QR 1 come gli altri cartoncini e facilita la lettura quando più QR sono visibili. Il livello L corregge meno errori del M: la robustezza di lettura dipende quindi molto da stampa nitida e messa a fuoco.
+- **Colori e leggibilità sotto la luce del proiettore.** Il corpo dei cartoncini speciali è viola-grigio neutro (sotto la soglia di saturazione: non è un colore di traccia). I test automatici verificano i PNG, non la lettura reale. Da verificare al banco: la lettura del QR e la distinzione tra le tre zone, con la luce reale del proiettore e della stanza.
+
 ## Esito della prova
 
 > **Sezione per l'operatore.** Da compilare durante la prova sul banco reale. Non compilare in anticipo: lasciare vuoti i campi fino all'esecuzione.
@@ -197,7 +256,7 @@ Misura suggerita (con registrazione audio):
 | Porte `VMBL` aperte, nessun avviso MIDI | | | |
 | Webcam aperta (nessun avviso di simulazione) | | | |
 | Calibrazione con 4 click, file `calibrazione.txt` creato | | | |
-| Nota on/off per ciascuna delle 6 tracce (rosso, arancione, giallo, verde, blu, viola) | | | |
+| Nota on/off per ciascun colore (rosso, arancione, giallo, verde, blu, viola: un canale per colore) | | | |
 | Nota on/off per clip (almeno clip 0, 3 e 7) | | | |
 | Mappatura clip in Ableton (MIDI Map) | | | |
 | Clock Master: Ableton segue il BPM dell'app | | | |
@@ -208,6 +267,10 @@ Misura suggerita (con registrazione audio):
 | Comando ONESHOT (nota 36, circa 6 tick) | | | |
 | Errori segnalati in rosso sulla guida (payload, colore, sovrapposizione) | | | |
 | Latenza misurata (mediana di 5 prove, in ms) | | | |
+| Misura 3/4 e 4/4 (colonne oltre la misura oscurate, nota nelle colonne attive) | | | |
+| Collegamento 2 righe (misura 1: righe 1, 3, 5; misura 2: righe 2, 4, 6) | | | |
+| A-B 2-3 con collegamento 3 (righe 1 e 4 mai attive) | | | |
+| Cartoncino mancante (zona vuota) → default 4/4, 6 righe in sequenza | | | |
 
 ## Correzioni emerse
 

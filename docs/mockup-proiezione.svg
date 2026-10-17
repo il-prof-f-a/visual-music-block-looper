@@ -1,113 +1,153 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" font-family="Arial, Helvetica, sans-serif">
   <title>Mockup della guida proiettata sul tavolo</title>
-  <desc>Tavolo proiettato: griglia 6 tracce x 16 step, playhead, una nota riconosciuta (verde), un errore (contorno rosso), zona comandi.</desc>
-
-  <!-- Sfondo della pagina (fuori dal tavolo) -->
+  <desc>Tavolo proiettato con le tre zone speciali a sinistra (Misura, Collegamento, A-B), griglia 6 righe x 16 colonne, barre di gruppo, numeri di riga, colonne e righe oscurate, playhead sulle righe attive, una nota riconosciuta (verde), un cartoncino scartato (contorno rosso) e la zona comandi.</desc>
   <rect x="0" y="0" width="1200" height="800" fill="#f6f6f6"/>
-  <text x="170" y="30" font-size="18" font-weight="bold" fill="#222">Tavolo proiettato (guida)</text>
-
-  <!-- Tavolo: fondo bianco come RenderGuida (Color.White) -->
-  <rect x="170" y="50" width="1000" height="680" fill="#ffffff" stroke="#222" stroke-width="1"/>
-
-  <!-- Griglia: area normalizzata (0.02, 0.04, 0.80, 0.92) del tavolo; celle 50 x 104.27 px -->
-  <g stroke="#d3d3d3" stroke-width="1" fill="none">
-    <rect x="190" y="77.2" width="50" height="104.27"/><rect x="240" y="77.2" width="50" height="104.27"/>
-    <rect x="290" y="77.2" width="50" height="104.27"/><rect x="340" y="77.2" width="50" height="104.27"/>
-    <rect x="390" y="77.2" width="50" height="104.27"/><rect x="440" y="77.2" width="50" height="104.27"/>
-    <rect x="490" y="77.2" width="50" height="104.27"/><rect x="540" y="77.2" width="50" height="104.27"/>
-    <rect x="590" y="77.2" width="50" height="104.27"/><rect x="640" y="77.2" width="50" height="104.27"/>
-    <rect x="690" y="77.2" width="50" height="104.27"/><rect x="740" y="77.2" width="50" height="104.27"/>
-    <rect x="790" y="77.2" width="50" height="104.27"/><rect x="840" y="77.2" width="50" height="104.27"/>
-    <rect x="890" y="77.2" width="50" height="104.27"/><rect x="940" y="77.2" width="50" height="104.27"/>
-    <rect x="190" y="181.47" width="50" height="104.27"/><rect x="240" y="181.47" width="50" height="104.27"/>
-    <rect x="290" y="181.47" width="50" height="104.27"/><rect x="340" y="181.47" width="50" height="104.27"/>
-    <rect x="390" y="181.47" width="50" height="104.27"/><rect x="440" y="181.47" width="50" height="104.27"/>
-    <rect x="490" y="181.47" width="50" height="104.27"/><rect x="540" y="181.47" width="50" height="104.27"/>
-    <rect x="590" y="181.47" width="50" height="104.27"/><rect x="640" y="181.47" width="50" height="104.27"/>
-    <rect x="690" y="181.47" width="50" height="104.27"/><rect x="740" y="181.47" width="50" height="104.27"/>
-    <rect x="790" y="181.47" width="50" height="104.27"/><rect x="840" y="181.47" width="50" height="104.27"/>
-    <rect x="890" y="181.47" width="50" height="104.27"/><rect x="940" y="181.47" width="50" height="104.27"/>
-    <rect x="190" y="285.73" width="50" height="104.27"/><rect x="240" y="285.73" width="50" height="104.27"/>
-    <rect x="290" y="285.73" width="50" height="104.27"/><rect x="340" y="285.73" width="50" height="104.27"/>
-    <rect x="390" y="285.73" width="50" height="104.27"/><rect x="440" y="285.73" width="50" height="104.27"/>
-    <rect x="490" y="285.73" width="50" height="104.27"/><rect x="540" y="285.73" width="50" height="104.27"/>
-    <rect x="590" y="285.73" width="50" height="104.27"/><rect x="640" y="285.73" width="50" height="104.27"/>
-    <rect x="690" y="285.73" width="50" height="104.27"/><rect x="740" y="285.73" width="50" height="104.27"/>
-    <rect x="790" y="285.73" width="50" height="104.27"/><rect x="840" y="285.73" width="50" height="104.27"/>
-    <rect x="890" y="285.73" width="50" height="104.27"/><rect x="940" y="285.73" width="50" height="104.27"/>
-    <rect x="190" y="390.0" width="50" height="104.27"/><rect x="240" y="390.0" width="50" height="104.27"/>
-    <rect x="290" y="390.0" width="50" height="104.27"/><rect x="340" y="390.0" width="50" height="104.27"/>
-    <rect x="390" y="390.0" width="50" height="104.27"/><rect x="440" y="390.0" width="50" height="104.27"/>
-    <rect x="490" y="390.0" width="50" height="104.27"/><rect x="540" y="390.0" width="50" height="104.27"/>
-    <rect x="590" y="390.0" width="50" height="104.27"/><rect x="640" y="390.0" width="50" height="104.27"/>
-    <rect x="690" y="390.0" width="50" height="104.27"/><rect x="740" y="390.0" width="50" height="104.27"/>
-    <rect x="790" y="390.0" width="50" height="104.27"/><rect x="840" y="390.0" width="50" height="104.27"/>
-    <rect x="890" y="390.0" width="50" height="104.27"/><rect x="940" y="390.0" width="50" height="104.27"/>
-    <rect x="190" y="494.27" width="50" height="104.27"/><rect x="240" y="494.27" width="50" height="104.27"/>
-    <rect x="290" y="494.27" width="50" height="104.27"/><rect x="340" y="494.27" width="50" height="104.27"/>
-    <rect x="390" y="494.27" width="50" height="104.27"/><rect x="440" y="494.27" width="50" height="104.27"/>
-    <rect x="490" y="494.27" width="50" height="104.27"/><rect x="540" y="494.27" width="50" height="104.27"/>
-    <rect x="590" y="494.27" width="50" height="104.27"/><rect x="640" y="494.27" width="50" height="104.27"/>
-    <rect x="690" y="494.27" width="50" height="104.27"/><rect x="740" y="494.27" width="50" height="104.27"/>
-    <rect x="790" y="494.27" width="50" height="104.27"/><rect x="840" y="494.27" width="50" height="104.27"/>
-    <rect x="890" y="494.27" width="50" height="104.27"/><rect x="940" y="494.27" width="50" height="104.27"/>
-    <rect x="190" y="598.53" width="50" height="104.27"/><rect x="240" y="598.53" width="50" height="104.27"/>
-    <rect x="290" y="598.53" width="50" height="104.27"/><rect x="340" y="598.53" width="50" height="104.27"/>
-    <rect x="390" y="598.53" width="50" height="104.27"/><rect x="440" y="598.53" width="50" height="104.27"/>
-    <rect x="490" y="598.53" width="50" height="104.27"/><rect x="540" y="598.53" width="50" height="104.27"/>
-    <rect x="590" y="598.53" width="50" height="104.27"/><rect x="640" y="598.53" width="50" height="104.27"/>
-    <rect x="690" y="598.53" width="50" height="104.27"/><rect x="740" y="598.53" width="50" height="104.27"/>
-    <rect x="790" y="598.53" width="50" height="104.27"/><rect x="840" y="598.53" width="50" height="104.27"/>
-    <rect x="890" y="598.53" width="50" height="104.27"/><rect x="940" y="598.53" width="50" height="104.27"/>
-  </g>
-
-  <!-- Playhead: colonna dello step 6 (indice 5), arancio semitrasparente quando in esecuzione (RenderGuida) -->
-  <rect x="440" y="77.2" width="50" height="625.6" fill="rgb(255,140,0)" fill-opacity="0.353"/>
-
-  <!-- Nota riconosciuta (verde, RenderGuida: riempimento 60,179,75 e bordo 30,110,45) -->
-  <rect x="290" y="77.2" width="150" height="104.27" fill="#3cb34b" stroke="#1e6e2d" stroke-width="2"/>
-  <text x="365" y="134" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">clip 3 · nota 39</text>
-  <rect x="640" y="285.73" width="100" height="104.27" fill="#3cb34b" stroke="#1e6e2d" stroke-width="2"/>
-  <rect x="790" y="390.0" width="50" height="104.27" fill="#3cb34b" stroke="#1e6e2d" stroke-width="2"/>
-
-  <!-- Errore: cartoncino scartato, area in rosso (RenderGuida: bordo 220,30,30 spessore 3, riempimento chiaro) -->
-  <rect x="395" y="500.3" width="90" height="92" fill="#ff7878" fill-opacity="0.235" stroke="#dc1e1e" stroke-width="3"/>
-  <text x="440" y="550" font-size="12" font-weight="bold" fill="#dc1e1e" text-anchor="middle">errore</text>
-
-  <!-- Zona comandi (fisica, la guida non la disegna): x 0.84..0.98, y 0.04..0.96 -->
-  <rect x="1010" y="77.2" width="140" height="625.6" fill="none" stroke="#777" stroke-width="2" stroke-dasharray="8 6"/>
-  <text x="1080" y="70" font-size="13" fill="#444" text-anchor="middle">zona comandi</text>
-  <!-- Cartoncino comando di esempio (corpo neutro grigio-azzurro, RenderGuida non lo disegna: e' un cartoncino fisico) -->
-  <rect x="1030" y="200" width="100" height="70" fill="#6e788c" stroke="#222" stroke-width="1"/>
-  <text x="1080" y="240" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">PLAY</text>
-
-  <!-- Etichette delle tracce (riga = colore del cartoncino) -->
-  <g font-size="14" fill="#222" text-anchor="end">
-    <rect x="132" y="121.2" width="16" height="16" fill="#dc2828"/><text x="124" y="134">Rosso</text>
-    <rect x="132" y="225.5" width="16" height="16" fill="#ff8c00"/><text x="124" y="238">Arancione</text>
-    <rect x="132" y="329.7" width="16" height="16" fill="#fad200"/><text x="124" y="342">Giallo</text>
-    <rect x="132" y="434.0" width="16" height="16" fill="#28a046"/><text x="124" y="446">Verde</text>
-    <rect x="132" y="538.3" width="16" height="16" fill="#1e5ac8"/><text x="124" y="550">Blu</text>
-    <rect x="132" y="642.5" width="16" height="16" fill="#8232aa"/><text x="124" y="655">Viola</text>
-  </g>
-
-  <!-- Numeri di step sotto la griglia -->
-  <g font-size="12" fill="#444" text-anchor="middle">
-    <text x="215" y="722">1</text><text x="265" y="722">2</text><text x="315" y="722">3</text><text x="365" y="722">4</text>
-    <text x="415" y="722">5</text><text x="465" y="722">6</text><text x="515" y="722">7</text><text x="565" y="722">8</text>
-    <text x="615" y="722">9</text><text x="665" y="722">10</text><text x="715" y="722">11</text><text x="765" y="722">12</text>
-    <text x="815" y="722">13</text><text x="865" y="722">14</text><text x="915" y="722">15</text><text x="965" y="722">16</text>
-  </g>
-
-  <!-- Legenda -->
-  <g font-size="14" fill="#222">
-    <rect x="170" y="760" width="20" height="16" fill="rgb(255,140,0)" fill-opacity="0.353" stroke="#808080"/>
-    <text x="198" y="773">playhead (in esecuzione; grigio se fermo)</text>
-    <rect x="560" y="760" width="20" height="16" fill="#3cb34b" stroke="#1e6e2d" stroke-width="2"/>
-    <text x="588" y="773">nota riconosciuta</text>
-    <rect x="770" y="760" width="20" height="16" fill="#ff7878" fill-opacity="0.235" stroke="#dc1e1e" stroke-width="2"/>
-    <text x="798" y="773">cartoncino scartato</text>
-    <rect x="980" y="760" width="20" height="16" fill="none" stroke="#777" stroke-dasharray="4 3"/>
-    <text x="1008" y="773">zona comandi</text>
-  </g>
+<text x="170" y="30" font-size="18" text-anchor="start" fill="#222" font-weight="bold">Tavolo proiettato (guida): misura 3/4, collegamento 3 righe, A-B 2-3</text>
+<rect x="170" y="50" width="1000" height="680" fill="#ffffff" stroke="#222" stroke-width="1"/>
+<g id="celle">
+<rect x="320" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="361.88" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="403.75" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="445.62" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="487.5" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="529.38" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="571.25" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="613.12" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="655" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="696.88" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="738.75" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="780.62" y="77.2" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="822.5" y="77.2" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="864.38" y="77.2" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="906.25" y="77.2" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="948.12" y="77.2" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="320" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="361.88" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="403.75" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="445.62" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="487.5" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="529.38" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="571.25" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="613.12" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="655" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="696.88" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="738.75" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="780.62" y="181.47" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="822.5" y="181.47" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="864.38" y="181.47" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="906.25" y="181.47" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="948.12" y="181.47" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="320" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="361.88" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="403.75" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="445.62" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="487.5" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="529.38" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="571.25" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="613.12" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="655" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="696.88" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="738.75" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="780.62" y="285.73" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="822.5" y="285.73" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="864.38" y="285.73" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="906.25" y="285.73" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="948.12" y="285.73" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="320" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="361.88" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="403.75" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="445.62" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="487.5" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="529.38" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="571.25" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="613.12" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="655" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="696.88" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="738.75" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="780.62" y="390" width="41.88" height="104.27" fill="#f0f0f0" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="822.5" y="390" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="864.38" y="390" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="906.25" y="390" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="948.12" y="390" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="320" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="361.88" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="403.75" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="445.62" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="487.5" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="529.38" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="571.25" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="613.12" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="655" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="696.88" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="738.75" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="780.62" y="494.27" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="822.5" y="494.27" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="864.38" y="494.27" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="906.25" y="494.27" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="948.12" y="494.27" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="320" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="361.88" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="403.75" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="445.62" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="487.5" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="529.38" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="571.25" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="613.12" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="655" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="696.88" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="738.75" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="780.62" y="598.53" width="41.88" height="104.27" fill="#ffffff" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="822.5" y="598.53" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="864.38" y="598.53" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="906.25" y="598.53" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+<rect x="948.12" y="598.53" width="41.88" height="104.27" fill="#d7d7d7" stroke="#d3d3d3" stroke-width="1"/>
+</g>
+<g id="barre-gruppo">
+<rect x="307" y="78.2" width="6" height="310.8" fill="#4682b4"/>
+<rect x="307" y="391" width="6" height="310.8" fill="#78aad2"/>
+</g>
+<g id="numeri-riga">
+<text x="301" y="133.33" font-size="12" text-anchor="end" fill="#2f4f4f" font-weight="normal">1</text>
+<text x="301" y="237.6" font-size="12" text-anchor="end" fill="#2f4f4f" font-weight="normal">2</text>
+<text x="301" y="341.87" font-size="12" text-anchor="end" fill="#2f4f4f" font-weight="normal">3</text>
+<text x="301" y="446.13" font-size="12" text-anchor="end" fill="#2f4f4f" font-weight="normal">4</text>
+<text x="301" y="550.4" font-size="12" text-anchor="end" fill="#2f4f4f" font-weight="normal">5</text>
+<text x="301" y="654.67" font-size="12" text-anchor="end" fill="#2f4f4f" font-weight="normal">6</text>
+</g>
+<g id="playhead">
+<rect x="529.38" y="181.47" width="41.88" height="104.27" fill="#ff8c00" fill-opacity="0.35"/>
+<rect x="529.38" y="494.27" width="41.88" height="104.27" fill="#ff8c00" fill-opacity="0.35"/>
+</g>
+<g id="nota">
+<rect x="361.88" y="187.47" width="125.62" height="92.27" fill="#3cb34b" stroke="#1e6e2d" stroke-width="2"/>
+</g>
+<g id="errore">
+<rect x="700.88" y="618.53" width="75.75" height="64.27" fill="#ff7878" stroke="#dc1e1e" stroke-width="3" fill-opacity="0.24"/>
+</g>
+<g id="zone-speciali">
+<rect x="180" y="77.2" width="120" height="190.4" fill="none" stroke="#808080" stroke-width="2"/>
+<text x="240" y="97.2" font-size="12" text-anchor="middle" fill="#a9a9a9" font-weight="bold">MISURA</text>
+<text x="240" y="117.2" font-size="11" text-anchor="middle" fill="#a9a9a9" font-weight="normal">3/4</text>
+<rect x="200" y="147.2" width="80" height="56" fill="#877396" stroke="#5b4b66" stroke-width="1"/>
+<text x="240" y="180.2" font-size="12" text-anchor="middle" fill="#ffffff" font-weight="bold">3/4</text>
+<rect x="180" y="294.8" width="120" height="190.4" fill="none" stroke="#808080" stroke-width="2"/>
+<text x="240" y="314.8" font-size="12" text-anchor="middle" fill="#a9a9a9" font-weight="bold">COLLEGA</text>
+<text x="240" y="334.8" font-size="11" text-anchor="middle" fill="#a9a9a9" font-weight="normal">3 righe</text>
+<rect x="200" y="364.8" width="80" height="56" fill="#877396" stroke="#5b4b66" stroke-width="1"/>
+<text x="240" y="397.8" font-size="12" text-anchor="middle" fill="#ffffff" font-weight="bold">3 righe</text>
+<rect x="180" y="512.4" width="120" height="190.4" fill="none" stroke="#808080" stroke-width="2"/>
+<text x="240" y="532.4" font-size="12" text-anchor="middle" fill="#a9a9a9" font-weight="bold">A-B</text>
+<text x="240" y="552.4" font-size="11" text-anchor="middle" fill="#a9a9a9" font-weight="normal">2-3</text>
+<rect x="200" y="582.4" width="80" height="56" fill="#877396" stroke="#5b4b66" stroke-width="1"/>
+<text x="240" y="615.4" font-size="12" text-anchor="middle" fill="#ffffff" font-weight="bold">A-B 2-3</text>
+</g>
+<g id="zona-comandi">
+<rect x="1010" y="77.2" width="140" height="625.6" fill="none" stroke="#808080" stroke-width="2"/>
+<text x="1080" y="97.2" font-size="12" text-anchor="middle" fill="#a9a9a9" font-weight="bold">COMANDI</text>
+<rect x="1040" y="147.2" width="80" height="56" fill="#6e788c" stroke="#4a5266" stroke-width="1"/>
+<text x="1080" y="180.2" font-size="12" text-anchor="middle" fill="#ffffff" font-weight="bold">PLAY</text>
+</g>
+<text x="170" y="752" font-size="13" text-anchor="start" fill="#222" font-weight="normal">Riga 1 e riga 4 in grigio chiaro: fuori da A-B 2-3. Colonne 13-16 in grigio: oltre la misura 3/4.</text>
+<text x="170" y="772" font-size="13" text-anchor="start" fill="#222" font-weight="normal">Playhead arancio: colonna 6 sulle righe attive (2 e 5), una per gruppo. Nota verde riconosciuta. Contorno rosso: cartoncino scartato.</text>
+<text x="170" y="792" font-size="13" text-anchor="start" fill="#222" font-weight="normal">Le zone a sinistra sono etichettate dalla guida. I cartoncini colorati sono fisici: non sono disegnati dalla guida.</text>
 </svg>

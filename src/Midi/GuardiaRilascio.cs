@@ -3,9 +3,14 @@ using System;
 namespace VisualMusicBlockLooper.Midi
 {
     /// <summary>
-    /// Serializza invii, ricezioni e rilascio di una risorsa MIDI. Dopo il rilascio
-    /// le operazioni non vengono più eseguite (invio: eccezione; ricezione: ignorata).
-    /// Il rilascio attende il completamento di un'operazione in corso.
+    /// Gestisce invii, ricezioni e rilascio di una risorsa MIDI.
+    /// <para>
+    /// Il lock protegge solo il flag di rilascio: l'invio (<see cref="Esegui"/>) è sincrono
+    /// e viene eseguito sotto lock, mentre le callback di ricezione (<see cref="EseguiSeAttivo"/>)
+    /// e l'azione di rilascio (<see cref="Rilascia"/>) vengono eseguite FUORI dal lock, per evitare
+    /// deadlock con il thread del dispositivo. Un evento che arriva durante il rilascio
+    /// può quindi essere consegnato una sola volta dopo l'avvio di Dispose.
+    /// </para>
     /// </summary>
     public sealed class GuardiaRilascio
     {
@@ -20,7 +25,7 @@ namespace VisualMusicBlockLooper.Midi
             this.nomeRisorsa = nomeRisorsa;
         }
 
-        /// <summary>True una volta eseguito il rilascio.</summary>
+        /// <summary>True una volta avviato il rilascio.</summary>
         public bool Rilasciato
         {
             get
@@ -32,8 +37,11 @@ namespace VisualMusicBlockLooper.Midi
             }
         }
 
-        /// <summary>Esegue l'azione se la risorsa non è rilasciata, altrimenti lancia ObjectDisposedException.</summary>
-        /// <param name="azione">Operazione da eseguire in modo sincronizzato.</param>
+        /// <summary>
+        /// Esegue l'azione sotto lock se la risorsa non è rilasciata, altrimenti lancia
+        /// ObjectDisposedException. Il lock garantisce che l'azione non sia in corso durante il rilascio.
+        /// </summary>
+        /// <param name="azione">Operazione di invio, sincrona e senza callback verso il motore.</param>
         public void Esegui(Action azione)
         {
             lock (blocco)
@@ -49,24 +57,33 @@ namespace VisualMusicBlockLooper.Midi
             }
         }
 
-        /// <summary>Esegue l'azione solo se la risorsa non è rilasciata.</summary>
-        /// <param name="azione">Operazione da eseguire in modo sincronizzato.</param>
+        /// <summary>
+        /// Controlla il flag sotto lock e, se la risorsa è attiva, esegue l'azione FUORI dal lock.
+        /// </summary>
+        /// <param name="azione">Callback da eseguire.</param>
         /// <returns>False se la risorsa è già rilasciata (azione non eseguita).</returns>
         public bool EseguiSeAttivo(Action azione)
         {
+            bool attiva;
             lock (blocco)
             {
-                if (rilasciato)
-                {
-                    return false;
-                }
-
-                azione();
-                return true;
+                attiva = !rilasciato;
             }
+
+            if (!attiva)
+            {
+                return false;
+            }
+
+            azione();
+            return true;
         }
 
-        /// <summary>Esegue il rilascio una sola volta; le chiamate successive non fanno nulla.</summary>
+        /// <summary>
+        /// Segna la risorsa come rilasciata sotto lock, poi esegue l'azione di rilascio FUORI dal lock.
+        /// Le chiamate successive non fanno nulla. Se l'azione lancia, l'eccezione viene propagata
+        /// e la risorsa resta marcata come rilasciata.
+        /// </summary>
         /// <param name="rilascio">Operazione di rilascio della risorsa.</param>
         public void Rilascia(Action rilascio)
         {
@@ -78,8 +95,9 @@ namespace VisualMusicBlockLooper.Midi
                 }
 
                 rilasciato = true;
-                rilascio();
             }
+
+            rilascio();
         }
     }
 }

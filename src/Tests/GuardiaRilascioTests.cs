@@ -60,40 +60,75 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void Rilascio_NonAvviene_MaiDuranteUnaOperazioneInCorso()
+        public void Rilascia_AzioneEseguitaFuoriDalLock_AltroThreadNonBloccato()
+        {
+            // Se l'azione di rilascio fosse eseguita sotto lock, EseguiSeAttivo da un altro thread
+            // resterebbe bloccato e il ManualResetEventSlim scadrebbe (risultato false).
+            GuardiaRilascio guardia = new GuardiaRilascio("Risorsa di prova");
+            bool completato = false;
+            bool risultato = true;
+
+            guardia.Rilascia(() =>
+            {
+                using (ManualResetEventSlim fine = new ManualResetEventSlim(false))
+                {
+                    Thread altro = new Thread(() =>
+                    {
+                        risultato = guardia.EseguiSeAttivo(() => { });
+                        fine.Set();
+                    });
+                    altro.IsBackground = true;
+                    altro.Start();
+                    completato = fine.Wait(TimeSpan.FromSeconds(5));
+                }
+            });
+
+            Assert.That(completato, Is.True, "EseguiSeAttivo da un altro thread è rimasto bloccato durante il rilascio");
+            Assert.That(risultato, Is.False);
+        }
+
+        [Test]
+        public void Rilascia_NonBloccatoDaCallbackInCorso()
+        {
+            // Una callback in corso non deve bloccare Rilascia chiamato da un altro thread.
+            GuardiaRilascio guardia = new GuardiaRilascio("Ingresso MIDI");
+            using (ManualResetEventSlim dentroCallback = new ManualResetEventSlim(false))
+            using (ManualResetEventSlim rilascioFatto = new ManualResetEventSlim(false))
+            {
+                bool rilascioTerminatoInTempo = false;
+                Thread filoCallback = new Thread(() =>
+                {
+                    guardia.EseguiSeAttivo(() =>
+                    {
+                        dentroCallback.Set();
+                        rilascioTerminatoInTempo = rilascioFatto.Wait(TimeSpan.FromSeconds(5));
+                    });
+                });
+                filoCallback.IsBackground = true;
+                filoCallback.Start();
+
+                Assert.That(dentroCallback.Wait(TimeSpan.FromSeconds(5)), Is.True, "La callback non è partita");
+
+                guardia.Rilascia(() => { });
+                rilascioFatto.Set();
+                filoCallback.Join(TimeSpan.FromSeconds(10));
+
+                Assert.That(rilascioTerminatoInTempo, Is.True, "Rilascia è rimasto bloccato dalla callback in corso");
+            }
+        }
+
+        [Test]
+        public void Rilascia_EccezioneNellAzione_MarcaRilasciataERilancia()
         {
             GuardiaRilascio guardia = new GuardiaRilascio("Risorsa di prova");
-            int violazioni = 0;
-            bool rilasciata = false;
+            int invocazioni = 0;
 
-            Thread[] fili = new Thread[4];
-            for (int i = 0; i < fili.Length; i++)
-            {
-                fili[i] = new Thread(() =>
-                {
-                    for (int j = 0; j < 2000; j++)
-                    {
-                        guardia.EseguiSeAttivo(() =>
-                        {
-                            if (Volatile.Read(ref rilasciata))
-                            {
-                                Interlocked.Increment(ref violazioni);
-                            }
-                        });
-                    }
-                });
-                fili[i].Start();
-            }
+            Assert.Throws<InvalidOperationException>(
+                () => guardia.Rilascia(() => throw new InvalidOperationException("prova")));
 
-            Thread.Sleep(5);
-            guardia.Rilascia(() => Volatile.Write(ref rilasciata, true));
-
-            foreach (Thread filo in fili)
-            {
-                filo.Join();
-            }
-
-            Assert.That(Volatile.Read(ref violazioni), Is.EqualTo(0));
+            Assert.That(guardia.Rilasciato, Is.True);
+            guardia.Rilascia(() => invocazioni++);
+            Assert.That(invocazioni, Is.EqualTo(0));
         }
     }
 }

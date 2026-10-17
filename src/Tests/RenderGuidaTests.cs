@@ -77,6 +77,9 @@ namespace VisualMusicBlockLooper.Tests
             {
                 Point p = CentroPieno(0, 3);
                 Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
+
+                // Il bordo sinistro della colonna dello step 3 (x = 240) è il contorno grigio del playhead.
+                Assert.That(bmp.GetPixel(3 * 80, p.Y).ToArgb(), Is.EqualTo(Color.Gray.ToArgb()));
             }
         }
 
@@ -171,6 +174,14 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void NoteOltreLaGrigliaTroncate()
         {
+            // Griglia x 128..1152, y 72..648; cella 64x96. Lo step 15 è l'ultimo.
+            var config = new ConfigGriglia
+            {
+                Tracce = 6,
+                Step = 16,
+                Area = new RettangoloTavolo(0.1, 0.1, 0.8, 0.8)
+            };
+
             var nota = new CartoncinoNota
             {
                 Traccia = 1,
@@ -181,18 +192,17 @@ namespace VisualMusicBlockLooper.Tests
             };
 
             Bitmap bmp = null;
-            Assert.DoesNotThrow(() => bmp = Disegna(ConfigPiena(), StatoCon(nota), 0, false));
+            Assert.DoesNotThrow(() => bmp = Disegna(config, StatoCon(nota), 0, false));
 
             using (bmp)
             {
-                // Lo step 15 è l'ultimo: dentro la griglia è verde.
-                Point dentro = CentroPieno(1, 15);
-                Color c = bmp.GetPixel(dentro.X, dentro.Y);
-                Assert.That(c.G, Is.GreaterThan(c.R));
+                // Ultima colonna della griglia (step 15, x 1088..1152): dentro la griglia è verde.
+                Color dentro = bmp.GetPixel(1120, 216);
+                Assert.That(dentro.G, Is.GreaterThan(dentro.R));
+                Assert.That(dentro.G, Is.GreaterThan(dentro.B));
 
-                // La nota è sulla traccia 1: l'ultima traccia (5) in fondo alla griglia non deve essere colorata.
-                Point sotto = new Point(dentro.X, 719);
-                Assert.That(bmp.GetPixel(sotto.X, sotto.Y).ToArgb(), Is.Not.EqualTo(Color.FromArgb(255, 60, 179, 75)));
+                // Appena a destra del bordo della griglia la nota non deve dipingere nulla.
+                Assert.That(bmp.GetPixel(1152 + 4, 216).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
             }
         }
 

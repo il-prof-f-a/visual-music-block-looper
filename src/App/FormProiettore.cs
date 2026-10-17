@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using VisualMusicBlockLooper.Core;
@@ -11,7 +12,7 @@ namespace VisualMusicBlockLooper.App
     /// </summary>
     public class FormProiettore : Form
     {
-        private const int WsExTransparent = 0x20;
+        // Non compare nella barra delle applicazioni né in Alt+Tab.
         private const int WsExToolWindow = 0x80;
 
         private readonly object bloccoStato = new object();
@@ -33,6 +34,9 @@ namespace VisualMusicBlockLooper.App
             DoubleBuffered = true;
         }
 
+        /// <summary>La form si mostra senza attivarsi, così non ruba il fuoco alla finestra di controllo.</summary>
+        protected override bool ShowWithoutActivation => true;
+
         /// <summary>Posiziona la form a schermo intero sullo schermo indicato e la mostra.</summary>
         public void MostraSuSchermo(Screen schermo)
         {
@@ -45,12 +49,22 @@ namespace VisualMusicBlockLooper.App
             Show();
         }
 
-        /// <summary>Aggiorna lo stato proiettato e richiede un nuovo disegno. Thread-safe.</summary>
+        /// <summary>
+        /// Aggiorna lo stato proiettato e richiede un nuovo disegno. Thread-safe.
+        /// Lo stato viene copiato: le modifiche successive del chiamante non influiscono sul disegno.
+        /// </summary>
         public void Aggiorna(StatoTavolo nuovoStato, int nuovoStep, bool nuovaEsecuzione)
         {
+            StatoTavolo copia = CopiaStato(nuovoStato);
+
             lock (bloccoStato)
             {
-                stato = nuovoStato;
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                stato = copia;
                 stepCorrente = nuovoStep;
                 inEsecuzione = nuovaEsecuzione;
             }
@@ -60,23 +74,33 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            if (InvokeRequired)
+            try
             {
-                BeginInvoke(new Action(() => Invalidate()));
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(Invalidate));
+                }
+                else
+                {
+                    Invalidate();
+                }
             }
-            else
+            catch (ObjectDisposedException)
             {
-                Invalidate();
+                // La form è stata chiusa nel frattempo: nessun disegno da richiedere.
+            }
+            catch (InvalidOperationException)
+            {
+                // Handle non più valido durante la chiusura: nessun disegno da richiedere.
             }
         }
 
-        /// <summary>Le click passano attraverso la finestra: il proiettore non intercetta il mouse.</summary>
         protected override CreateParams CreateParams
         {
             get
             {
                 CreateParams parametri = base.CreateParams;
-                parametri.ExStyle |= WsExTransparent | WsExToolWindow;
+                parametri.ExStyle |= WsExToolWindow;
                 return parametri;
             }
         }
@@ -95,6 +119,19 @@ namespace VisualMusicBlockLooper.App
             }
 
             renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, stepDisegnato, esecuzione);
+        }
+
+        private static StatoTavolo CopiaStato(StatoTavolo origine)
+        {
+            if (origine == null)
+            {
+                return null;
+            }
+
+            return new StatoTavolo(
+                new List<CartoncinoNota>(origine.Note),
+                new List<ComandoRilevato>(origine.Comandi),
+                new List<ErroreTavolo>(origine.Errori));
         }
     }
 }

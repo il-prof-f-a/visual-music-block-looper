@@ -192,6 +192,49 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void CandidataCheCambia_ContatoreRipartiDaUnoAnchePoiCheXAvevaDueFrame()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
+            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            StrutturaTavolo y = Struttura(4, 2, 1, 2);
+
+            var output = new List<StrutturaTavolo>();
+            foreach (StrutturaTavolo struttura in new[] { x, x, y, y, y })
+            {
+                output.Add(stabilizzatore.Aggiorna(Stato(struttura: struttura)).Struttura);
+            }
+
+            // X ha contribuito con due frame, ma Y riparte da uno: Y compare solo al terzo Y consecutivo.
+            Assert.That(output[0], Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(output[1], Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(output[2], Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(output[3], Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(output[4], Is.EqualTo(y));
+        }
+
+        [Test]
+        public void CandidataCheCambia_NonEreditaIContatoriPrecedenti()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 4);
+            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            StrutturaTavolo y = Struttura(4, 2, 1, 2);
+
+            var output = new List<StrutturaTavolo>();
+            foreach (StrutturaTavolo struttura in new[] { x, x, x, y, y, y, y })
+            {
+                output.Add(stabilizzatore.Aggiorna(Stato(struttura: struttura)).Struttura);
+            }
+
+            // X ha contribuito con tre frame; Y deve comunque comparire solo al quarto Y consecutivo (settimo frame).
+            for (int frame = 0; frame < 6; frame++)
+            {
+                Assert.That(output[frame], Is.EqualTo(StrutturaTavolo.Default), $"frame {frame + 1}");
+            }
+
+            Assert.That(output[6], Is.EqualTo(y));
+        }
+
+        [Test]
         public void FramePresenzaUnoCambiaSubito()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 1);

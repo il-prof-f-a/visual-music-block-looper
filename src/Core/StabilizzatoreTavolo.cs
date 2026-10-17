@@ -6,6 +6,7 @@ namespace VisualMusicBlockLooper.Core
 {
     /// <summary>
     /// Filtra nel tempo lo stato grezzo del tavolo per eliminare lo sfarfallio della visione.
+    /// La struttura del tavolo cambia solo dopo <c>framePresenza</c> frame consecutivi con lo stesso valore.
     /// Una nota o un comando diventa stabile dopo <c>framePresenza</c> frame consecutivi di presenza;
     /// una nota stabile resta in output finché non è assente per <c>frameAssenza</c> frame consecutivi.
     /// I comandi vengono esposti solo nel frame in cui diventano stabili, per evitare doppi PLAY.
@@ -57,8 +58,9 @@ namespace VisualMusicBlockLooper.Core
         }
 
         /// <summary>
-        /// Elabora un fotogramma e restituisce le note stabili, i comandi appena stabilizzati e gli errori invariati.
-        /// Uno stato null viene trattato come vuoto: tutti i candidati risultano assenti.
+        /// Elabora un fotogramma e restituisce la struttura stabile, le note stabili, i comandi appena stabilizzati e gli errori invariati.
+        /// La struttura stabile cambia solo dopo <c>framePresenza</c> frame consecutivi con lo stesso valore diverso.
+        /// Uno stato null viene trattato come vuoto: tutti i candidati risultano assenti (struttura compresa: Default).
         /// </summary>
         public StatoTavolo Aggiorna(StatoTavolo grezzo)
         {

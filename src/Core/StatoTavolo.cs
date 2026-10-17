@@ -1,11 +1,15 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace VisualMusicBlockLooper.Core
 {
     /// <summary>Nota piazzata sulla griglia, derivata da un cartoncino valido.</summary>
     public class CartoncinoNota
     {
-        /// <summary>Traccia della griglia (indice 0-based).</summary>
+        /// <summary>Riga della griglia (indice 0-based): la riga-misura in cui sta la nota.</summary>
+        public int Riga { get; set; }
+
+        /// <summary>Traccia della griglia, uguale al colore del cartoncino (indice 0-based).</summary>
         public int Traccia { get; set; }
 
         /// <summary>Step iniziale della nota.</summary>
@@ -20,8 +24,8 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Colore del cartoncino.</summary>
         public ColoreTraccia Colore { get; set; }
 
-        /// <summary>Chiave univoca della nota: clip, traccia e step iniziale.</summary>
-        public string Chiave => $"{IdClip}:{Traccia}:{StepIniziale}";
+        /// <summary>Chiave univoca della nota: clip, traccia, riga e step iniziale.</summary>
+        public string Chiave => $"{IdClip}:{Traccia}:{Riga}:{StepIniziale}";
     }
 
     /// <summary>Comando richiesto da un cartoncino posto nella zona comandi.</summary>
@@ -38,7 +42,6 @@ namespace VisualMusicBlockLooper.Core
     public enum TipoErrore
     {
         PayloadNonValido,
-        ColoreIncoerente,
         ColoreMancante,
         Sovrapposto,
         FuoriGriglia,
@@ -56,19 +59,26 @@ namespace VisualMusicBlockLooper.Core
         public RettangoloTavolo Area { get; set; }
     }
 
-    /// <summary>Risultato dell'interpretazione del tavolo: note, comandi ed errori.</summary>
+    /// <summary>Risultato dell'interpretazione del tavolo: struttura, note, comandi ed errori.</summary>
     public class StatoTavolo
     {
-        /// <summary>Crea lo stato; le liste null diventano liste vuote.</summary>
+        /// <summary>
+        /// Crea lo stato; le liste null diventano liste vuote, una struttura null diventa <see cref="StrutturaTavolo.Default"/>.
+        /// </summary>
         public StatoTavolo(
-            IReadOnlyList<CartoncinoNota> note,
-            IReadOnlyList<ComandoRilevato> comandi,
-            IReadOnlyList<ErroreTavolo> errori)
+            IEnumerable<CartoncinoNota> note,
+            IEnumerable<ComandoRilevato> comandi,
+            IEnumerable<ErroreTavolo> errori,
+            StrutturaTavolo struttura = null)
         {
-            Note = note ?? new List<CartoncinoNota>();
-            Comandi = comandi ?? new List<ComandoRilevato>();
-            Errori = errori ?? new List<ErroreTavolo>();
+            Note = note?.ToList() ?? new List<CartoncinoNota>();
+            Comandi = comandi?.ToList() ?? new List<ComandoRilevato>();
+            Errori = errori?.ToList() ?? new List<ErroreTavolo>();
+            Struttura = struttura ?? StrutturaTavolo.Default;
         }
+
+        /// <summary>Struttura del tavolo (misura, collegamento, A-B), mai null.</summary>
+        public StrutturaTavolo Struttura { get; }
 
         /// <summary>Note valide, mai null.</summary>
         public IReadOnlyList<CartoncinoNota> Note { get; }

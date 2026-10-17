@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using VisualMusicBlockLooper.Core;
 
@@ -30,25 +31,190 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(nota.DurataStep, Is.EqualTo(1));
             Assert.That(nota.IdClip, Is.EqualTo(12));
             Assert.That(nota.Colore, Is.EqualTo(ColoreTraccia.Verde));
-            Assert.That(nota.Chiave, Is.EqualTo("12:3:2"));
+            Assert.That(nota.Riga, Is.EqualTo(3));
+            Assert.That(nota.Chiave, Is.EqualTo("12:3:3:2"));
         }
 
         [Test]
-        public void ColoreIncoerente()
+        public void ColoriMistiNellaStessaRiga()
         {
-            RettangoloTavolo area = Cella(3, 2);
-
-            StatoTavolo stato = CreaInterprete().Interpreta(new[]
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
-                Rilevato("VMBL1;N;12", ColoreTraccia.Rosso, area)
+                Carta(3, 2, 1, ColoreTraccia.Rosso, "VMBL1;N;1"),
+                Carta(3, 2, 1, ColoreTraccia.Verde, "VMBL1;N;2")
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
+            Assert.That(stato.Note.Select(n => n.Traccia), Is.EquivalentTo(new[] { 0, 3 }));
+            Assert.That(stato.Note.Select(n => n.Riga), Is.All.EqualTo(3));
+        }
+
+        [Test]
+        public void RigaETracciaSeparate()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(1, 4, 1, ColoreTraccia.Verde, "VMBL1;N;7")
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note[0].Riga, Is.EqualTo(1));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(3));
+            Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(4));
+            Assert.That(stato.Note[0].Chiave, Is.EqualTo("7:3:1:4"));
+        }
+
+        [Test]
+        public void StessoColoreSovrappostoNellaRiga()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(2, 4, 2, ColoreTraccia.Blu, "VMBL1;N;1"),
+                Carta(2, 5, 1, ColoreTraccia.Blu, "VMBL1;N;2")
+            });
+
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.Sovrapposto));
+        }
+
+        [Test]
+        public void ColoriDiversiSovrapposti_Ammessi()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(2, 4, 2, ColoreTraccia.Blu, "VMBL1;N;1"),
+                Carta(2, 4, 2, ColoreTraccia.Viola, "VMBL1;N;2")
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
+        }
+
+        [Test]
+        public void StrutturaDaiCartoniSpeciali()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                NellaZona(ZonaSpeciale.Misura, "VMBL1;S;MISURA;3"),
+                NellaZona(ZonaSpeciale.Collegamento, "VMBL1;S;LINK;2")
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Struttura.BattitiPerMisura, Is.EqualTo(3));
+            Assert.That(stato.Struttura.RigheCollegate, Is.EqualTo(2));
+            Assert.That(stato.Struttura.AInizio, Is.EqualTo(1));
+            Assert.That(stato.Struttura.AFine, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void SenzaCartoniSpeciali_StrutturaDefault()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(0, 0, 1, ColoreTraccia.Rosso, "VMBL1;N;1")
+            });
+
+            Assert.That(stato.Struttura, Is.EqualTo(StrutturaTavolo.Default));
+        }
+
+        [Test]
+        public void MisuraTreQuarti_NotaAlloStep14_FuoriMisura()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                NellaZona(ZonaSpeciale.Misura, "VMBL1;S;MISURA;3"),
+                Carta(0, 14, 1, ColoreTraccia.Rosso, "VMBL1;N;1")
             });
 
             Assert.That(stato.Note, Is.Empty);
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.FuoriMisura));
+        }
+
+        [Test]
+        public void MisuraTreQuarti_DurataTroncata()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                NellaZona(ZonaSpeciale.Misura, "VMBL1;S;MISURA;3"),
+                Carta(0, 8, 6, ColoreTraccia.Rosso, "VMBL1;N;1")
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(8));
+            Assert.That(stato.Note[0].DurataStep, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void ZonaSpecialeConNota_FuoriGriglia()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                NellaZona(ZonaSpeciale.Misura, "VMBL1;N;1")
+            });
+
+            Assert.That(stato.Note, Is.Empty);
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.FuoriGriglia));
+        }
+
+        [Test]
+        public void ComandoInZonaSpeciale_PayloadNonValido()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                NellaZona(ZonaSpeciale.Misura, "VMBL1;C;PLAY")
+            });
+
             Assert.That(stato.Comandi, Is.Empty);
             Assert.That(stato.Errori, Has.Count.EqualTo(1));
-            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.ColoreIncoerente));
-            Assert.That(stato.Errori[0].Area.X, Is.EqualTo(area.X));
-            Assert.That(stato.Errori[0].Area.Y, Is.EqualTo(area.Y));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.PayloadNonValido));
+        }
+
+        [Test]
+        public void ImpostazioneFuoriZone_PayloadNonValido()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(0, 2, 1, null, "VMBL1;S;MISURA;3")
+            });
+
+            Assert.That(stato.Note, Is.Empty);
+            Assert.That(stato.Struttura, Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.PayloadNonValido));
+        }
+
+        [Test]
+        public void OverloadSenzaZoneSpeciali_NessunaZonaSpeciale()
+        {
+            // Con il solo overload della zona comandi, una nota nella vecchia posizione della zona Misura è una nota.
+            StatoTavolo stato = CreaInterprete().Interpreta(new[]
+            {
+                Rilevato("VMBL1;N;1", ColoreTraccia.Rosso, new RettangoloTavolo(0.01, 0.04, 0.01, 0.05))
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Struttura, Is.EqualTo(StrutturaTavolo.Default));
+        }
+
+        [Test]
+        public void LayoutNull_ArgumentNullException()
+        {
+            var griglia = new Griglia(new ConfigGriglia());
+
+            Assert.Throws<System.ArgumentNullException>(() => new InterpreteTavolo(griglia, (LayoutTavolo)null));
+        }
+
+        [Test]
+        public void GrigliaNull_ArgumentNullException()
+        {
+            Assert.Throws<System.ArgumentNullException>(() => new InterpreteTavolo(null, LayoutTavolo.Default));
         }
 
         [Test]
@@ -176,6 +342,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Note, Is.Not.Null.And.Empty);
             Assert.That(stato.Comandi, Is.Not.Null.And.Empty);
             Assert.That(stato.Errori, Is.Not.Null.And.Empty);
+            Assert.That(stato.Struttura, Is.EqualTo(StrutturaTavolo.Default));
         }
 
         [Test]
@@ -256,6 +423,48 @@ namespace VisualMusicBlockLooper.Tests
         private static CartoncinoRilevato Rilevato(string payload, ColoreTraccia? colore, RettangoloTavolo area)
         {
             return new CartoncinoRilevato { Payload = payload, Colore = colore, Area = area };
+        }
+
+        private static InterpreteTavolo CreaInterpreteCompleto()
+        {
+            var config = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+            return new InterpreteTavolo(new Griglia(config), LayoutTavolo.Default);
+        }
+
+        // Cartoncino nella griglia di default: colonna = Larghezza/16, riga = Altezza/6.
+        // Il rettangolo resta dentro la propria cella (margini di un decimo di colonna).
+        private static CartoncinoRilevato Carta(int riga, int step, int larghezzaStep, ColoreTraccia? colore, string payload)
+        {
+            RettangoloTavolo g = LayoutTavolo.AreaGrigliaDefault;
+            double colonna = g.Larghezza / 16.0;
+            double altezzaRiga = g.Altezza / 6.0;
+            double margine = colonna * 0.1;
+
+            var area = new RettangoloTavolo(
+                g.X + step * colonna + margine,
+                g.Y + riga * altezzaRiga + altezzaRiga * 0.25,
+                larghezzaStep * colonna - 2 * margine,
+                altezzaRiga * 0.5);
+
+            return Rilevato(payload, colore, area);
+        }
+
+        // Cartoncino piccolo al centro di una zona speciale del layout di default, senza colore.
+        private static CartoncinoRilevato NellaZona(ZonaSpeciale zona, string payload)
+        {
+            RettangoloTavolo z;
+            switch (zona)
+            {
+                case ZonaSpeciale.Misura: z = LayoutTavolo.Default.Misura; break;
+                case ZonaSpeciale.Collegamento: z = LayoutTavolo.Default.Collegamento; break;
+                case ZonaSpeciale.Ab: z = LayoutTavolo.Default.Ab; break;
+                case ZonaSpeciale.Comandi: z = LayoutTavolo.Default.Comandi; break;
+                default: throw new System.ArgumentOutOfRangeException(nameof(zona));
+            }
+
+            double cx = z.X + z.Larghezza / 2;
+            double cy = z.Y + z.Altezza / 2;
+            return Rilevato(payload, null, new RettangoloTavolo(cx - 0.005, cy - 0.005, 0.01, 0.01));
         }
     }
 }

@@ -111,14 +111,30 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
-        // Ogni payload prodotto dal generatore deve essere valido e risolto senza errori nella sua zona.
-        [Test]
-        public void Speciali_PayloadAccettatiERisoltiSenzaErrori()
+        // Area piccola al centro di una zona del layout di default: il centro cade nella zona voluta.
+        private static RettangoloTavolo AreaAlCentro(RettangoloTavolo zona)
         {
+            double cx = zona.X + zona.Larghezza / 2;
+            double cy = zona.Y + zona.Altezza / 2;
+            return new RettangoloTavolo(cx - 0.005, cy - 0.005, 0.01, 0.01);
+        }
+
+        // Ogni payload speciale: nella zona attesa, senza errori, con i valori risolti attesi
+        // (misura, righe, A, B). Il test fallisce se il risolutore ignora il payload.
+        [Test]
+        public void Speciali_PayloadRisoltiNelLoroValoreEZona()
+        {
+            LayoutTavolo layout = LayoutTavolo.Default;
             var elenco = GeneratoreCartoncini.ElencoSpeciali();
             Assert.That(elenco, Has.Count.EqualTo(22));
 
-            var area = new RettangoloTavolo(0.01, 0.04, 0.1, 0.1);
+            RettangoloTavolo areaMisura = AreaAlCentro(layout.Misura);
+            RettangoloTavolo areaLink = AreaAlCentro(layout.Collegamento);
+            RettangoloTavolo areaAb = AreaAlCentro(layout.Ab);
+            Assert.AreEqual(ZonaSpeciale.Misura, layout.ZonaDelCentro(areaMisura), "centro misura");
+            Assert.AreEqual(ZonaSpeciale.Collegamento, layout.ZonaDelCentro(areaLink), "centro collegamento");
+            Assert.AreEqual(ZonaSpeciale.Ab, layout.ZonaDelCentro(areaAb), "centro A-B");
+
             Assert.That(ParserPayload.TryParse("VMBL1;S;LINK;6", out PayloadCartoncino seiRighe), Is.True);
 
             var misure = new List<int>();
@@ -126,32 +142,43 @@ namespace VisualMusicBlockLooper.Tests
             var coppie = new List<string>();
             foreach (var (nome, testo, _) in elenco)
             {
-                PayloadCartoncino payload;
-                Assert.That(ParserPayload.TryParse(testo, out payload), Is.True, "Payload non valido: " + nome);
+                Assert.That(ParserPayload.TryParse(testo, out PayloadCartoncino payload), Is.True, "Payload non valido: " + nome);
                 Assert.AreEqual(TipoCartoncino.Impostazione, payload.Tipo, nome);
 
+                // Valori attesi: default per i parametri non letti dal cartoncino.
+                int battitiAttesi = 4, righeAttese = 6, aInizioAttesa = 1, aFineAttesa = 6;
                 RisoluzioneStruttura risultato;
                 if (payload.Impostazione == TipoImpostazione.Misura)
                 {
                     misure.Add(payload.Valore);
-                    risultato = RisolutoreStruttura.Risolvi(new[] { (payload, area, ZonaSpeciale.Misura) });
+                    battitiAttesi = payload.Valore;
+                    risultato = RisolutoreStruttura.Risolvi(new[] { (payload, areaMisura, ZonaSpeciale.Misura) });
                 }
                 else if (payload.Impostazione == TipoImpostazione.Collegamento)
                 {
                     collegamenti.Add(payload.Valore);
-                    risultato = RisolutoreStruttura.Risolvi(new[] { (payload, area, ZonaSpeciale.Collegamento) });
+                    righeAttese = payload.Valore;
+                    aFineAttesa = payload.Valore;
+                    risultato = RisolutoreStruttura.Risolvi(new[] { (payload, areaLink, ZonaSpeciale.Collegamento) });
                 }
                 else
                 {
                     coppie.Add($"{payload.Valore}-{payload.ValoreB}");
+                    aInizioAttesa = payload.Valore;
+                    aFineAttesa = payload.ValoreB;
                     risultato = RisolutoreStruttura.Risolvi(new[]
                     {
-                        (seiRighe, area, ZonaSpeciale.Collegamento),
-                        (payload, area, ZonaSpeciale.Ab),
+                        (seiRighe, areaLink, ZonaSpeciale.Collegamento),
+                        (payload, areaAb, ZonaSpeciale.Ab),
                     });
                 }
 
                 Assert.That(risultato.Errori, Is.Empty, "Errori su " + nome);
+                StrutturaTavolo s = risultato.Struttura;
+                Assert.AreEqual(battitiAttesi, s.BattitiPerMisura, "battiti su " + nome);
+                Assert.AreEqual(righeAttese, s.RigheCollegate, "righe su " + nome);
+                Assert.AreEqual(aInizioAttesa, s.AInizio, "A su " + nome);
+                Assert.AreEqual(aFineAttesa, s.AFine, "B su " + nome);
             }
 
             CollectionAssert.AreEquivalent(new[] { 2, 3, 4 }, misure);
@@ -167,6 +194,21 @@ namespace VisualMusicBlockLooper.Tests
             }
 
             CollectionAssert.AreEquivalent(attese, coppie);
+        }
+
+        // Il corpo dei cartoncini speciali e' neutro: nessuna traccia di colore, sotto la soglia di saturazione.
+        [Test]
+        public void ColoreSpeciale_NeutroESottoSogliaDiSaturazione()
+        {
+            Color speciale = GeneratoreCartoncini.ColoreSpeciale;
+            Assert.IsNull(ClassificatoreColore.Classifica(speciale.R, speciale.G, speciale.B), "Corpo speciale classificato come colore");
+            Assert.IsNull(ClassificatoreColore.Classifica(GeneratoreCartoncini.ColoreComando.R,
+                GeneratoreCartoncini.ColoreComando.G, GeneratoreCartoncini.ColoreComando.B), "Corpo comando classificato come colore");
+
+            int max = Math.Max(speciale.R, Math.Max(speciale.G, speciale.B));
+            int min = Math.Min(speciale.R, Math.Min(speciale.G, speciale.B));
+            double saturazione = (max - min) / (double)max;
+            Assert.That(saturazione, Is.LessThanOrEqualTo(0.25), "Saturazione del corpo speciale");
         }
 
         private static int LeggiIntero(string nome, int predefinito, int minimo, int massimo)

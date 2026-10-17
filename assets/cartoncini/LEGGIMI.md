@@ -50,7 +50,7 @@ Oltre a note e comandi, il tavolo legge 22 cartoncini speciali che impostano la 
 - **Collegamento** (al centro): righe per gruppo, 1, 2, 3 o 6 righe.
 - **A-B** (in basso): l'intervallo di righe che il giro percorre, da A a B.
 
-Il corpo è viola-grigio (120, 100, 150), diverso da quello dei comandi, e non ha colore di traccia. Ogni zona accetta un solo cartoncino: se ne sono posati più di uno vale quello più in alto (poi quello più a sinistra), gli altri sono segnalati come sovrapposti e ignorati.
+Il corpo è viola-grigio (135, 115, 150), diverso da quello dei comandi, e non ha colore di traccia. Ogni zona accetta un solo cartoncino: se ne sono posati più di uno vale quello più in alto (poi quello più a sinistra), gli altri sono segnalati come sovrapposti e ignorati.
 
 | File | Payload | Etichetta | Significato |
 |---|---|---|---|
@@ -76,7 +76,7 @@ Se una zona è vuota vale il default: **4/4**, **6 righe collegate**, **A-B 1-6*
 
 ### Scala
 
-La griglia è ora più stretta (67% della larghezza invece di 80%), perché la colonna a sinistra ospita le tre zone. Lo step proiettato risulta circa il 16% più stretto: per allineare la scala fisica dei cartoncini ricalcolare `VMBL_PASSO_MM` (circa 30 x 0.84, quindi circa 25 mm) e verificare con la proiezione reale. I PNG committati restano a 30 mm, come gli altri cartoncini.
+La griglia è più stretta rispetto alla versione precedente del progetto (67% della larghezza invece di 80%), perché la colonna a sinistra ospita le tre zone. Lo step proiettato risulta circa il 16% più stretto: per allineare la scala fisica dei cartoncini ricalcolare `VMBL_PASSO_MM` (circa 30 x 0.84, quindi circa 25 mm) e verificare con la proiezione reale. I PNG committati restano a 30 mm, come gli altri cartoncini.
 
 I QR speciali usano la correzione d'errore L: il payload di misura passa così alla versione QR 1, come gli altri cartoncini, e il rilevatore lo legge anche quando più QR sono visibili insieme. La griglia QR resta di 21 moduli, quindi il layout non cambia.
 
@@ -101,4 +101,4 @@ Attenzione:
 - La scala fisica dei PNG è nei metadati di risoluzione (300 dpi) e nelle dimensioni in pixel: cambiare `VMBL_PASSO_MM` cambia la larghezza in mm di tutti i cartoncini. Il materiale committato usa 30 mm.
 - Il generatore usa il font **Arial** per le etichette. Su macchine con font diversi i byte dei PNG e la posizione del testo possono differire leggermente; il contenuto dei QR è identico.
 
-Il test non esplicito `Rileva_CartoncinoGenerato_PayloadEColoreCorretti` verifica che i cartoncini generati siano letti dal rilevatore reale con il payload e il colore attesi. Il test `Rileva_CartoncinoSpeciale_PayloadCorretto` fa lo stesso per `speciale-misura-3.png`, `speciale-link-2.png` e `speciale-ab-2-5.png`, e `Speciali_PayloadAccettatiERisoltiSenzaErrori` controlla che tutti i 22 payload speciali siano validi nella loro zona.
+Il test non esplicito `Rileva_CartoncinoGenerato_PayloadEColoreCorretti` verifica che i cartoncini generati siano letti dal rilevatore reale con il payload e il colore attesi. Il test `Rileva_CartoncinoSpeciale_PayloadCorretto` fa lo stesso per `speciale-misura-3.png`, `speciale-link-2.png` e `speciale-ab-2-5.png`, e `Speciali_PayloadRisoltiNelLoroValoreEZona` controlla, per tutti i 22 payload speciali, la zona in cui cadono e i valori risolti (misura, righe, A e B). `ColoreSpeciale_NeutroESottoSogliaDiSaturazione` verifica che il corpo speciale non sia classificato come colore.

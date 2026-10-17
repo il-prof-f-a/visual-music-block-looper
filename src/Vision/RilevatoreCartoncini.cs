@@ -37,6 +37,9 @@ namespace VisualMusicBlockLooper.Vision
             this.calibrazione = calibrazione ?? throw new ArgumentNullException(nameof(calibrazione));
         }
 
+        /// <summary>Calibrazione con cui il rilevatore converte la camera nelle coordinate del tavolo.</summary>
+        public Calibrazione Calibrazione => calibrazione;
+
         public IReadOnlyList<CartoncinoRilevato> Rileva()
         {
             var risultato = new List<CartoncinoRilevato>();

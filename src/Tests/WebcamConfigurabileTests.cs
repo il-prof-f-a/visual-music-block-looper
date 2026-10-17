@@ -173,6 +173,11 @@ namespace VisualMusicBlockLooper.Tests
                 return null;
             }
 
+            public Bitmap AnteprimaRaddrizzata(VisualMusicBlockLooper.Vision.Calibrazione calibrazione, int larghezza, int altezza)
+            {
+                return null;
+            }
+
             public void Dispose()
             {
                 Rilasciata = true;
@@ -337,6 +342,8 @@ namespace VisualMusicBlockLooper.Tests
             public Mat Frame() { return null; }
 
             public Bitmap Anteprima() { return null; }
+
+            public Bitmap AnteprimaRaddrizzata(VisualMusicBlockLooper.Vision.Calibrazione calibrazione, int larghezza, int altezza) { return null; }
 
             public void Dispose() { }
         }

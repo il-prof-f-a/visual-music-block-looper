@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using VisualMusicBlockLooper.Core;
+using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
 {
@@ -15,6 +16,9 @@ namespace VisualMusicBlockLooper.App
 
         /// <summary>True se è stato impostato un rilevatore reale.</summary>
         public bool Attivo => corrente != null;
+
+        /// <summary>Calibrazione del rilevatore attivo (serve a raddrizzare l'anteprima), o null.</summary>
+        public Calibrazione CalibrazioneAttiva => (corrente as RilevatoreCartoncini)?.Calibrazione;
 
         /// <summary>Imposta il rilevatore da usare; null torna al tavolo vuoto.</summary>
         public void Imposta(IRilevatoreCartoncini rilevatore)

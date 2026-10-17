@@ -149,6 +149,63 @@ namespace VisualMusicBlockLooper.Vision
             return new PuntoTavolo(x / w, y / w);
         }
 
+        /// <summary>
+        /// Raddrizza l'immagine della camera sull'area del tavolo definita dalla calibrazione: il risultato è
+        /// una vista dall'alto, "stirata", in cui il rettangolo calibrato riempie tutta l'immagine
+        /// (tavolo (0,0) in alto a sinistra, (1,1) in basso a destra). Ciò che sta fuori dall'area
+        /// calibrata non compare.
+        /// </summary>
+        /// <param name="sorgente">Frame della camera (non viene modificato).</param>
+        /// <param name="larghezza">Larghezza in pixel dell'immagine raddrizzata.</param>
+        /// <param name="altezza">Altezza in pixel dell'immagine raddrizzata.</param>
+        /// <returns>Una nuova <see cref="Mat"/>: il chiamante la rilascia.</returns>
+        public Mat Raddrizza(Mat sorgente, int larghezza, int altezza)
+        {
+            if (sorgente == null || sorgente.Empty())
+            {
+                throw new ArgumentException("Il frame da raddrizzare è nullo o vuoto.", nameof(sorgente));
+            }
+
+            if (larghezza <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(larghezza), "La larghezza deve essere positiva.");
+            }
+
+            if (altezza <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(altezza), "L'altezza deve essere positiva.");
+            }
+
+            // M = S * H: H porta la camera nelle coordinate del tavolo (0..1), S le scala in pixel di uscita.
+            double[] riga0 = { matrice[0] * larghezza, matrice[1] * larghezza, matrice[2] * larghezza };
+            double[] riga1 = { matrice[3] * altezza, matrice[4] * altezza, matrice[5] * altezza };
+            double[] riga2 = { matrice[6], matrice[7], matrice[8] };
+
+            using (Mat trasformazione = new Mat(3, 3, MatType.CV_64FC1))
+            {
+                for (int c = 0; c < 3; c++)
+                {
+                    trasformazione.Set(0, c, riga0[c]);
+                    trasformazione.Set(1, c, riga1[c]);
+                    trasformazione.Set(2, c, riga2[c]);
+                }
+
+                Mat uscita = new Mat();
+                try
+                {
+                    Cv2.WarpPerspective(
+                        sorgente, uscita, trasformazione, new Size(larghezza, altezza),
+                        InterpolationFlags.Linear, BorderTypes.Constant, Scalar.All(0));
+                    return uscita;
+                }
+                catch
+                {
+                    uscita.Dispose();
+                    throw;
+                }
+            }
+        }
+
         public void Salva(string percorso)
         {
             if (percorso == null)

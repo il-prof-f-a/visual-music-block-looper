@@ -45,6 +45,8 @@ namespace VisualMusicBlockLooper.App
         private Label etichettaStato;
         private Label etichettaPorte;
         private Label etichettaAvviso;
+        private Label etichettaAnteprima;
+        private bool immagineRaddrizzata;
         private PictureBox anteprima;
         private Button pulsanteCalibra;
         private Button pulsanteAvviaFerma;
@@ -173,7 +175,7 @@ namespace VisualMusicBlockLooper.App
         private void CostruisciInterfaccia()
         {
             Text = "Visual Music Block Looper - Controllo";
-            ClientSize = new Size(760, 560);
+            ClientSize = new Size(760, 580);
             StartPosition = FormStartPosition.CenterScreen;
 
             etichettaStato = new Label
@@ -213,16 +215,22 @@ namespace VisualMusicBlockLooper.App
             pulsanteAggiornaWebcam = new Button { Text = "Aggiorna elenco", Left = 545, Top = 360, Width = 200, Height = 28 };
             pulsanteAggiornaWebcam.Click += (m, a) => AggiornaElencoWebcam();
 
+            etichettaAnteprima = new Label
+            {
+                Left = 10, Top = 458, Width = 740, Height = 40, ForeColor = Color.DarkBlue,
+                Font = new Font(Font.FontFamily, 9f, FontStyle.Bold), Text = AnteprimaTavolo.TestoGrezza
+            };
+
             etichettaAvviso = new Label
             {
-                Left = 10, Top = 462, Width = 740, Height = 90, ForeColor = Color.DarkRed
+                Left = 10, Top = 502, Width = 740, Height = 70, ForeColor = Color.DarkRed
             };
 
             Controls.AddRange(new Control[]
             {
                 etichettaStato, etichettaPorte, anteprima, pulsanteCalibra, pulsanteAvviaFerma,
                 pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor,
-                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, etichettaAvviso
+                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, etichettaAnteprima, etichettaAvviso
             });
 
             AggiornaInterfaccia();
@@ -315,7 +323,23 @@ namespace VisualMusicBlockLooper.App
 
         private void AggiornaAnteprima()
         {
-            Bitmap nuova = webcam.Anteprima();
+            // Con una calibrazione attiva l'anteprima mostra l'area del tavolo raddrizzata (stirata);
+            // durante la calibrazione serve invece l'immagine originale per cliccare i quattro angoli.
+            Calibrazione calibrazioneAttiva = rilevatore.CalibrazioneAttiva;
+            bool raddrizza = AnteprimaTavolo.Raddrizzata(calibrazioneAttiva != null, inCalibrazione);
+
+            Bitmap nuova;
+            if (raddrizza)
+            {
+                Size dimensioni = AnteprimaTavolo.Dimensioni(
+                    AspettoDelTavolo(), anteprima.ClientSize.Width, anteprima.ClientSize.Height);
+                nuova = webcam.AnteprimaRaddrizzata(calibrazioneAttiva, dimensioni.Width, dimensioni.Height);
+            }
+            else
+            {
+                nuova = webcam.Anteprima();
+            }
+
             if (nuova == null)
             {
                 return;
@@ -324,6 +348,20 @@ namespace VisualMusicBlockLooper.App
             Image vecchia = anteprima.Image;
             anteprima.Image = nuova;
             vecchia?.Dispose();
+            immagineRaddrizzata = raddrizza;
+            etichettaAnteprima.Text = raddrizza ? AnteprimaTavolo.TestoRaddrizzata : AnteprimaTavolo.TestoGrezza;
+        }
+
+        /// <summary>Rapporto larghezza/altezza del tavolo: quello dello schermo del proiettore, se scelto.</summary>
+        private double AspettoDelTavolo()
+        {
+            int indice = comboMonitor.SelectedIndex;
+            if (indice >= 0 && indice < schermi.Length && schermi[indice].Bounds.Height > 0)
+            {
+                return (double)schermi[indice].Bounds.Width / schermi[indice].Bounds.Height;
+            }
+
+            return AnteprimaTavolo.AspettoPredefinito;
         }
 
         private void AvviaCalibrazione()
@@ -343,7 +381,8 @@ namespace VisualMusicBlockLooper.App
 
         private void OnClickAnteprima(object mittente, MouseEventArgs argomenti)
         {
-            if (!inCalibrazione || anteprima.Image == null)
+            // Si clicca solo sull'immagine originale: i punti sono pixel della webcam, non dell'area raddrizzata.
+            if (!inCalibrazione || anteprima.Image == null || immagineRaddrizzata)
             {
                 return;
             }

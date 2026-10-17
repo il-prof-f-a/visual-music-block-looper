@@ -114,12 +114,39 @@ namespace VisualMusicBlockLooper.App
                     return null;
                 }
 
-                Cv2.ImEncode(".bmp", ultimoFrame, out byte[] byteImmagine);
-                using (MemoryStream flusso = new MemoryStream(byteImmagine))
-                using (Bitmap temporanea = new Bitmap(flusso))
+                return ABitmap(ultimoFrame);
+            }
+        }
+
+        /// <summary>Bitmap dell'ultimo frame raddrizzato sull'area calibrata del tavolo, o null; il chiamante la rilascia.</summary>
+        public Bitmap AnteprimaRaddrizzata(Calibrazione calibrazione, int larghezza, int altezza)
+        {
+            if (calibrazione == null)
+            {
+                return null;
+            }
+
+            lock (bloccoCamera)
+            {
+                if (eliminata || ultimoFrame == null || ultimoFrame.Empty())
                 {
-                    return new Bitmap(temporanea);
+                    return null;
                 }
+
+                using (Mat raddrizzato = calibrazione.Raddrizza(ultimoFrame, larghezza, altezza))
+                {
+                    return ABitmap(raddrizzato);
+                }
+            }
+        }
+
+        private static Bitmap ABitmap(Mat immagine)
+        {
+            Cv2.ImEncode(".bmp", immagine, out byte[] byteImmagine);
+            using (MemoryStream flusso = new MemoryStream(byteImmagine))
+            using (Bitmap temporanea = new Bitmap(flusso))
+            {
+                return new Bitmap(temporanea);
             }
         }
 

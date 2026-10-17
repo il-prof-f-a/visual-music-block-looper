@@ -15,5 +15,11 @@ namespace VisualMusicBlockLooper.App
 
         /// <summary>Bitmap dell'ultimo frame letto, o null; il chiamante la rilascia.</summary>
         Bitmap Anteprima();
+
+        /// <summary>
+        /// Bitmap dell'ultimo frame raddrizzato sull'area del tavolo (vedi <see cref="Calibrazione.Raddrizza"/>),
+        /// o null se non c'è ancora un frame; il chiamante la rilascia.
+        /// </summary>
+        Bitmap AnteprimaRaddrizzata(Calibrazione calibrazione, int larghezza, int altezza);
     }
 }

@@ -349,9 +349,13 @@ namespace VisualMusicBlockLooper.App
             try
             {
                 Calibrazione calibrazione = Calibrazione.Calcola(puntiCalibrazione.ToArray(), AngoliTavolo);
-                calibrazione.Salva(percorsoCalibrazione);
-                rilevatore.Imposta(new RilevatoreCartoncini(webcam, calibrazione));
+                string avvisoSalvataggio = ApplicazioneCalibrazione.Applica(
+                    rilevatore, webcam, calibrazione, c => c.Salva(percorsoCalibrazione));
                 calibrazionePresente = true;
+                if (avvisoSalvataggio != null)
+                {
+                    avvisi.Add(avvisoSalvataggio);
+                }
             }
             catch (Exception eccezione)
             {

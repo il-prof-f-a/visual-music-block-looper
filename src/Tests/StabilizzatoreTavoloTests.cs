@@ -21,7 +21,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(fotogramma1.Note, Is.Empty);
             Assert.That(fotogramma2.Note, Is.Empty);
             Assert.That(fotogramma3.Note, Has.Count.EqualTo(1));
-            Assert.That(fotogramma3.Note[0].Chiave, Is.EqualTo("12:3:2"));
+            Assert.That(fotogramma3.Note[0].Chiave, Is.EqualTo("12:3:0:2"));
         }
 
         [Test]
@@ -36,7 +36,7 @@ namespace VisualMusicBlockLooper.Tests
             {
                 StatoTavolo assente = stabilizzatore.Aggiorna(Stato());
                 Assert.That(assente.Note, Has.Count.EqualTo(1), $"frame di assenza {frame}");
-                Assert.That(assente.Note[0].Chiave, Is.EqualTo("12:3:2"));
+                Assert.That(assente.Note[0].Chiave, Is.EqualTo("12:3:0:2"));
             }
 
             // Ricomparsa: il contatore di assenza si azzera.

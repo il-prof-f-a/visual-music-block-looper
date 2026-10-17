@@ -67,7 +67,8 @@ namespace VisualMusicBlockLooper.Core
             return new StatoTavolo(
                 OutputNote(),
                 comandiEsposti,
-                errori);
+                errori,
+                grezzo?.Struttura);
         }
 
         private void AggiornaNote(IReadOnlyList<CartoncinoNota> noteGrezze)

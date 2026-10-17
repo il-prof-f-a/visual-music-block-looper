@@ -8,12 +8,12 @@ namespace VisualMusicBlockLooper.Midi
 {
     /// <summary>
     /// Ingresso MIDI dal DAW tramite DryWetMIDI. Gli eventi vengono sollevati
-    /// sul thread del dispositivo.
+    /// sul thread del dispositivo. Dopo Dispose nessun subscriber viene più invocato.
     /// </summary>
     public class IngressoMidiDryWet : IIngressoMidi, IDisposable
     {
         private readonly InputDevice dispositivo;
-        private bool disposto;
+        private readonly GuardiaRilascio guardia = new GuardiaRilascio("Ingresso MIDI");
 
         /// <summary>Apre la porta di ingresso indicata e avvia l'ascolto.</summary>
         /// <param name="nomePorta">Nome della porta MIDI di ingresso.</param>
@@ -21,8 +21,19 @@ namespace VisualMusicBlockLooper.Midi
         public IngressoMidiDryWet(string nomePorta)
         {
             dispositivo = ApriPorta(nomePorta);
-            dispositivo.EventReceived += GestisciEvento;
-            dispositivo.StartEventsListening();
+
+            try
+            {
+                dispositivo.EventReceived += GestisciEvento;
+                dispositivo.StartEventsListening();
+            }
+            catch
+            {
+                // Evita di perdere l'handle se l'avvio dell'ascolto fallisce.
+                dispositivo.EventReceived -= GestisciEvento;
+                dispositivo.Dispose();
+                throw;
+            }
         }
 
         /// <inheritdoc />
@@ -40,34 +51,35 @@ namespace VisualMusicBlockLooper.Midi
         /// <summary>Interrompe l'ascolto e rilascia la porta MIDI di ingresso.</summary>
         public void Dispose()
         {
-            if (disposto)
+            guardia.Rilascia(() =>
             {
-                return;
-            }
-
-            disposto = true;
-            dispositivo.EventReceived -= GestisciEvento;
-            dispositivo.StopEventsListening();
-            dispositivo.Dispose();
+                dispositivo.EventReceived -= GestisciEvento;
+                dispositivo.StopEventsListening();
+                dispositivo.Dispose();
+            });
         }
 
         private void GestisciEvento(object mittente, MidiEventReceivedEventArgs argomenti)
         {
-            switch (argomenti.Event)
+            // Dopo il rilascio gli eventi residui vengono ignorati.
+            guardia.EseguiSeAttivo(() =>
             {
-                case TimingClockEvent _:
-                    Solleva(ClockRicevuto);
-                    break;
-                case StartEvent _:
-                    Solleva(StartRicevuto);
-                    break;
-                case StopEvent _:
-                    Solleva(StopRicevuto);
-                    break;
-                case ContinueEvent _:
-                    Solleva(ContinueRicevuto);
-                    break;
-            }
+                switch (argomenti.Event)
+                {
+                    case TimingClockEvent _:
+                        Solleva(ClockRicevuto);
+                        break;
+                    case StartEvent _:
+                        Solleva(StartRicevuto);
+                        break;
+                    case StopEvent _:
+                        Solleva(StopRicevuto);
+                        break;
+                    case ContinueEvent _:
+                        Solleva(ContinueRicevuto);
+                        break;
+                }
+            });
         }
 
         private static void Solleva(Action evento)

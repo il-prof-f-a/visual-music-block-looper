@@ -39,12 +39,12 @@ namespace VisualMusicBlockLooper.Tests
         {
             VerificaPortaLoopback();
 
+            using (ManualResetEventSlim ricevuto = new ManualResetEventSlim(false))
             using (InputDevice osservatore = InputDevice.GetByName(PortaLoopback))
             using (UscitaMidiDryWet uscita = new UscitaMidiDryWet(PortaLoopback))
-            using (ManualResetEventSlim ricevuto = new ManualResetEventSlim(false))
             {
                 NoteOnEvent notaRicevuta = null;
-                osservatore.EventReceived += (mittente, argomenti) =>
+                EventHandler<MidiEventReceivedEventArgs> gestore = (mittente, argomenti) =>
                 {
                     if (argomenti.Event is NoteOnEvent noteOn && noteOn.NoteNumber == (SevenBitNumber)60)
                     {
@@ -52,11 +52,13 @@ namespace VisualMusicBlockLooper.Tests
                         ricevuto.Set();
                     }
                 };
+                osservatore.EventReceived += gestore;
                 osservatore.StartEventsListening();
 
                 uscita.NotaOn(0, 60, 100);
 
                 bool arrivato = ricevuto.Wait(TimeSpan.FromSeconds(3));
+                osservatore.EventReceived -= gestore;
                 osservatore.StopEventsListening();
 
                 Assert.That(arrivato, Is.True, "Nota-on non ricevuta sul loopback");
@@ -71,15 +73,17 @@ namespace VisualMusicBlockLooper.Tests
         {
             VerificaPortaLoopback();
 
+            using (ManualResetEventSlim ricevuto = new ManualResetEventSlim(false))
             using (OutputDevice mittente = OutputDevice.GetByName(PortaLoopback))
             using (IngressoMidiDryWet ingresso = new IngressoMidiDryWet(PortaLoopback))
-            using (ManualResetEventSlim ricevuto = new ManualResetEventSlim(false))
             {
-                ingresso.ClockRicevuto += () => ricevuto.Set();
+                Action gestore = () => ricevuto.Set();
+                ingresso.ClockRicevuto += gestore;
 
                 mittente.SendEvent(new TimingClockEvent());
 
                 bool arrivato = ricevuto.Wait(TimeSpan.FromSeconds(3));
+                ingresso.ClockRicevuto -= gestore;
 
                 Assert.That(arrivato, Is.True, "Clock non ricevuto dal loopback");
             }

@@ -31,6 +31,11 @@ namespace VisualMusicBlockLooper.Core
         // Comandi stabili (tenuti, non esposti): conteggio di assenze consecutive per chiave.
         private readonly Dictionary<string, int> comandiTenuti = new Dictionary<string, int>();
 
+        // Struttura stabile del tavolo, con la candidata che si sta confermando e il suo conteggio di frame.
+        private StrutturaTavolo strutturaStabile = StrutturaTavolo.Default;
+        private StrutturaTavolo candidata;
+        private int contatoreCandidata;
+
         /// <summary>Crea lo stabilizzatore con le soglie di presenza e di assenza in frame.</summary>
         /// <param name="framePresenza">Frame consecutivi di presenza necessari per diventare stabile (minimo 1).</param>
         /// <param name="frameAssenza">Frame consecutivi di assenza necessari per la rimozione (minimo 1).</param>
@@ -63,12 +68,41 @@ namespace VisualMusicBlockLooper.Core
 
             AggiornaNote(noteGrezze);
             List<ComandoRilevato> comandiEsposti = AggiornaComandi(comandiGrezzi);
+            AggiornaStruttura(grezzo?.Struttura ?? StrutturaTavolo.Default);
 
             return new StatoTavolo(
                 OutputNote(),
                 comandiEsposti,
                 errori,
-                grezzo?.Struttura);
+                strutturaStabile);
+        }
+
+        // La struttura cambia solo dopo framePresenza frame consecutivi con lo stesso valore diverso dallo stabile.
+        private void AggiornaStruttura(StrutturaTavolo struttura)
+        {
+            if (struttura.Equals(strutturaStabile))
+            {
+                candidata = null;
+                contatoreCandidata = 0;
+                return;
+            }
+
+            if (struttura.Equals(candidata))
+            {
+                contatoreCandidata++;
+            }
+            else
+            {
+                candidata = struttura;
+                contatoreCandidata = 1;
+            }
+
+            if (contatoreCandidata >= framePresenza)
+            {
+                strutturaStabile = candidata;
+                candidata = null;
+                contatoreCandidata = 0;
+            }
         }
 
         private void AggiornaNote(IReadOnlyList<CartoncinoNota> noteGrezze)

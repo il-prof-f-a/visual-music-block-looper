@@ -12,7 +12,6 @@ namespace VisualMusicBlockLooper.App
     public sealed class TickMaster : IDisposable
     {
         private const double PeriodoTimeoutMs = 100;
-        private const double SogliaRitardoInIntervalli = 4;
 
         private readonly MotoreMusicale motore;
         private readonly Func<long> orologioMs;
@@ -63,6 +62,23 @@ namespace VisualMusicBlockLooper.App
 
         private void Ciclo()
         {
+            // Senza risoluzione 1 ms Thread.Sleep(1) dura fino a ~15,6 ms e il clock MIDI avrebbe jitter.
+            bool risoluzioneAlzata = RisoluzioneTimer.Richiedi();
+            try
+            {
+                CicloInterno();
+            }
+            finally
+            {
+                if (risoluzioneAlzata)
+                {
+                    RisoluzioneTimer.Rilascia();
+                }
+            }
+        }
+
+        private void CicloInterno()
+        {
             Stopwatch cronometro = Stopwatch.StartNew();
             double prossimoTick = 0;
             double prossimoTimeout = PeriodoTimeoutMs;
@@ -83,12 +99,8 @@ namespace VisualMusicBlockLooper.App
                         // Un errore MIDI momentaneo non deve fermare il clock.
                     }
 
-                    // Accumulatore: la scadenza successiva non dipende dal ritardo effettivo (niente deriva).
-                    prossimoTick += intervallo;
-                    if (adesso - prossimoTick > SogliaRitardoInIntervalli * intervallo)
-                    {
-                        prossimoTick = adesso + intervallo;
-                    }
+                    // Accumulatore senza deriva; dopo uno stallo si recuperano al massimo 2 tick.
+                    prossimoTick = PianificatoreTick.Prossima(prossimoTick, adesso, intervallo);
                 }
 
                 if (adesso >= prossimoTimeout)

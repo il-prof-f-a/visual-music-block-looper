@@ -30,8 +30,17 @@ namespace VisualMusicBlockLooper.Midi
             catch
             {
                 // Evita di perdere l'handle se l'avvio dell'ascolto fallisce.
-                dispositivo.EventReceived -= GestisciEvento;
-                dispositivo.Dispose();
+                // Un errore durante la pulizia non deve mascherare l'eccezione originale.
+                try
+                {
+                    dispositivo.EventReceived -= GestisciEvento;
+                    dispositivo.Dispose();
+                }
+                catch (Exception)
+                {
+                    // Ignorato di proposito: viene rilanciata l'eccezione originale.
+                }
+
                 throw;
             }
         }
@@ -48,20 +57,32 @@ namespace VisualMusicBlockLooper.Midi
         /// <inheritdoc />
         public event Action ContinueRicevuto;
 
-        /// <summary>Interrompe l'ascolto e rilascia la porta MIDI di ingresso.</summary>
+        /// <summary>
+        /// Interrompe l'ascolto e rilascia la porta MIDI di ingresso. Il rilascio del dispositivo
+        /// avviene fuori dal lock della guardia, quindi non può deadlockare con il thread del dispositivo.
+        /// Un evento già in consegna può arrivare ai subscriber una volta dopo l'avvio di Dispose.
+        /// </summary>
         public void Dispose()
         {
+            // Sgancia il gestore prima del rilascio: eventi già in volo vengono comunque scartati dalla guardia.
+            dispositivo.EventReceived -= GestisciEvento;
+
             guardia.Rilascia(() =>
             {
-                dispositivo.EventReceived -= GestisciEvento;
-                dispositivo.StopEventsListening();
-                dispositivo.Dispose();
+                try
+                {
+                    dispositivo.StopEventsListening();
+                }
+                finally
+                {
+                    dispositivo.Dispose();
+                }
             });
         }
 
         private void GestisciEvento(object mittente, MidiEventReceivedEventArgs argomenti)
         {
-            // Dopo il rilascio gli eventi residui vengono ignorati.
+            // Dopo il rilascio gli eventi residui vengono ignorati; i subscriber sono invocati fuori dal lock.
             guardia.EseguiSeAttivo(() =>
             {
                 switch (argomenti.Event)

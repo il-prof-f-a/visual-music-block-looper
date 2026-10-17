@@ -10,10 +10,100 @@ namespace VisualMusicBlockLooper.Tests
     {
         private const double Tolleranza = 1e-6;
 
-        private static void AsseriPunto(PuntoTavolo atteso, PuntoTavolo ottenuto)
+        private static void AsseriPunto(PuntoTavolo atteso, PuntoTavolo ottenuto, double tolleranza = Tolleranza)
         {
-            Assert.That(ottenuto.X, Is.EqualTo(atteso.X).Within(Tolleranza));
-            Assert.That(ottenuto.Y, Is.EqualTo(atteso.Y).Within(Tolleranza));
+            Assert.That(ottenuto.X, Is.EqualTo(atteso.X).Within(tolleranza));
+            Assert.That(ottenuto.Y, Is.EqualTo(atteso.Y).Within(tolleranza));
+        }
+
+        private static string PercorsoTemporaneo()
+        {
+            return Path.Combine(Path.GetTempPath(), "vmbl-cal-" + Guid.NewGuid().ToString("N") + ".txt");
+        }
+
+        [Test]
+        public void RansacScartaUnPuntoErrato()
+        {
+            // Mappatura nota: tavolo = camera / (640, 480). Un punto del tavolo e' grossolanamente errato.
+            PuntoImmagine[] camera =
+            {
+                new PuntoImmagine(0, 0), new PuntoImmagine(640, 0), new PuntoImmagine(640, 480),
+                new PuntoImmagine(0, 480), new PuntoImmagine(320, 240), new PuntoImmagine(160, 360)
+            };
+            PuntoTavolo[] tavolo =
+            {
+                new PuntoTavolo(0, 0), new PuntoTavolo(1, 0), new PuntoTavolo(1, 1),
+                new PuntoTavolo(0, 1), new PuntoTavolo(0.9, 0.1), new PuntoTavolo(0.25, 0.75)
+            };
+
+            Calibrazione calibrazione = Calibrazione.Calcola(camera, tavolo);
+
+            AsseriPunto(new PuntoTavolo(0, 0), calibrazione.DaCameraATavolo(new PuntoImmagine(0, 0)), 1e-3);
+            AsseriPunto(new PuntoTavolo(1, 0), calibrazione.DaCameraATavolo(new PuntoImmagine(640, 0)), 1e-3);
+            AsseriPunto(new PuntoTavolo(1, 1), calibrazione.DaCameraATavolo(new PuntoImmagine(640, 480)), 1e-3);
+            AsseriPunto(new PuntoTavolo(0, 1), calibrazione.DaCameraATavolo(new PuntoImmagine(0, 480)), 1e-3);
+            AsseriPunto(new PuntoTavolo(0.25, 0.25), calibrazione.DaCameraATavolo(new PuntoImmagine(160, 120)), 1e-3);
+        }
+
+        [Test]
+        public void PuntoNonFiniteRifiutati()
+        {
+            PuntoTavolo[] tavolo =
+            {
+                new PuntoTavolo(0, 0), new PuntoTavolo(1, 0), new PuntoTavolo(1, 1), new PuntoTavolo(0, 1)
+            };
+            PuntoImmagine[] conNaN =
+            {
+                new PuntoImmagine(0, 0), new PuntoImmagine(640, 0),
+                new PuntoImmagine(double.NaN, 480), new PuntoImmagine(0, 480)
+            };
+            PuntoImmagine[] conInfinito =
+            {
+                new PuntoImmagine(0, 0), new PuntoImmagine(640, 0),
+                new PuntoImmagine(640, 480), new PuntoImmagine(double.PositiveInfinity, 480)
+            };
+
+            Assert.That(() => Calibrazione.Calcola(conNaN, tavolo), Throws.TypeOf<ArgumentException>());
+            Assert.That(() => Calibrazione.Calcola(conInfinito, tavolo), Throws.TypeOf<ArgumentException>());
+        }
+
+        [Test]
+        public void MessaggioLunghezzeDiverse()
+        {
+            PuntoImmagine[] camera =
+            {
+                new PuntoImmagine(0, 0), new PuntoImmagine(640, 0),
+                new PuntoImmagine(640, 480), new PuntoImmagine(0, 480)
+            };
+            PuntoTavolo[] tavolo =
+            {
+                new PuntoTavolo(0, 0), new PuntoTavolo(1, 0),
+                new PuntoTavolo(1, 1), new PuntoTavolo(0, 1), new PuntoTavolo(0.5, 0.5)
+            };
+
+            ArgumentException ex = Assert.Throws<ArgumentException>(() => Calibrazione.Calcola(camera, tavolo));
+
+            Assert.That(ex.Message, Does.Contain("4").And.Contain("5"));
+            Assert.That(ex.ParamName, Is.EqualTo("puntiTavolo"));
+        }
+
+        [Test]
+        public void CaricaMatriceDegenere()
+        {
+            string percorso = PercorsoTemporaneo();
+
+            try
+            {
+                File.WriteAllText(percorso, "VMBL-CAL1\n1;0;0;0;1;0;0;0;0\n");
+                Assert.That(() => Calibrazione.Carica(percorso), Throws.TypeOf<InvalidDataException>());
+            }
+            finally
+            {
+                if (File.Exists(percorso))
+                {
+                    File.Delete(percorso);
+                }
+            }
         }
 
         [Test]
@@ -141,7 +231,7 @@ namespace VisualMusicBlockLooper.Tests
 
                 PuntoImmagine prova = new PuntoImmagine(300, 250);
                 PuntoTavolo attesoOriginale = originale.DaCameraATavolo(prova);
-                AsseriPunto(attesoOriginale, caricata.DaCameraATavolo(prova));
+                AsseriPunto(attesoOriginale, caricata.DaCameraATavolo(prova), 1e-9);
             }
             finally
             {

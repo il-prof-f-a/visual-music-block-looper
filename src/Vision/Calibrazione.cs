@@ -19,6 +19,9 @@ namespace VisualMusicBlockLooper.Vision
         private const double SogliaW = 1e-12;
         private const double SogliaDeterminante = 1e-12;
 
+        // Soglia RANSAC in unita' del tavolo (coordinate normalizzate 0..1).
+        private const double SogliaRansacTavolo = 0.02;
+
         private readonly double[] matrice;
 
         private Calibrazione(double[] matrice)
@@ -40,41 +43,40 @@ namespace VisualMusicBlockLooper.Vision
 
             if (puntiCamera.Length < NumeroPuntiMinimi || puntiTavolo.Length < NumeroPuntiMinimi)
             {
-                throw new ArgumentException("Servono almeno 4 punti di calibrazione.", nameof(puntiCamera));
+                throw new ArgumentException(
+                    "Servono almeno 4 punti di calibrazione (camera: " + puntiCamera.Length
+                    + ", tavolo: " + puntiTavolo.Length + ").", nameof(puntiCamera));
             }
 
             if (puntiCamera.Length != puntiTavolo.Length)
             {
-                throw new ArgumentException("Il numero di punti camera e tavolo deve coincidere.", nameof(puntiTavolo));
+                throw new ArgumentException(
+                    "Il numero di punti camera (" + puntiCamera.Length
+                    + ") e tavolo (" + puntiTavolo.Length + ") deve coincidere.", nameof(puntiTavolo));
+            }
+
+            if (puntiCamera.Any(p => !Finito(p.X) || !Finito(p.Y)) || puntiTavolo.Any(p => !Finito(p.X) || !Finito(p.Y)))
+            {
+                throw new ArgumentException("I punti di calibrazione devono avere coordinate finite.", nameof(puntiCamera));
             }
 
             Point2d[] sorgente = puntiCamera.Select(p => new Point2d(p.X, p.Y)).ToArray();
             Point2d[] destinazione = puntiTavolo.Select(p => new Point2d(p.X, p.Y)).ToArray();
 
             // Con esattamente 4 punti l'omografia e' determinata: nessun RANSAC necessario.
-            HomographyMethods metodo = sorgente.Length == NumeroPuntiMinimi
-                ? HomographyMethods.None
-                : HomographyMethods.Ransac;
-
+            // Con piu' punti RANSAC scarta gli outlier; la soglia e' espressa in unita' del tavolo.
             double[] valori;
-            using (Mat h = Cv2.FindHomography(sorgente, destinazione, metodo))
+            if (sorgente.Length == NumeroPuntiMinimi)
             {
-                if (h == null || h.Empty() || h.Rows != 3 || h.Cols != 3)
-                {
-                    throw new ArgumentException("Punti di calibrazione degeneri: impossibile calcolare l'omografia.", nameof(puntiCamera));
-                }
-
-                valori = new double[ValoriMatrice];
-                for (int r = 0; r < 3; r++)
-                {
-                    for (int c = 0; c < 3; c++)
-                    {
-                        valori[r * 3 + c] = h.At<double>(r, c);
-                    }
-                }
+                valori = LeggiMatrice(Cv2.FindHomography(sorgente, destinazione, HomographyMethods.None));
+            }
+            else
+            {
+                valori = LeggiMatrice(Cv2.FindHomography(
+                    sorgente, destinazione, HomographyMethods.Ransac, SogliaRansacTavolo));
             }
 
-            if (valori.Any(v => double.IsNaN(v) || double.IsInfinity(v)) || Math.Abs(Determinante(valori)) < SogliaDeterminante)
+            if (valori == null || !MatriceValida(valori))
             {
                 throw new ArgumentException("Punti di calibrazione degeneri: impossibile calcolare l'omografia.", nameof(puntiCamera));
             }
@@ -103,7 +105,8 @@ namespace VisualMusicBlockLooper.Vision
                 throw new ArgumentNullException(nameof(percorso));
             }
 
-            string valori = string.Join(";", matrice.Select(v => v.ToString("R", CultureInfo.InvariantCulture)));
+            // "G17" garantisce il round-trip esatto di un double su net472.
+            string valori = string.Join(";", matrice.Select(v => v.ToString("G17", CultureInfo.InvariantCulture)));
             File.WriteAllText(percorso, Intestazione + Environment.NewLine + valori + Environment.NewLine, Encoding.UTF8);
         }
 
@@ -138,7 +141,7 @@ namespace VisualMusicBlockLooper.Vision
             for (int i = 0; i < ValoriMatrice; i++)
             {
                 if (!double.TryParse(parti[i], NumberStyles.Float, CultureInfo.InvariantCulture, out double v)
-                    || double.IsNaN(v) || double.IsInfinity(v))
+                    || !Finito(v))
                 {
                     throw new InvalidDataException("Valore non valido nel file di calibrazione: '" + parti[i] + "'.");
                 }
@@ -146,7 +149,44 @@ namespace VisualMusicBlockLooper.Vision
                 valori[i] = v;
             }
 
+            if (!MatriceValida(valori))
+            {
+                throw new InvalidDataException("Matrice di calibrazione degenere nel file.");
+            }
+
             return new Calibrazione(valori);
+        }
+
+        private static double[] LeggiMatrice(Mat h)
+        {
+            using (h)
+            {
+                if (h == null || h.Empty() || h.Rows != 3 || h.Cols != 3)
+                {
+                    return null;
+                }
+
+                double[] valori = new double[ValoriMatrice];
+                for (int r = 0; r < 3; r++)
+                {
+                    for (int c = 0; c < 3; c++)
+                    {
+                        valori[r * 3 + c] = h.At<double>(r, c);
+                    }
+                }
+
+                return valori;
+            }
+        }
+
+        private static bool MatriceValida(double[] m)
+        {
+            return m.All(Finito) && Math.Abs(Determinante(m)) >= SogliaDeterminante;
+        }
+
+        private static bool Finito(double v)
+        {
+            return !double.IsNaN(v) && !double.IsInfinity(v);
         }
 
         private static double Determinante(double[] m)

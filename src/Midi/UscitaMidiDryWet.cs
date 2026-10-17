@@ -10,11 +10,13 @@ namespace VisualMusicBlockLooper.Midi
     /// <summary>
     /// Uscita MIDI verso il DAW tramite DryWetMIDI. Invia solo messaggi:
     /// non richiama mai il motore dall'interno dei metodi di invio.
+    /// Invii e rilascio sono sincronizzati: thread diversi possono inviare
+    /// in sicurezza, e dopo Dispose ogni invio lancia ObjectDisposedException.
     /// </summary>
     public class UscitaMidiDryWet : IUscitaMidi, IDisposable
     {
         private readonly OutputDevice dispositivo;
-        private bool disposto;
+        private readonly GuardiaRilascio guardia = new GuardiaRilascio("Uscita MIDI");
 
         /// <summary>Apre la porta di uscita indicata.</summary>
         /// <param name="nomePorta">Nome della porta MIDI di uscita.</param>
@@ -34,7 +36,7 @@ namespace VisualMusicBlockLooper.Midi
                 Channel = (FourBitNumber)ConversioneMidi.Canale(canale)
             };
 
-            dispositivo.SendEvent(evento);
+            Invia(evento);
         }
 
         /// <inheritdoc />
@@ -47,43 +49,42 @@ namespace VisualMusicBlockLooper.Midi
                 Channel = (FourBitNumber)ConversioneMidi.Canale(canale)
             };
 
-            dispositivo.SendEvent(evento);
+            Invia(evento);
         }
 
         /// <inheritdoc />
         public void Clock()
         {
-            dispositivo.SendEvent(new TimingClockEvent());
+            Invia(new TimingClockEvent());
         }
 
         /// <inheritdoc />
         public void Start()
         {
-            dispositivo.SendEvent(new StartEvent());
+            Invia(new StartEvent());
         }
 
         /// <inheritdoc />
         public void Stop()
         {
-            dispositivo.SendEvent(new StopEvent());
+            Invia(new StopEvent());
         }
 
         /// <inheritdoc />
         public void Continue()
         {
-            dispositivo.SendEvent(new ContinueEvent());
+            Invia(new ContinueEvent());
         }
 
-        /// <summary>Rilascia la porta MIDI di uscita.</summary>
+        /// <summary>Rilascia la porta MIDI di uscita. Attende l'eventuale invio in corso.</summary>
         public void Dispose()
         {
-            if (disposto)
-            {
-                return;
-            }
+            guardia.Rilascia(() => dispositivo.Dispose());
+        }
 
-            disposto = true;
-            dispositivo.Dispose();
+        private void Invia(MidiEvent evento)
+        {
+            guardia.Esegui(() => dispositivo.SendEvent(evento));
         }
 
         private static OutputDevice ApriPorta(string nomePorta)

@@ -43,7 +43,7 @@ namespace VisualMusicBlockLooper.Tests
         // Rigenera i PNG in assets/cartoncini (eseguire a mano con --filter Name=GeneraCartoncini).
         // Parametri opzionali da variabili d'ambiente: VMBL_PASSO_MM (mm per passo, 15-60) e
         // VMBL_PASSI (passi per cartoncino, 2-8). Senza variabili: 30 mm e 2 passi.
-        // ATTENZIONE: ogni esecuzione riscrive tutti i 53 PNG in assets/cartoncini.
+        // ATTENZIONE: ogni esecuzione riscrive tutti i 75 PNG in assets/cartoncini (53 di nota e comando, 22 speciali).
         [Test, Explicit("Rigenera il materiale stampabile in assets/cartoncini")]
         public void GeneraCartoncini()
         {
@@ -55,7 +55,118 @@ namespace VisualMusicBlockLooper.Tests
 
             GeneratoreCartoncini.Genera(dir, passoMm, GeneratoreCartoncini.AltezzaMmDefault, passi);
 
-            Assert.That(Directory.GetFiles(dir, "*.png"), Has.Length.EqualTo(53));
+            Assert.That(Directory.GetFiles(dir, "*.png"), Has.Length.EqualTo(75));
+        }
+
+        private static IReadOnlyList<CartoncinoRilevato> RilevaSul(Bitmap tavolo, int larghezza, int altezza)
+        {
+            Mat mat;
+            using (MemoryStream flusso = new MemoryStream())
+            {
+                tavolo.Save(flusso, ImageFormat.Png);
+                mat = Cv2.ImDecode(flusso.ToArray(), ImreadModes.Color);
+            }
+
+            using (mat)
+            {
+                return new RilevatoreCartoncini(new FonteMat(mat), CalibrazioneSuFrame(larghezza, altezza)).Rileva();
+            }
+        }
+
+        // I cartoncini speciali stampati in assets/cartoncini devono essere letti dal rilevatore reale.
+        [Test]
+        public void Rileva_CartoncinoSpeciale_PayloadCorretto()
+        {
+            const int larghezza = 1600;
+            const int altezza = 1100;
+            string dir = GeneratoreCartoncini.CartellaCartoncini();
+            Assert.IsNotNull(dir);
+
+            using (Bitmap tavolo = new Bitmap(larghezza, altezza))
+            using (Graphics g = Graphics.FromImage(tavolo))
+            {
+                g.Clear(Color.White);
+                using (Bitmap misura = new Bitmap(Path.Combine(dir, "speciale-misura-3.png")))
+                using (Bitmap link = new Bitmap(Path.Combine(dir, "speciale-link-2.png")))
+                using (Bitmap ab = new Bitmap(Path.Combine(dir, "speciale-ab-2-5.png")))
+                {
+                    g.DrawImage(misura, 60, 40);
+                    g.DrawImage(link, 60, 560);
+                    g.DrawImage(ab, 800, 300);
+                }
+
+                var rilevati = RilevaSul(tavolo, larghezza, altezza);
+
+                Assert.AreEqual(3, rilevati.Count, "Cartoncini letti: " + rilevati.Count);
+
+                Dictionary<string, CartoncinoRilevato> per = new Dictionary<string, CartoncinoRilevato>();
+                foreach (CartoncinoRilevato r in rilevati)
+                {
+                    per[r.Payload] = r;
+                }
+
+                Assert.That(per.ContainsKey("VMBL1;S;MISURA;3"), Is.True, "Payload misura non letto");
+                Assert.That(per.ContainsKey("VMBL1;S;LINK;2"), Is.True, "Payload collegamento non letto");
+                Assert.That(per.ContainsKey("VMBL1;S;AB;2;5"), Is.True, "Payload A-B non letto");
+            }
+        }
+
+        // Ogni payload prodotto dal generatore deve essere valido e risolto senza errori nella sua zona.
+        [Test]
+        public void Speciali_PayloadAccettatiERisoltiSenzaErrori()
+        {
+            var elenco = GeneratoreCartoncini.ElencoSpeciali();
+            Assert.That(elenco, Has.Count.EqualTo(22));
+
+            var area = new RettangoloTavolo(0.01, 0.04, 0.1, 0.1);
+            Assert.That(ParserPayload.TryParse("VMBL1;S;LINK;6", out PayloadCartoncino seiRighe), Is.True);
+
+            var misure = new List<int>();
+            var collegamenti = new List<int>();
+            var coppie = new List<string>();
+            foreach (var (nome, testo, _) in elenco)
+            {
+                PayloadCartoncino payload;
+                Assert.That(ParserPayload.TryParse(testo, out payload), Is.True, "Payload non valido: " + nome);
+                Assert.AreEqual(TipoCartoncino.Impostazione, payload.Tipo, nome);
+
+                RisoluzioneStruttura risultato;
+                if (payload.Impostazione == TipoImpostazione.Misura)
+                {
+                    misure.Add(payload.Valore);
+                    risultato = RisolutoreStruttura.Risolvi(new[] { (payload, area, ZonaSpeciale.Misura) });
+                }
+                else if (payload.Impostazione == TipoImpostazione.Collegamento)
+                {
+                    collegamenti.Add(payload.Valore);
+                    risultato = RisolutoreStruttura.Risolvi(new[] { (payload, area, ZonaSpeciale.Collegamento) });
+                }
+                else
+                {
+                    coppie.Add($"{payload.Valore}-{payload.ValoreB}");
+                    risultato = RisolutoreStruttura.Risolvi(new[]
+                    {
+                        (seiRighe, area, ZonaSpeciale.Collegamento),
+                        (payload, area, ZonaSpeciale.Ab),
+                    });
+                }
+
+                Assert.That(risultato.Errori, Is.Empty, "Errori su " + nome);
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 2, 3, 4 }, misure);
+            CollectionAssert.AreEquivalent(new[] { 1, 2, 3, 6 }, collegamenti);
+
+            var attese = new List<string>();
+            for (int a = 1; a <= 6; a++)
+            {
+                for (int b = a + 1; b <= 6; b++)
+                {
+                    attese.Add($"{a}-{b}");
+                }
+            }
+
+            CollectionAssert.AreEquivalent(attese, coppie);
         }
 
         private static int LeggiIntero(string nome, int predefinito, int minimo, int massimo)

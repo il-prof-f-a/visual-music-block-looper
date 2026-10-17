@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
@@ -58,6 +59,9 @@ namespace VisualMusicBlockLooper.Tests
         /// <summary>Corpo neutro (grigio-azzurro, sotto la soglia di saturazione) per i cartoncini comando.</summary>
         public static readonly Color ColoreComando = Color.FromArgb(110, 120, 140);
 
+        /// <summary>Corpo neutro viola-grigio dei cartoncini speciali (misura, collegamento, A-B), distinto da <see cref="ColoreComando"/>.</summary>
+        public static readonly Color ColoreSpeciale = Color.FromArgb(255, 120, 100, 150);
+
         /// <summary>Nomi dei colori in italiano, nello stesso ordine di <see cref="ColoriCorpo"/>.</summary>
         public static readonly string[] NomiColori = { "Rosso", "Arancione", "Giallo", "Verde", "Blu", "Viola" };
 
@@ -82,7 +86,51 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         /// <summary>
-        /// Rigenera tutti i cartoncini in <paramref name="cartella"/>: 6 colori x 8 clip di nota e 5 comandi.
+        /// Crea un cartoncino speciale (corpo viola-grigio, payload VMBL1;S;...).
+        /// Correzione d'errore L: i payload speciali (fino a 16 byte) entrano nella versione QR 1, come gli altri
+        /// cartoncini; con il livello M il payload di MISURA passerebbe alla versione 2 e il rilevatore non lo legge
+        /// quando più QR sono visibili insieme. La griglia resta di 21 moduli, quindi il layout non cambia.
+        /// </summary>
+        public static Bitmap CartoncinoSpeciale(string payload, string etichetta, int passi = 2,
+            double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
+        {
+            return Disegna(payload, ColoreSpeciale, etichetta, passi, passoMm, altezzaMm,
+                ZXing.QrCode.Internal.ErrorCorrectionLevel.L);
+        }
+
+        /// <summary>
+        /// Elenco dei 22 cartoncini speciali: misura 2-4 (3), collegamento 1, 2, 3, 6 (4) e A-B a&lt;b in 1..6 (15).
+        /// Ogni voce è (nome file, payload, etichetta).
+        /// </summary>
+        public static IReadOnlyList<(string Nome, string Payload, string Etichetta)> ElencoSpeciali()
+        {
+            var elenco = new List<(string Nome, string Payload, string Etichetta)>();
+
+            foreach (int battiti in new[] { 2, 3, 4 })
+            {
+                elenco.Add(($"speciale-misura-{battiti}.png", $"VMBL1;S;MISURA;{battiti}", $"{battiti}/4"));
+            }
+
+            foreach (int righe in new[] { 1, 2, 3, 6 })
+            {
+                string etichetta = righe == 1 ? "1 riga" : $"{righe} righe";
+                elenco.Add(($"speciale-link-{righe}.png", $"VMBL1;S;LINK;{righe}", etichetta));
+            }
+
+            for (int a = 1; a <= 6; a++)
+            {
+                for (int b = a + 1; b <= 6; b++)
+                {
+                    elenco.Add(($"speciale-ab-{a}-{b}.png", $"VMBL1;S;AB;{a};{b}", $"A-B {a}-{b}"));
+                }
+            }
+
+            return elenco;
+        }
+
+        /// <summary>
+        /// Rigenera tutti i cartoncini in <paramref name="cartella"/>: 6 colori x 8 clip di nota, 5 comandi
+        /// e 22 cartoncini speciali (75 PNG in totale).
         /// </summary>
         public static void Genera(string cartella, double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault,
             int passi = PassiDefault)
@@ -104,13 +152,19 @@ namespace VisualMusicBlockLooper.Tests
             Salva(CartoncinoComando("VMBL1;C;MODO", "MODO", passi, passoMm, altezzaMm), Path.Combine(cartella, "comando-modo.png"));
             Salva(CartoncinoComando($"VMBL1;C;ONESHOT;{NotaBase}", $"ONESHOT · nota {NotaBase}", passi, passoMm, altezzaMm),
                 Path.Combine(cartella, "comando-oneshot-36.png"));
+
+            foreach (var (nome, payload, etichetta) in ElencoSpeciali())
+            {
+                Salva(CartoncinoSpeciale(payload, etichetta, passi, passoMm, altezzaMm), Path.Combine(cartella, nome));
+            }
         }
 
         /// <summary>
         /// Disegna un cartoncino: QR bianco con zona quieta sul bordo sinistro, corpo colorato intorno,
         /// etichetta in alto a destra del corpo, area di disegno incorniciata, contorno di taglio nero.
         /// </summary>
-        public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm)
+        public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm,
+            ZXing.QrCode.Internal.ErrorCorrectionLevel? livelloEcc = null)
         {
             if (passi < PassiMinimi)
             {
@@ -136,7 +190,7 @@ namespace VisualMusicBlockLooper.Tests
                 // QR: quadrato bianco con zona quieta, a sinistra, centrato in verticale.
                 double latoQrMm = altezzaMm - 2 * MargineVerticaleMm;
                 RettangoloPx qr = new RettangoloPx(Mm(MargineSinistroMm, k), Mm(MargineVerticaleMm, k), Mm(latoQrMm, k));
-                DisegnaQr(g, payload, qr);
+                DisegnaQr(g, payload, qr, livelloEcc ?? ZXing.QrCode.Internal.ErrorCorrectionLevel.M);
 
                 // Area di disegno incorniciata a destra del QR, sotto la fascia dell'etichetta.
                 double xAreaMm = MargineSinistroMm + latoQrMm + 4;
@@ -187,12 +241,12 @@ namespace VisualMusicBlockLooper.Tests
             return dir == null ? null : Path.Combine(dir, "assets", "cartoncini");
         }
 
-        private static void DisegnaQr(Graphics g, string testo, RettangoloPx area)
+        private static void DisegnaQr(Graphics g, string testo, RettangoloPx area, ZXing.QrCode.Internal.ErrorCorrectionLevel livelloEcc)
         {
             var hint = new System.Collections.Generic.Dictionary<EncodeHintType, object>
             {
                 { EncodeHintType.MARGIN, 0 },
-                { EncodeHintType.ERROR_CORRECTION, ZXing.QrCode.Internal.ErrorCorrectionLevel.M },
+                { EncodeHintType.ERROR_CORRECTION, livelloEcc },
             };
             BitMatrix m = new QRCodeWriter().encode(testo, BarcodeFormat.QR_CODE, 0, 0, hint);
 

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
@@ -32,6 +34,44 @@ namespace VisualMusicBlockLooper.App
                 default:
                     avviso = null;
                     return true;
+            }
+        }
+
+        /// <summary>
+        /// Carica la calibrazione salvata e, se compatibile con la webcam corrente, attiva il rilevatore.
+        /// Senza webcam, senza file o con risoluzione diversa il rilevatore resta spento.
+        /// </summary>
+        /// <param name="avvisi">Riceve i messaggi da mostrare all'operatore.</param>
+        /// <returns>True se il rilevatore è stato attivato.</returns>
+        public static bool TentaCaricamento(
+            string percorso, GestoreWebcam webcam, RilevatoreCommutabile rilevatore, ICollection<string> avvisi)
+        {
+            if (webcam == null || !webcam.Disponibile || !File.Exists(percorso))
+            {
+                return false;
+            }
+
+            try
+            {
+                Calibrazione calibrazione = Calibrazione.Carica(percorso);
+                bool attivabile = ValutaRisoluzione(calibrazione, webcam.Larghezza, webcam.Altezza, out string avviso);
+                if (avviso != null)
+                {
+                    avvisi.Add(avviso);
+                }
+
+                if (!attivabile)
+                {
+                    return false;
+                }
+
+                rilevatore.Imposta(new RilevatoreCartoncini(webcam, calibrazione));
+                return true;
+            }
+            catch (Exception eccezione)
+            {
+                avvisi.Add("Calibrazione salvata non valida (" + eccezione.Message + "): ripetere la calibrazione.");
+                return false;
             }
         }
 

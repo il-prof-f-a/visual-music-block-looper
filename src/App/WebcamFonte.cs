@@ -6,8 +6,8 @@ using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
 {
-    /// <summary>Sorgente di immagini basata sulla prima webcam; conserva l'ultimo frame per l'anteprima.</summary>
-    public sealed class WebcamFonte : IFonteImmagini, IDisposable
+    /// <summary>Sorgente di immagini basata su una webcam di sistema (per indice); conserva l'ultimo frame per l'anteprima.</summary>
+    public sealed class WebcamFonte : ISorgenteWebcam
     {
         /// <summary>Larghezza richiesta alla webcam.</summary>
         public const int LarghezzaRichiesta = 1280;

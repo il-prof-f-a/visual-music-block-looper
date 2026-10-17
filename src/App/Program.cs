@@ -33,10 +33,22 @@ namespace VisualMusicBlockLooper.App
             IUscitaMidi uscita = ApriUscita(configMidi.PortaUscita, avvisi, risorse);
             IIngressoMidi ingresso = ApriIngresso(configMidi.PortaIngresso, avvisi, risorse);
 
-            WebcamFonte webcam = WebcamFonte.Apri(0);
+            string percorsoConfigurazione = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
+            ConfigurazioneApplicazione configurazione = CaricaConfigurazione(percorsoConfigurazione, avvisi);
+
+            // L'elenco si rileva prima di aprire la webcam configurata: una webcam aperta risulterebbe occupata.
+            IReadOnlyList<InfoWebcam> elencoWebcam = ElencoWebcam.RilevaReali();
+            GestoreWebcam webcam = new GestoreWebcam(indice => WebcamFonte.Apri(indice));
+            if (!webcam.Apri(configurazione.Webcam.Indice))
+            {
+                avvisi.Add("Webcam " + configurazione.Webcam.Indice
+                    + " (da configurazione) non disponibile: scegli una webcam dalla lista.");
+            }
+
             RilevatoreCommutabile rilevatore = new RilevatoreCommutabile();
             string percorsoCalibrazione = Path.Combine(cartella, NomeCalibrazione);
-            bool calibrata = CaricaCalibrazione(webcam, rilevatore, percorsoCalibrazione, avvisi);
+            bool calibrata = ApplicazioneCalibrazione.TentaCaricamento(
+                percorsoCalibrazione, webcam, rilevatore, avvisi);
 
             Compositore compositore = new Compositore(
                 rilevatore, uscita, ingresso, mappatura, config, null, orologioMs);
@@ -46,6 +58,7 @@ namespace VisualMusicBlockLooper.App
 
             using (FormControllo controllo = new FormControllo(
                 compositore, proiettore, webcam, rilevatore, percorsoCalibrazione,
+                configurazione, percorsoConfigurazione, elencoWebcam,
                 orologioMs, testoPorte, avvisi, risorse, calibrata))
             {
                 Application.Run(controllo);
@@ -95,36 +108,16 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
-        private static bool CaricaCalibrazione(
-            WebcamFonte webcam, RilevatoreCommutabile rilevatore, string percorso, List<string> avvisi)
+        private static ConfigurazioneApplicazione CaricaConfigurazione(string percorso, List<string> avvisi)
         {
-            if (webcam == null || !File.Exists(percorso))
-            {
-                return false;
-            }
-
             try
             {
-                Calibrazione calibrazione = Calibrazione.Carica(percorso);
-                bool attivabile = ApplicazioneCalibrazione.ValutaRisoluzione(
-                    calibrazione, webcam.Larghezza, webcam.Altezza, out string avviso);
-                if (avviso != null)
-                {
-                    avvisi.Add(avviso);
-                }
-
-                if (!attivabile)
-                {
-                    return false;
-                }
-
-                rilevatore.Imposta(new RilevatoreCartoncini(webcam, calibrazione));
-                return true;
+                return ConfigurazioneApplicazione.Carica(percorso);
             }
-            catch (Exception eccezione)
+            catch (Exception eccezione) when (eccezione is IOException || eccezione is InvalidDataException || eccezione is ArgumentException)
             {
-                avvisi.Add("Calibrazione salvata non valida (" + eccezione.Message + "): ripetere la calibrazione.");
-                return false;
+                avvisi.Add("Configurazione non caricata (" + eccezione.Message + "): uso i valori di default.");
+                return new ConfigurazioneApplicazione();
             }
         }
     }

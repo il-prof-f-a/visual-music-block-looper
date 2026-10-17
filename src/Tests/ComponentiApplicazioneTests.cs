@@ -134,7 +134,8 @@ namespace VisualMusicBlockLooper.Tests
             Assert.DoesNotThrow(() =>
             {
                 using (var form = new FormControllo(
-                    compositore, new FormProiettore(config), null, rilevatore, "calibrazione-test.txt",
+                    compositore, new FormProiettore(config), new GestoreWebcam(i => null), rilevatore,
+                    "calibrazione-test.txt", new ConfigurazioneApplicazione(), null, new List<InfoWebcam>(),
                     () => 0, "MIDI", new List<string>(), new List<System.IDisposable>(), false))
                 {
                     Assert.That(form.Text, Is.Not.Empty);

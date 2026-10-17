@@ -401,14 +401,17 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Dopo una calibrazione riuscita salva nel file di configurazione la webcam in uso.</summary>
         private void SalvaWebcamInConfigurazione()
         {
-            if (string.IsNullOrEmpty(percorsoConfigurazione) || webcam.IndiceCorrente < 0)
+            InfoWebcam inUso = webcam.Info;
+            if (string.IsNullOrEmpty(percorsoConfigurazione) || inUso == null)
             {
                 return;
             }
 
             try
             {
-                configurazione.Webcam.Indice = webcam.IndiceCorrente;
+                // Si salva l'identità (nome e percorso), non solo la posizione: al prossimo avvio
+                // l'ordine delle webcam può essere diverso.
+                configurazione.Webcam.Imposta(inUso);
                 configurazione.Salva(percorsoConfigurazione);
             }
             catch (Exception eccezione)
@@ -428,7 +431,7 @@ namespace VisualMusicBlockLooper.App
                     comboWebcam.Items.Add(info);
                 }
 
-                comboWebcam.SelectedItem = elenco.FirstOrDefault(i => i.Indice == webcam.IndiceCorrente);
+                comboWebcam.SelectedItem = TrovaInElenco(elenco, webcam.Info);
             }
             finally
             {
@@ -438,8 +441,20 @@ namespace VisualMusicBlockLooper.App
 
         private void AggiornaElencoWebcam()
         {
-            // Le webcam libere vengono provate aprendole; quella in uso non si riapre.
             PopolaElencoWebcam(ElencoWebcam.RilevaReali(webcam.IndiceCorrente));
+        }
+
+        /// <summary>Trova nell'elenco la webcam aperta, per identità (nome/percorso) e non per posizione.</summary>
+        private static InfoWebcam TrovaInElenco(IReadOnlyList<InfoWebcam> elenco, InfoWebcam inUso)
+        {
+            if (inUso == null)
+            {
+                return null;
+            }
+
+            ConfigurazioneWebcam identita = new ConfigurazioneWebcam();
+            identita.Imposta(inUso);
+            return AbbinamentoWebcam.Trova(elenco, identita);
         }
 
         private void OnWebcamSelezionata(object mittente, EventArgs argomenti)
@@ -455,14 +470,13 @@ namespace VisualMusicBlockLooper.App
             }
 
             avvisi.RemoveAll(a => a.StartsWith(PrefissoAvvisoWebcam));
-            if (!webcam.Apri(scelta.Indice))
+            if (!webcam.Apri(scelta))
             {
-                avvisi.Add(PrefissoAvvisoWebcam + scelta.Indice + " non apribile: resta attiva la precedente.");
+                avvisi.Add(PrefissoAvvisoWebcam + "«" + scelta.Descrizione + "» non apribile: resta attiva la precedente.");
                 aggiornamentoComboWebcam = true;
                 try
                 {
-                    comboWebcam.SelectedItem = comboWebcam.Items.Cast<InfoWebcam>()
-                        .FirstOrDefault(i => i.Indice == webcam.IndiceCorrente);
+                    comboWebcam.SelectedItem = TrovaInElenco(comboWebcam.Items.Cast<InfoWebcam>().ToList(), webcam.Info);
                 }
                 finally
                 {
@@ -477,7 +491,7 @@ namespace VisualMusicBlockLooper.App
             rilevatore.Imposta(null);
             avvisi.RemoveAll(a => a == ApplicazioneCalibrazione.AvvisoRisoluzioneDiversa
                 || a == ApplicazioneCalibrazione.AvvisoRisoluzioneSconosciuta);
-            calibrazionePresente = configurazione.Webcam.Indice == scelta.Indice
+            calibrazionePresente = configurazione.Webcam.Corrisponde(scelta)
                 && ApplicazioneCalibrazione.TentaCaricamento(percorsoCalibrazione, webcam, rilevatore, avvisi);
             AggiornaInterfaccia();
         }

@@ -39,11 +39,7 @@ namespace VisualMusicBlockLooper.App
             // L'elenco si rileva prima di aprire la webcam configurata: una webcam aperta risulterebbe occupata.
             IReadOnlyList<InfoWebcam> elencoWebcam = ElencoWebcam.RilevaReali();
             GestoreWebcam webcam = new GestoreWebcam(indice => WebcamFonte.Apri(indice));
-            if (!webcam.Apri(configurazione.Webcam.Indice))
-            {
-                avvisi.Add("Webcam " + configurazione.Webcam.Indice
-                    + " (da configurazione) non disponibile: scegli una webcam dalla lista.");
-            }
+            ApriWebcamConfigurata(webcam, elencoWebcam, configurazione.Webcam, avvisi);
 
             RilevatoreCommutabile rilevatore = new RilevatoreCommutabile();
             string percorsoCalibrazione = Path.Combine(cartella, NomeCalibrazione);
@@ -105,6 +101,30 @@ namespace VisualMusicBlockLooper.App
             {
                 avvisi.Add("Porta MIDI di ingresso non disponibile: " + eccezione.Message);
                 return new IngressoMidiNullo();
+            }
+        }
+
+        /// <summary>
+        /// Apre la webcam indicata nel config cercandola per identità (percorso, poi nome) tra quelle
+        /// presenti. Se non c'è, resta la modalità simulazione con un avviso: non si apre un'altra webcam.
+        /// </summary>
+        private static void ApriWebcamConfigurata(
+            GestoreWebcam webcam, IReadOnlyList<InfoWebcam> elenco, ConfigurazioneWebcam salvata, List<string> avvisi)
+        {
+            string descrizione = !string.IsNullOrWhiteSpace(salvata.Nome)
+                ? "«" + salvata.Nome + "»"
+                : "con indice " + salvata.Indice;
+
+            InfoWebcam trovata = AbbinamentoWebcam.Trova(elenco, salvata);
+            if (trovata == null)
+            {
+                avvisi.Add("Webcam " + descrizione + " (da configurazione) non trovata: scegli una webcam dalla lista.");
+                return;
+            }
+
+            if (!webcam.Apri(trovata))
+            {
+                avvisi.Add("Webcam " + descrizione + " (da configurazione) non apribile: scegli una webcam dalla lista.");
             }
         }
 

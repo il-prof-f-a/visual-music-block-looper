@@ -33,12 +33,22 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Altezza reale in pixel dei frame (0 se non determinabile).</summary>
         public int Altezza { get; }
 
-        /// <summary>Apre la webcam con l'indice dato; restituisce null se non è disponibile.</summary>
+        /// <summary>
+        /// Apre la webcam con l'indice dato; restituisce null se non è disponibile. Si usa il backend
+        /// DirectShow, il cui indice coincide con l'ordine dei nomi di <see cref="DispositiviDirectShow"/>;
+        /// se non si apre si ripiega sul backend automatico.
+        /// </summary>
         public static WebcamFonte Apri(int indice = 0)
         {
             try
             {
-                VideoCapture cattura = new VideoCapture(indice);
+                VideoCapture cattura = new VideoCapture(indice, VideoCaptureAPIs.DSHOW);
+                if (!cattura.IsOpened())
+                {
+                    cattura.Dispose();
+                    cattura = new VideoCapture(indice);
+                }
+
                 if (!cattura.IsOpened())
                 {
                     cattura.Dispose();

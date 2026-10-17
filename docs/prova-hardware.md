@@ -11,7 +11,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 | Windows 10/11 a 64 bit | L'app è net472. Nei progetti non è impostato `PlatformTarget` (compilazione AnyCPU di default). |
 | loopMIDI | Driver MIDI virtuale. Creare due porte con nome esatto **`VMBL`** (usata dall'app in uscita e in ingresso) e, solo per i test automatici, **`VMBL Test`**. |
 | Ableton Live | Con preferenze MIDI accessibili (sezione Link/Tempo/MIDI). |
-| Webcam | All'avvio si apre la webcam indicata in `configurazione.json` (indice 0 = la prima, se il file non c'è). Si cambia dalla lista "Webcam" della finestra di controllo. Non deve essere usata da altre app (Teams, OBS, Zoom). |
+| Webcam | All'avvio si apre la webcam indicata in `configurazione.json` (la prima, se il file non c'è). Si cambia dalla lista "Webcam" della finestra di controllo. Non deve essere usata da altre app (Teams, OBS, Zoom). |
 | Proiettore | Su secondo schermo, meglio in modalità "solo secondo schermo" (estendi). |
 | Cartoncini | Stampati a 100% da `assets/cartoncini/` (6 colori x 8 clip, 5 comandi). |
 
@@ -42,20 +42,24 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 
 ### Scelta della webcam e `configurazione.json`
 
-- La lista **Webcam** della finestra di controllo mostra le webcam trovate all'avvio (`Webcam 0`, `Webcam 1`, ...). **Aggiorna elenco** le rileva di nuovo (la webcam in uso non viene riaperta).
+- La lista **Webcam** della finestra di controllo mostra le webcam con il **nome** che usa Windows (per esempio `USB2.0 HD UVC WebCam`). Due webcam con lo stesso nome compaiono come `Nome (1)` e `Nome (2)`. **Aggiorna elenco** le rileva di nuovo. Se Windows non fornisce i nomi, la lista ripiega su `Webcam 0`, `Webcam 1`, ...
+- Le webcam si aprono con il backend DirectShow, il cui indice segue lo stesso ordine dei nomi.
 - Scegliendo una webcam dalla lista l'app la apre subito; se non si apre resta attiva la precedente e compare un avviso.
 - Cambiare webcam spegne il riconoscimento: la calibrazione è legata alla webcam e alla sua risoluzione, quindi va rifatta (viene ricaricata da sola solo se era stata salvata con quella stessa webcam).
-- **Dopo una calibrazione riuscita** l'app scrive `configurazione.json` accanto all'exe con la webcam in uso. All'avvio rilegge il file, apre quella webcam e ricarica `calibrazione.txt`. Si può anche modificare il file a mano:
+- **Dopo una calibrazione riuscita** l'app scrive `configurazione.json` accanto all'exe con l'**identità** della webcam in uso: nome, percorso univoco del dispositivo e indice. All'avvio rilegge il file e cerca la webcam **per percorso, poi per nome**, non per posizione: se cambiano ordine o numero delle webcam viene riaperta la stessa. L'indice è usato solo per i file scritti dalla versione precedente, che contengono soltanto quello.
 
   ```json
   {
     "Webcam": {
-      "Indice": 1
+      "Nome": "USB2.0 HD UVC WebCam",
+      "Percorso": "\\\\?\\usb#vid_...",
+      "Indice": 0
     }
   }
   ```
 
-- Se la webcam indicata nel file non è disponibile l'app parte in modalità simulazione con un avviso e si sceglie un'altra webcam dalla lista. Se il file è assente si usa l'indice 0.
+  Si può modificare a mano: basta il solo `Nome` (con più webcam dello stesso nome vale la prima, salvo che sia indicato anche il `Percorso`).
+- Se la webcam indicata nel file non è presente (scollegata) l'app parte in modalità simulazione con un avviso e **non** apre un'altra webcam al suo posto: si sceglie dalla lista. Se il file è assente si usa la prima webcam.
 
 ## 5. Calibrazione (4 click)
 

@@ -51,16 +51,14 @@ namespace VisualMusicBlockLooper.App
             }
 
             Rectangle griglia = InPixel(config.Area, dimensione);
-            int larghezzaCella = griglia.Width / config.Step;
-            int altezzaCella = griglia.Height / config.Tracce;
 
-            DisegnaCelleLibere(g, griglia, larghezzaCella, altezzaCella);
-            DisegnaPlayhead(g, griglia, larghezzaCella, stepCorrente, inEsecuzione);
-            DisegnaNote(g, griglia, larghezzaCella, altezzaCella, stato);
+            DisegnaCelleLibere(g, griglia);
+            DisegnaPlayhead(g, griglia, stepCorrente, inEsecuzione);
+            DisegnaNote(g, griglia, stato);
             DisegnaErrori(g, dimensione, stato);
         }
 
-        private void DisegnaCelleLibere(Graphics g, Rectangle griglia, int larghezzaCella, int altezzaCella)
+        private void DisegnaCelleLibere(Graphics g, Rectangle griglia)
         {
             using (var penna = new Pen(ColoreGriglia, 1))
             {
@@ -68,24 +66,24 @@ namespace VisualMusicBlockLooper.App
                 {
                     for (int step = 0; step < config.Step; step++)
                     {
-                        g.DrawRectangle(penna, CellaRect(griglia, larghezzaCella, altezzaCella, traccia, step));
+                        g.DrawRectangle(penna, CellaRect(griglia, traccia, step));
                     }
                 }
             }
         }
 
-        private void DisegnaPlayhead(Graphics g, Rectangle griglia, int larghezzaCella, int stepCorrente, bool inEsecuzione)
+        private void DisegnaPlayhead(Graphics g, Rectangle griglia, int stepCorrente, bool inEsecuzione)
         {
             if (stepCorrente < 0 || stepCorrente >= config.Step)
             {
                 return;
             }
 
-            var colonna = new Rectangle(
-                griglia.X + stepCorrente * larghezzaCella,
+            var colonna = Rectangle.FromLTRB(
+                BordoX(griglia, stepCorrente),
                 griglia.Y,
-                larghezzaCella,
-                griglia.Height);
+                BordoX(griglia, stepCorrente + 1),
+                griglia.Bottom);
 
             if (inEsecuzione)
             {
@@ -103,7 +101,7 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
-        private void DisegnaNote(Graphics g, Rectangle griglia, int larghezzaCella, int altezzaCella, StatoTavolo stato)
+        private void DisegnaNote(Graphics g, Rectangle griglia, StatoTavolo stato)
         {
             if (stato == null)
             {
@@ -122,12 +120,13 @@ namespace VisualMusicBlockLooper.App
                         continue;
                     }
 
+                    // Durata troncata a fine griglia: oltre il bordo la nota non viene disegnata.
                     int durata = Math.Min(Math.Max(nota.DurataStep, 1), config.Step - nota.StepIniziale);
-                    var area = new Rectangle(
-                        griglia.X + nota.StepIniziale * larghezzaCella,
-                        griglia.Y + nota.Traccia * altezzaCella,
-                        durata * larghezzaCella,
-                        altezzaCella);
+                    var area = Rectangle.FromLTRB(
+                        BordoX(griglia, nota.StepIniziale),
+                        BordoY(griglia, nota.Traccia),
+                        BordoX(griglia, nota.StepIniziale + durata),
+                        BordoY(griglia, nota.Traccia + 1));
 
                     g.FillRectangle(pennello, area);
                     g.DrawRectangle(penna, area);
@@ -159,14 +158,25 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
-        private static Rectangle CellaRect(
-            Rectangle griglia, int larghezzaCella, int altezzaCella, int traccia, int step)
+        // Bordi calcolati dagli spigoli (non dalla larghezza intera della cella), così che
+        // i resti della divisione finiscano su bordi reali e nessuna linea venga persa.
+        private int BordoX(Rectangle griglia, int indice)
         {
-            return new Rectangle(
-                griglia.X + step * larghezzaCella,
-                griglia.Y + traccia * altezzaCella,
-                larghezzaCella,
-                altezzaCella);
+            return griglia.X + (int)Math.Round(indice * griglia.Width / (double)config.Step);
+        }
+
+        private int BordoY(Rectangle griglia, int indice)
+        {
+            return griglia.Y + (int)Math.Round(indice * griglia.Height / (double)config.Tracce);
+        }
+
+        private Rectangle CellaRect(Rectangle griglia, int traccia, int step)
+        {
+            return Rectangle.FromLTRB(
+                BordoX(griglia, step),
+                BordoY(griglia, traccia),
+                BordoX(griglia, step + 1),
+                BordoY(griglia, traccia + 1));
         }
 
         private static Rectangle InPixel(RettangoloTavolo area, Size dimensione)

@@ -103,21 +103,81 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void Default_ValoriDelleZone()
+        public void Default_ValoriDelleZoneCompleti()
+        {
+            LayoutTavolo layout = LayoutTavolo.Default;
+            (string nome, RettangoloTavolo r, double x, double y, double w, double h)[] attesi =
+            {
+                ("Misura", layout.Misura, 0.01, 0.04, 0.12, 0.28),
+                ("Collegamento", layout.Collegamento, 0.01, 0.36, 0.12, 0.28),
+                ("Ab", layout.Ab, 0.01, 0.68, 0.12, 0.28),
+                ("Comandi", layout.Comandi, 0.84, 0.04, 0.14, 0.92),
+                ("AreaGriglia", LayoutTavolo.AreaGrigliaDefault, 0.15, 0.04, 0.67, 0.92),
+            };
+
+            foreach (var a in attesi)
+            {
+                Assert.That(a.r.X, Is.EqualTo(a.x), a.nome + " X");
+                Assert.That(a.r.Y, Is.EqualTo(a.y), a.nome + " Y");
+                Assert.That(a.r.Larghezza, Is.EqualTo(a.w), a.nome + " Larghezza");
+                Assert.That(a.r.Altezza, Is.EqualTo(a.h), a.nome + " Altezza");
+            }
+        }
+
+        [Test]
+        public void ZonaDelCentro_AreaNonDegenere_CentroInMisura()
+        {
+            // Centro (0.1, 0.1): dentro Misura. Con il centro errato (X + Larghezza) cadrebbe a 0.2 e direbbe Nessuna.
+            LayoutTavolo layout = LayoutTavolo.Default;
+
+            Assert.That(layout.ZonaDelCentro(new RettangoloTavolo(0.0, 0.0, 0.2, 0.2)), Is.EqualTo(ZonaSpeciale.Misura));
+        }
+
+        [Test]
+        public void ZonaDelCentro_BordiSullaZonaCentroNellaFessura_Nessuna()
+        {
+            // Bordi (y 0.30..0.40) sovrapposti a Misura e Collegamento, ma centro (0.1, 0.35) nella fessura.
+            LayoutTavolo layout = LayoutTavolo.Default;
+
+            Assert.That(layout.ZonaDelCentro(new RettangoloTavolo(0.0, 0.30, 0.2, 0.1)), Is.EqualTo(ZonaSpeciale.Nessuna));
+        }
+
+        [Test]
+        public void ZonaDelCentro_BordoSinistroNellaZonaCentroFuori_Nessuna()
+        {
+            // Bordo sinistro x=0.05 dentro Misura, ma centro (0.2, 0.15) fuori.
+            LayoutTavolo layout = LayoutTavolo.Default;
+
+            Assert.That(layout.ZonaDelCentro(new RettangoloTavolo(0.05, 0.10, 0.3, 0.1)), Is.EqualTo(ZonaSpeciale.Nessuna));
+        }
+
+        [Test]
+        public void ZonaDelCentro_CentroDentroBordiSporgenti_ZonaDelCentro()
+        {
+            // Centro (0.05, 0.15) dentro Misura; il rettangolo sporge a sinistra (X = -0.05).
+            LayoutTavolo layout = LayoutTavolo.Default;
+
+            Assert.That(layout.ZonaDelCentro(new RettangoloTavolo(-0.05, 0.05, 0.2, 0.2)), Is.EqualTo(ZonaSpeciale.Misura));
+        }
+
+        [TestCase(-0.001, 0.18)]
+        [TestCase(0.131, 0.18)]
+        [TestCase(0.07, 0.039)]
+        [TestCase(0.07, 0.321)]
+        public void ZonaDelCentro_PocoFuoriMisura_Nessuna(double x, double y)
         {
             LayoutTavolo layout = LayoutTavolo.Default;
 
-            Assert.That(layout.Misura.X, Is.EqualTo(0.01));
-            Assert.That(layout.Misura.Y, Is.EqualTo(0.04));
-            Assert.That(layout.Misura.Larghezza, Is.EqualTo(0.12));
-            Assert.That(layout.Misura.Altezza, Is.EqualTo(0.28));
+            Assert.That(layout.ZonaDelCentro(Punto(x, y)), Is.EqualTo(ZonaSpeciale.Nessuna));
+        }
 
-            Assert.That(layout.Collegamento.Y, Is.EqualTo(0.36));
-            Assert.That(layout.Ab.Y, Is.EqualTo(0.68));
-
-            Assert.That(layout.Comandi.X, Is.EqualTo(0.84));
-            Assert.That(layout.Comandi.Larghezza, Is.EqualTo(0.14));
-            Assert.That(layout.Comandi.Altezza, Is.EqualTo(0.92));
+        [Test]
+        public void SiSovrappongono_RettangoliSovrapposti_Vero()
+        {
+            // Controllo positivo: l'helper deve rilevare una vera sovrapposizione.
+            Assert.That(SiSovrappongono(
+                new RettangoloTavolo(0.0, 0.0, 0.2, 0.2),
+                new RettangoloTavolo(0.1, 0.1, 0.2, 0.2)), Is.True);
         }
     }
 }

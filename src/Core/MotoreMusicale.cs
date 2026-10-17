@@ -91,16 +91,16 @@ namespace VisualMusicBlockLooper.Core
                     switch (comando.Tipo)
                     {
                         case TipoComando.Play:
-                            Avvia();
+                            AvviaInterno();
                             break;
                         case TipoComando.Stop:
-                            Arresta();
+                            ArrestaInterno();
                             break;
                         case TipoComando.Tap:
                             Tap(orologioMs());
                             break;
                         case TipoComando.Modo:
-                            CambiaModo();
+                            CambiaModoInterno();
                             break;
                         case TipoComando.OneShot:
                             SuonaOneShot(comando.Parametro);
@@ -166,7 +166,46 @@ namespace VisualMusicBlockLooper.Core
             }
         }
 
-        private void Avvia()
+        /// <summary>Step corrente del sequencer (thread-safe); zero prima del primo tick o dopo l'arresto.</summary>
+        public int StepCorrente
+        {
+            get
+            {
+                lock (bloccoLock)
+                {
+                    return sequencer.StepCorrente;
+                }
+            }
+        }
+
+        /// <summary>Avvia la riproduzione e invia Start (solo in Master, se non già in esecuzione).</summary>
+        public void Avvia()
+        {
+            lock (bloccoLock)
+            {
+                AvviaInterno();
+            }
+        }
+
+        /// <summary>Ferma la riproduzione, spegne le note e invia Stop (solo in Master, se in esecuzione).</summary>
+        public void Arresta()
+        {
+            lock (bloccoLock)
+            {
+                ArrestaInterno();
+            }
+        }
+
+        /// <summary>Alterna Master e Slave fermando l'eventuale riproduzione.</summary>
+        public void CambiaModo()
+        {
+            lock (bloccoLock)
+            {
+                CambiaModoInterno();
+            }
+        }
+
+        private void AvviaInterno()
         {
             if (Modo != ModoSincronia.Master || InEsecuzione)
             {
@@ -177,7 +216,7 @@ namespace VisualMusicBlockLooper.Core
             uscita.Start();
         }
 
-        private void Arresta()
+        private void ArrestaInterno()
         {
             if (Modo != ModoSincronia.Master || !InEsecuzione)
             {
@@ -189,7 +228,7 @@ namespace VisualMusicBlockLooper.Core
             uscita.Stop();
         }
 
-        private void CambiaModo()
+        private void CambiaModoInterno()
         {
             bool eraMaster = Modo == ModoSincronia.Master;
             Modo = eraMaster ? ModoSincronia.Slave : ModoSincronia.Master;

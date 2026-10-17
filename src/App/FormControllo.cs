@@ -53,6 +53,7 @@ namespace VisualMusicBlockLooper.App
         private bool inCalibrazione;
         private bool calibrazionePresente;
         private bool chiusuraEseguita;
+        private Size dimensioniFrame;
 
         /// <summary>Crea la finestra. Thread e ciclo di cattura partono solo quando la finestra viene mostrata.</summary>
         /// <param name="webcam">Webcam aperta, o null in modalità simulazione.</param>
@@ -333,6 +334,7 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
+            dimensioniFrame = anteprima.Image.Size;
             puntiCalibrazione.Add(punto.Value);
             puntiSchermo.Add(argomenti.Location);
             anteprima.Invalidate();
@@ -350,10 +352,14 @@ namespace VisualMusicBlockLooper.App
             inCalibrazione = false;
             try
             {
-                Calibrazione calibrazione = Calibrazione.Calcola(puntiCalibrazione.ToArray(), AngoliTavolo);
+                // L'omografia è in pixel: si memorizza la risoluzione del frame su cui sono stati cliccati i punti.
+                Calibrazione calibrazione = Calibrazione.Calcola(
+                    puntiCalibrazione.ToArray(), AngoliTavolo, dimensioniFrame.Width, dimensioniFrame.Height);
                 string avvisoSalvataggio = ApplicazioneCalibrazione.Applica(
                     rilevatore, webcam, calibrazione, c => c.Salva(percorsoCalibrazione));
                 calibrazionePresente = true;
+                avvisi.RemoveAll(a => a == ApplicazioneCalibrazione.AvvisoRisoluzioneDiversa
+                    || a == ApplicazioneCalibrazione.AvvisoRisoluzioneSconosciuta);
                 if (avvisoSalvataggio != null)
                 {
                     avvisi.Add(avvisoSalvataggio);

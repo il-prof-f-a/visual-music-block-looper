@@ -105,7 +105,20 @@ namespace VisualMusicBlockLooper.App
 
             try
             {
-                rilevatore.Imposta(new RilevatoreCartoncini(webcam, Calibrazione.Carica(percorso)));
+                Calibrazione calibrazione = Calibrazione.Carica(percorso);
+                bool attivabile = ApplicazioneCalibrazione.ValutaRisoluzione(
+                    calibrazione, webcam.Larghezza, webcam.Altezza, out string avviso);
+                if (avviso != null)
+                {
+                    avvisi.Add(avviso);
+                }
+
+                if (!attivabile)
+                {
+                    return false;
+                }
+
+                rilevatore.Imposta(new RilevatoreCartoncini(webcam, calibrazione));
                 return true;
             }
             catch (Exception eccezione)

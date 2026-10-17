@@ -267,6 +267,109 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
+        private static Calibrazione CalibrazioneDiProva(int larghezza = 0, int altezza = 0)
+        {
+            PuntoImmagine[] camera =
+            {
+                new PuntoImmagine(10, 12), new PuntoImmagine(630, 20),
+                new PuntoImmagine(620, 470), new PuntoImmagine(15, 460)
+            };
+            PuntoTavolo[] tavolo =
+            {
+                new PuntoTavolo(0, 0), new PuntoTavolo(1, 0),
+                new PuntoTavolo(1, 1), new PuntoTavolo(0, 1)
+            };
+            return Calibrazione.Calcola(camera, tavolo, larghezza, altezza);
+        }
+
+        [Test]
+        public void SalvaECaricaCal2ConservaRisoluzione()
+        {
+            Calibrazione originale = CalibrazioneDiProva(1280, 720);
+            string percorso = PercorsoTemporaneo();
+
+            try
+            {
+                originale.Salva(percorso);
+                Assert.That(File.ReadAllLines(percorso)[0], Is.EqualTo("VMBL-CAL2"));
+                Assert.That(File.ReadAllLines(percorso)[2], Is.EqualTo("1280;720"));
+
+                Calibrazione caricata = Calibrazione.Carica(percorso);
+
+                Assert.That(caricata.Larghezza, Is.EqualTo(1280));
+                Assert.That(caricata.Altezza, Is.EqualTo(720));
+                PuntoImmagine prova = new PuntoImmagine(300, 250);
+                AsseriPunto(originale.DaCameraATavolo(prova), caricata.DaCameraATavolo(prova), 1e-9);
+            }
+            finally
+            {
+                if (File.Exists(percorso))
+                {
+                    File.Delete(percorso);
+                }
+            }
+        }
+
+        [Test]
+        public void CaricaCal1HaRisoluzioneSconosciuta()
+        {
+            string percorso = PercorsoTemporaneo();
+
+            try
+            {
+                File.WriteAllText(percorso, "VMBL-CAL1\n1;0;0;0;1;0;0;0;1\n");
+
+                Calibrazione caricata = Calibrazione.Carica(percorso);
+
+                Assert.That(caricata.Larghezza, Is.EqualTo(0));
+                Assert.That(caricata.Altezza, Is.EqualTo(0));
+            }
+            finally
+            {
+                if (File.Exists(percorso))
+                {
+                    File.Delete(percorso);
+                }
+            }
+        }
+
+        [TestCase("VMBL-CAL2\n1;0;0;0;1;0;0;0;1\n")]
+        [TestCase("VMBL-CAL2\n1;0;0;0;1;0;0;0;1\n1280\n")]
+        [TestCase("VMBL-CAL2\n1;0;0;0;1;0;0;0;1\n1280;abc\n")]
+        [TestCase("VMBL-CAL2\n1;0;0;0;1;0;0;0;1\n1280;-720\n")]
+        [TestCase("VMBL-CAL2\n1;0;0;0;1;0;0;0;1\n1280;720;5\n")]
+        [TestCase("VMBL-CAL2\n1;0;0;0;1;0;0;0\n1280;720\n")]
+        [TestCase("VMBL-CAL1\n1;0;0;0;1;0;0;0;1\n1280;720\n")]
+        public void CaricaCal2Malformato(string contenuto)
+        {
+            string percorso = PercorsoTemporaneo();
+
+            try
+            {
+                File.WriteAllText(percorso, contenuto);
+
+                Assert.That(() => Calibrazione.Carica(percorso), Throws.TypeOf<InvalidDataException>());
+            }
+            finally
+            {
+                if (File.Exists(percorso))
+                {
+                    File.Delete(percorso);
+                }
+            }
+        }
+
+        [Test]
+        public void ConfrontoRisoluzione()
+        {
+            Assert.That(CalibrazioneDiProva(1280, 720).VerificaRisoluzione(1280, 720), Is.EqualTo(EsitoRisoluzione.Compatibile));
+            Assert.That(CalibrazioneDiProva(1280, 720).VerificaRisoluzione(640, 480), Is.EqualTo(EsitoRisoluzione.Diversa));
+            Assert.That(CalibrazioneDiProva(1280, 720).VerificaRisoluzione(1280, 480), Is.EqualTo(EsitoRisoluzione.Diversa));
+            Assert.That(CalibrazioneDiProva().VerificaRisoluzione(1280, 720), Is.EqualTo(EsitoRisoluzione.Sconosciuta));
+            // Camera di dimensione ignota: nessun confronto possibile.
+            Assert.That(CalibrazioneDiProva(1280, 720).VerificaRisoluzione(0, 0), Is.EqualTo(EsitoRisoluzione.Compatibile));
+        }
+
         [Test]
         public void CaricaFileMancante()
         {

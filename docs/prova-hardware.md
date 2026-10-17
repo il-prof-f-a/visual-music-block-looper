@@ -51,7 +51,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 
    Il testo nell'area avvisi in basso nella finestra di controllo indica l'angolo atteso ("clicca l'angolo 2/4 ..."). La riga di stato in alto mostra invece BPM, modo e stato di esecuzione.
 3. Dopo il quarto click la calibrazione viene calcolata e salvata in `calibrazione.txt`, accanto all'exe. Il messaggio "Calibrazione mancante" scompare.
-4. Se i click sono sbagliati, premere di nuovo **Calibra** e ripetere.
+4. Se i click sono sbagliati, premere di nuovo **Calibra** e ripetere. La webcam viene aperta a 1280x720 (se il driver non la concede si usa la risoluzione reale) e `calibrazione.txt` memorizza la risoluzione usata: se all'avvio la camera lavora a una risoluzione diversa compare "Calibrazione per una risoluzione diversa: rifai la calibrazione" e il rilevatore resta spento; un vecchio file senza risoluzione viene accettato con l'avviso "Calibrazione senza risoluzione: ripetila per sicurezza".
 5. Controllo: appoggiare un cartoncino nero o colorato su una zona nota e verificare che la guida proiettata lo riconosca nella cella giusta (vedi sezione 7).
 
 ## 6. Mappatura in Ableton

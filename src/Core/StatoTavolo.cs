@@ -41,7 +41,9 @@ namespace VisualMusicBlockLooper.Core
         ColoreIncoerente,
         ColoreMancante,
         Sovrapposto,
-        FuoriGriglia
+        FuoriGriglia,
+        ImpostazioneNonValida,
+        FuoriMisura
     }
 
     /// <summary>Cartoncino scartato, con l'area che lo identifica sul tavolo.</summary>

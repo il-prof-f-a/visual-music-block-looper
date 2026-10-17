@@ -125,6 +125,12 @@ namespace VisualMusicBlockLooper.App
             return corrente?.Anteprima();
         }
 
+        /// <summary>Bitmap dell'ultimo frame raddrizzato sull'area del tavolo, o null; il chiamante la rilascia.</summary>
+        public Bitmap AnteprimaRaddrizzata(Calibrazione calibrazione, int larghezza, int altezza)
+        {
+            return corrente?.AnteprimaRaddrizzata(calibrazione, larghezza, altezza);
+        }
+
         public void Dispose()
         {
             lock (blocco)

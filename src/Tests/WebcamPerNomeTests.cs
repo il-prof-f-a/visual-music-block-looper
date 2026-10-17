@@ -253,6 +253,8 @@ namespace VisualMusicBlockLooper.Tests
 
             public Bitmap Anteprima() { return null; }
 
+            public Bitmap AnteprimaRaddrizzata(VisualMusicBlockLooper.Vision.Calibrazione calibrazione, int larghezza, int altezza) { return null; }
+
             public void Dispose() { }
         }
 

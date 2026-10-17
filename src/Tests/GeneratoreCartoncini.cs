@@ -7,6 +7,7 @@ using System.IO;
 using ZXing;
 using ZXing.Common;
 using ZXing.QrCode;
+using ErrorCorrectionLevel = ZXing.QrCode.Internal.ErrorCorrectionLevel;
 
 namespace VisualMusicBlockLooper.Tests
 {
@@ -60,7 +61,7 @@ namespace VisualMusicBlockLooper.Tests
         public static readonly Color ColoreComando = Color.FromArgb(110, 120, 140);
 
         /// <summary>Corpo neutro viola-grigio dei cartoncini speciali (misura, collegamento, A-B), distinto da <see cref="ColoreComando"/>.</summary>
-        public static readonly Color ColoreSpeciale = Color.FromArgb(255, 120, 100, 150);
+        public static readonly Color ColoreSpeciale = Color.FromArgb(255, 135, 115, 150);
 
         /// <summary>Nomi dei colori in italiano, nello stesso ordine di <see cref="ColoriCorpo"/>.</summary>
         public static readonly string[] NomiColori = { "Rosso", "Arancione", "Giallo", "Verde", "Blu", "Viola" };
@@ -95,7 +96,7 @@ namespace VisualMusicBlockLooper.Tests
             double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
         {
             return Disegna(payload, ColoreSpeciale, etichetta, passi, passoMm, altezzaMm,
-                ZXing.QrCode.Internal.ErrorCorrectionLevel.L);
+                ErrorCorrectionLevel.L);
         }
 
         /// <summary>
@@ -164,7 +165,7 @@ namespace VisualMusicBlockLooper.Tests
         /// etichetta in alto a destra del corpo, area di disegno incorniciata, contorno di taglio nero.
         /// </summary>
         public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm,
-            ZXing.QrCode.Internal.ErrorCorrectionLevel? livelloEcc = null)
+            ErrorCorrectionLevel? livelloEcc = null)
         {
             if (passi < PassiMinimi)
             {
@@ -190,7 +191,7 @@ namespace VisualMusicBlockLooper.Tests
                 // QR: quadrato bianco con zona quieta, a sinistra, centrato in verticale.
                 double latoQrMm = altezzaMm - 2 * MargineVerticaleMm;
                 RettangoloPx qr = new RettangoloPx(Mm(MargineSinistroMm, k), Mm(MargineVerticaleMm, k), Mm(latoQrMm, k));
-                DisegnaQr(g, payload, qr, livelloEcc ?? ZXing.QrCode.Internal.ErrorCorrectionLevel.M);
+                DisegnaQr(g, payload, qr, livelloEcc ?? ErrorCorrectionLevel.M);
 
                 // Area di disegno incorniciata a destra del QR, sotto la fascia dell'etichetta.
                 double xAreaMm = MargineSinistroMm + latoQrMm + 4;
@@ -241,7 +242,7 @@ namespace VisualMusicBlockLooper.Tests
             return dir == null ? null : Path.Combine(dir, "assets", "cartoncini");
         }
 
-        private static void DisegnaQr(Graphics g, string testo, RettangoloPx area, ZXing.QrCode.Internal.ErrorCorrectionLevel livelloEcc)
+        private static void DisegnaQr(Graphics g, string testo, RettangoloPx area, ErrorCorrectionLevel livelloEcc)
         {
             var hint = new System.Collections.Generic.Dictionary<EncodeHintType, object>
             {

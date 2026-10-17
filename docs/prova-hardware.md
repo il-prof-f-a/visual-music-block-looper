@@ -237,14 +237,14 @@ La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step pro
 - **Zone a sinistra della griglia**, con etichetta e valore attivo: «MISURA» con 4/4, 3/4 o 2/4; «COLLEGA» con il numero di righe; «A-B» con l'intervallo. La zona «COMANDI» è indicata come riferimento.
 - **Barre di gruppo** sul lato sinistro della griglia: le righe dello stesso gruppo sono unite da una barra.
 - **Numeri di riga** da 1 a 6, a sinistra della griglia, per leggere A-B.
-- **Colonne oltre la misura** in grigio scuro (note non utilizzabili); **righe fuori da A-B** in grigio chiaro (non suonano).
+- **Colonne oltre la misura** in grigio chiaro (note non utilizzabili); **righe fuori da A-B** in grigio chiaro (non suonano).
 - **Playhead** (colonna arancione) solo sulle righe attive: una per gruppo. Da fermo è un contorno.
 - **Note riconosciute** in verde; **cartoncini scartati** con contorno rosso (anche `ImpostazioneNonValida` e `FuoriMisura`).
 
 ## 13. Problemi noti
 
 - **Comando ONESHOT con più QR visibili.** Il cartoncino `comando-oneshot-36.png` ha un payload più lungo (`VMBL1;C;ONESHOT;36`) che richiede il QR di versione 2 con correzione M. Quando più QR sono visibili insieme, la lettura multipla di OpenCV può scartarlo. Al banco: verificare il ONESHOT con gli altri cartoncini nel campo, e se serve posarlo da solo.
-- **Cartoncini speciali: livello di correzione L.** I cartoncini speciali usano la correzione d'errore L, che li mantiene nella versione QR 1 come gli altri cartoncini e facilita la lettura quando più QR sono visibili. Il livello L corregge meno errori del M: la robustezza di lettura dipende quindi molto da stampa nitida e messa a fuoco.
+- **Cartoncini speciali: livello di correzione L.** I cartoncini speciali usano la correzione d'errore L: il loro payload più lungo (`VMBL1;S;MISURA;3`, 16 caratteri) entra nella versione QR 1 solo con questo livello (capacità della versione 1 in modo byte: 17 byte a livello L, 14 a livello M). Il livello L corregge meno errori del M: la robustezza di lettura dipende quindi molto da stampa nitida e messa a fuoco.
 - **Colori e leggibilità sotto la luce del proiettore.** Il corpo dei cartoncini speciali è viola-grigio neutro (sotto la soglia di saturazione: non è un colore di traccia). I test automatici verificano i PNG, non la lettura reale. Da verificare al banco: la lettura del QR e la distinzione tra le tre zone, con la luce reale del proiettore e della stanza.
 
 ## Esito della prova

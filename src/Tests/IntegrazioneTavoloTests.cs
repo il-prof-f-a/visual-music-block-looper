@@ -324,6 +324,38 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void CambioDiStruttura_SpegneSubitoLeNoteInCorso()
+        {
+            // Nota di 16 step (96 tick) con LINK 1: senza cambio finirebbe al tick 96.
+            var rilevatore = new RilevatoreFisso
+            {
+                Cartoncini = new[]
+                {
+                    NelCentro(LayoutTavolo.Default.Collegamento, "VMBL1;S;LINK;1"),
+                    Comando("PLAY"),
+                    Nota(0, 16),
+                }
+            };
+            Banco banco = NuovoBanco(rilevatore);
+            banco.Passi(4);
+            banco.Tick(10);
+
+            // Il LINK viene tolto: la struttura diventa Default al terzo Passo (stabilizzazione a 3 frame).
+            rilevatore.Cartoncini = new[] { Nota(0, 16) };
+            banco.Passi(1);
+            banco.Tick(1);
+            banco.Passi(1);
+            banco.Tick(1);
+            banco.Passi(1);
+            Assert.That(banco.Compositore.Motore.Struttura, Is.EqualTo(StrutturaTavolo.Default));
+
+            // Il tick 12 è il primo con la nuova struttura: la nota in corso si spegne lì, non al tick 96.
+            banco.Tick(1);
+            string primoOff = banco.Eventi.First(e => e.Contains("NotaOff:0:36"));
+            Assert.That(primoOff, Is.EqualTo("12 NotaOff:0:36"));
+        }
+
+        [Test]
         public void Misura34_TroncaLeNoteLunghe()
         {
             var rilevatore = new RilevatoreFisso

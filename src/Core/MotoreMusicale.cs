@@ -150,19 +150,27 @@ namespace VisualMusicBlockLooper.Core
         }
 
         /// <summary>
-        /// Controlla che il clock esterno sia ancora presente: in Slave, se in esecuzione e
-        /// il clock manca da più di 500 ms, ferma la riproduzione e spegne le note.
+        /// Controlla che il clock esterno sia ancora presente: in Slave, se il clock manca da più di 500 ms
+        /// (dall'ultimo clock o dall'ultimo cambio di modo) spegne gli one-shot pendenti, anche con il DAW
+        /// fermo, e se in esecuzione ferma la riproduzione e spegne le note.
         /// </summary>
         /// <param name="adessoMs">Istante corrente in millisecondi.</param>
         public void ControllaTimeoutClock(long adessoMs)
         {
             lock (bloccoLock)
             {
-                if (Modo == ModoSincronia.Slave && InEsecuzione && adessoMs - ultimoClock > TimeoutClockMs)
+                if (Modo != ModoSincronia.Slave || adessoMs - ultimoClock <= TimeoutClockMs)
+                {
+                    return;
+                }
+
+                if (InEsecuzione)
                 {
                     InEsecuzione = false;
                     FermaESpegni();
                 }
+
+                SpegniOneShotPendenti();
             }
         }
 
@@ -187,12 +195,30 @@ namespace VisualMusicBlockLooper.Core
             }
         }
 
-        /// <summary>Ferma la riproduzione, spegne le note e invia Stop (solo in Master, se in esecuzione).</summary>
+        /// <summary>
+        /// Ferma la riproduzione, spegne le note e invia Stop (solo in Master, se in esecuzione).
+        /// Spegne comunque gli one-shot pendenti, in qualsiasi modo.
+        /// </summary>
         public void Arresta()
         {
             lock (bloccoLock)
             {
                 ArrestaInterno();
+                SpegniOneShotPendenti();
+            }
+        }
+
+        /// <summary>
+        /// Spegne tutto in qualsiasi modo: ferma il sequencer, invia i note-off delle note sonanti e degli
+        /// one-shot pendenti e imposta <see cref="InEsecuzione"/> a false. Non invia Start/Stop al DAW.
+        /// </summary>
+        public void Silenzia()
+        {
+            lock (bloccoLock)
+            {
+                InEsecuzione = false;
+                FermaESpegni();
+                SpegniOneShotPendenti();
             }
         }
 

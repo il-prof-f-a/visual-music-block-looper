@@ -290,7 +290,7 @@ namespace VisualMusicBlockLooper.App
             }
 
             MotoreMusicale motore = compositore.Motore;
-            proiettore.Aggiorna(compositore.UltimoStato, motore.StepCorrente, motore.InEsecuzione);
+            proiettore.Aggiorna(compositore.UltimoStato, motore.Posizione, motore.InEsecuzione);
         }
 
         private void AggiornaInterfaccia()

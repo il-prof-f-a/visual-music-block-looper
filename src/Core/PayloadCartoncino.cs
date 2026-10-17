@@ -7,7 +7,23 @@ namespace VisualMusicBlockLooper.Core
         Nota,
 
         /// <summary>Cartoncino che esegue un comando.</summary>
-        Comando
+        Comando,
+
+        /// <summary>Cartoncino che imposta un parametro del tavolo.</summary>
+        Impostazione
+    }
+
+    /// <summary>Tipo di impostazione letta da un cartoncino di tipo Impostazione.</summary>
+    public enum TipoImpostazione
+    {
+        /// <summary>Misura (parametro intero).</summary>
+        Misura,
+
+        /// <summary>Collegamento (parametro intero).</summary>
+        Collegamento,
+
+        /// <summary>Intervallo AB (due parametri interi).</summary>
+        IntervalloAb
     }
 
     /// <summary>Comando eseguibile da un cartoncino di tipo Comando.</summary>
@@ -36,5 +52,14 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Parametro del comando, ad esempio la nota MIDI per ONESHOT.</summary>
         public int Parametro { get; set; }
+
+        /// <summary>Impostazione (cartoncino di tipo Impostazione).</summary>
+        public TipoImpostazione Impostazione { get; set; }
+
+        /// <summary>Valore dell'impostazione (primo valore per AB).</summary>
+        public int Valore { get; set; }
+
+        /// <summary>Secondo valore dell'intervallo AB (solo per IntervalloAb).</summary>
+        public int ValoreB { get; set; }
     }
 }

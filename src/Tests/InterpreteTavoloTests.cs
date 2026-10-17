@@ -166,6 +166,73 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Errori[0].Area.X, Is.EqualTo(area.X));
         }
 
+        [Test]
+        public void InputNull_StatoVuoto()
+        {
+            StatoTavolo stato = null;
+
+            Assert.DoesNotThrow(() => stato = CreaInterprete().Interpreta(null));
+
+            Assert.That(stato.Note, Is.Not.Null.And.Empty);
+            Assert.That(stato.Comandi, Is.Not.Null.And.Empty);
+            Assert.That(stato.Errori, Is.Not.Null.And.Empty);
+        }
+
+        [Test]
+        public void ElementoNull_Ignorato()
+        {
+            StatoTavolo stato = null;
+
+            Assert.DoesNotThrow(() => stato = CreaInterprete().Interpreta(new CartoncinoRilevato[]
+            {
+                null,
+                Rilevato("VMBL1;N;12", ColoreTraccia.Verde, Cella(3, 2)),
+                null
+            }));
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Comandi, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note[0].IdClip, Is.EqualTo(12));
+        }
+
+        [Test]
+        public void SovrapposizioneParziale()
+        {
+            // Nota [2,5) e nota [4,7) sulla stessa traccia: la seconda si sovrappone solo in parte.
+            RettangoloTavolo primaArea = Cella(2, 2, 3);
+            RettangoloTavolo secondaArea = Cella(2, 4, 3);
+
+            StatoTavolo stato = CreaInterprete().Interpreta(new[]
+            {
+                Rilevato("VMBL1;N;1", ColoreTraccia.Giallo, primaArea),
+                Rilevato("VMBL1;N;2", ColoreTraccia.Giallo, secondaArea)
+            });
+
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note[0].IdClip, Is.EqualTo(1));
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.Sovrapposto));
+            Assert.That(stato.Errori[0].Area.X, Is.EqualTo(secondaArea.X));
+        }
+
+        [Test]
+        public void StessiStepSuTracceDiverse_Accettati()
+        {
+            StatoTavolo stato = CreaInterprete().Interpreta(new[]
+            {
+                Rilevato("VMBL1;N;1", ColoreTraccia.Arancione, Cella(1, 4)),
+                Rilevato("VMBL1;N;2", ColoreTraccia.Blu, Cella(4, 4))
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(1));
+            Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(4));
+            Assert.That(stato.Note[1].Traccia, Is.EqualTo(4));
+            Assert.That(stato.Note[1].StepIniziale, Is.EqualTo(4));
+        }
+
         private static InterpreteTavolo CreaInterprete()
         {
             var config = new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 0.8) };

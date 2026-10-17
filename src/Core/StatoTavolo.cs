@@ -57,14 +57,15 @@ namespace VisualMusicBlockLooper.Core
     /// <summary>Risultato dell'interpretazione del tavolo: note, comandi ed errori.</summary>
     public class StatoTavolo
     {
+        /// <summary>Crea lo stato; le liste null diventano liste vuote.</summary>
         public StatoTavolo(
             IReadOnlyList<CartoncinoNota> note,
             IReadOnlyList<ComandoRilevato> comandi,
             IReadOnlyList<ErroreTavolo> errori)
         {
-            Note = note;
-            Comandi = comandi;
-            Errori = errori;
+            Note = note ?? new List<CartoncinoNota>();
+            Comandi = comandi ?? new List<ComandoRilevato>();
+            Errori = errori ?? new List<ErroreTavolo>();
         }
 
         /// <summary>Note valide, mai null.</summary>

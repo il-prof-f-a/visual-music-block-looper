@@ -133,6 +133,102 @@ namespace VisualMusicBlockLooper.Tests
                 Throws.InstanceOf<ArgumentOutOfRangeException>());
         }
 
+        [Test]
+        public void StrutturaCambiaDopoNFrame()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
+            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(x));
+        }
+
+        [Test]
+        public void StrutturaSfarfallio_NonCambia()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
+            StrutturaTavolo x = Struttura(4, 2, 1, 2);
+
+            for (int frame = 1; frame <= 6; frame++)
+            {
+                StrutturaTavolo struttura = frame % 2 == 1 ? x : StrutturaTavolo.Default;
+                StatoTavolo stato = stabilizzatore.Aggiorna(Stato(struttura: struttura));
+                Assert.That(stato.Struttura, Is.EqualTo(StrutturaTavolo.Default), $"frame {frame}");
+            }
+        }
+
+        [Test]
+        public void TornaAlDefaultDopoNFrameDiAssenza()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
+            StrutturaTavolo x = Struttura(2, 1, 1, 1);
+            for (int frame = 1; frame <= 3; frame++)
+            {
+                stabilizzatore.Aggiorna(Stato(struttura: x));
+            }
+
+            // Due frame con il default non bastano: la struttura resta X.
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: StrutturaTavolo.Default)).Struttura, Is.EqualTo(x));
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: StrutturaTavolo.Default)).Struttura, Is.EqualTo(x));
+
+            // Il terzo frame consecutivo con il default riporta al default.
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: StrutturaTavolo.Default)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
+        }
+
+        [Test]
+        public void CandidataCheCambia_RipartiDaUno()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
+            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            StrutturaTavolo y = Struttura(4, 2, 1, 2);
+
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: y)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: y)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
+
+            // Solo al terzo Y consecutivo la struttura diventa Y: X non ha contribuito al conteggio.
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: y)).Struttura, Is.EqualTo(y));
+        }
+
+        [Test]
+        public void FramePresenzaUnoCambiaSubito()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 1);
+            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+
+            Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(x));
+        }
+
+        [Test]
+        public void NoteEComandiInvariati_AlCambioDiStruttura()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
+            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            CartoncinoNota nota = Nota(3, 2);
+            ComandoRilevato play = new ComandoRilevato { Tipo = TipoComando.Play, Parametro = 0 };
+
+            stabilizzatore.Aggiorna(Stato(note: new[] { nota }, comandi: new[] { play }, struttura: x));
+            stabilizzatore.Aggiorna(Stato(note: new[] { nota }, comandi: new[] { play }, struttura: x));
+            StatoTavolo terzo = stabilizzatore.Aggiorna(Stato(note: new[] { nota }, comandi: new[] { play }, struttura: x));
+
+            Assert.That(terzo.Struttura, Is.EqualTo(x));
+            Assert.That(terzo.Note, Has.Count.EqualTo(1));
+            Assert.That(terzo.Note[0].Chiave, Is.EqualTo("12:3:0:2"));
+            Assert.That(terzo.Comandi, Has.Count.EqualTo(1));
+
+            // Il cambio di struttura non fa riscattare né duplicare il comando già esposto.
+            StatoTavolo dopoCambio = stabilizzatore.Aggiorna(Stato(note: new[] { nota }, comandi: new[] { play }, struttura: StrutturaTavolo.Default));
+            Assert.That(dopoCambio.Note, Has.Count.EqualTo(1));
+            Assert.That(dopoCambio.Comandi, Is.Empty);
+        }
+
+        private static StrutturaTavolo Struttura(int battiti, int righeCollegate, int aInizio, int aFine)
+        {
+            Assert.That(StrutturaTavolo.TryCrea(battiti, righeCollegate, aInizio, aFine, out StrutturaTavolo struttura), Is.True);
+            return struttura;
+        }
+
         private static void StabilizzaNota(StabilizzatoreTavolo stabilizzatore, CartoncinoNota nota)
         {
             for (int frame = 1; frame <= 3; frame++)
@@ -156,12 +252,14 @@ namespace VisualMusicBlockLooper.Tests
         private static StatoTavolo Stato(
             IReadOnlyList<CartoncinoNota> note = null,
             IReadOnlyList<ComandoRilevato> comandi = null,
-            IReadOnlyList<ErroreTavolo> errori = null)
+            IReadOnlyList<ErroreTavolo> errori = null,
+            StrutturaTavolo struttura = null)
         {
             return new StatoTavolo(
                 note ?? new List<CartoncinoNota>(),
                 comandi ?? new List<ComandoRilevato>(),
-                errori ?? new List<ErroreTavolo>());
+                errori ?? new List<ErroreTavolo>(),
+                struttura);
         }
 
     }

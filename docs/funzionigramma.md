@@ -158,7 +158,7 @@ Dentro `Sequencer.Tick`, in quest'ordine:
 - Se la struttura è cambiata rispetto al tick precedente, tutte le note in corso ricevono subito il note-off: nessuna nota resta appesa. La riproduzione prosegue sullo step assoluto in corso.
 - Ogni tick: le note che non sono più sulla griglia ricevono subito il note-off.
 - Ai multipli di 6 tick (confine di passo) si calcola la posizione nel giro (`PosizioneGiro`), si spengono le note giunte alla fine della durata e si accendono le note che iniziano sul passo corrente, con la riga attiva. A parità, ordine per colore (traccia), clip e riga.
-- Una nota due volte nella stessa chiave (riga, colore, step) non viene riaccesa mentre suona.
+- Una nota già in corso, identificata dalla chiave `IdClip:Traccia:Riga:StepIniziale`, non viene riaccesa finché suona.
 - La durata minima è 1 passo, troncata a fine misura.
 
 Mappatura verso MIDI (`MappaturaMidiJson`): canale = `CanalePerTraccia[traccia]` (0-based, la traccia è il colore), nota = `NotaPerClip[idClip]` oppure `36 + idClip`, velocity = `Velocity` (default 100).
@@ -225,7 +225,7 @@ Regole di posa e di risoluzione:
 | `ImpostazioneNonValida` | Impostazione fuori dall'insieme ammesso (misura diversa da 2, 3, 4; collegamento diverso da 1, 2, 3, 6); A-B con `a >= b`, con `b` oltre le righe collegate o con `LINK 1`. | Cartoncino non previsto (es. `MISURA;5`, `AB;4;2`, `AB;2;5` con `LINK 3`). | Usare un cartoncino della tabella dei cartoncini speciali. Il parametro vale il default. | Contorno rosso sul cartoncino. |
 | `FuoriMisura` | Nota che inizia oltre il numero di colonne della misura (in 3/4 dalla colonna 13; in 2/4 dalla colonna 9). | Nota nelle colonne oscurate. | Spostare la nota nelle colonne attive della misura, oppure usare 4/4. | Contorno rosso. |
 
-Gli errori non vengono filtrati dallo stabilizzatore: passano subito alla guida. Il vecchio errore `ColoreIncoerente` non esiste più: il colore non è più legato alla riga, quindi qualunque colore può stare in qualunque riga.
+Gli errori non vengono filtrati dallo stabilizzatore: passano subito alla guida. Il colore non è più legato alla riga.
 
 ## Riferimenti
 

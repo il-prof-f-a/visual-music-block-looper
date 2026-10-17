@@ -39,7 +39,58 @@ namespace VisualMusicBlockLooper.Core
                 return TryParseComando(campi, out payload);
             }
 
+            if (string.Equals(tipo, "S", StringComparison.Ordinal))
+            {
+                return TryParseImpostazione(campi, out payload);
+            }
+
             return false;
+        }
+
+        private static bool TryParseImpostazione(string[] campi, out PayloadCartoncino payload)
+        {
+            payload = null;
+
+            string chiave = campi[2].ToUpperInvariant();
+            switch (chiave)
+            {
+                case "MISURA":
+                case "LINK":
+                    if (campi.Length != 4 || !TryParseNumero(campi[3], out int valore))
+                    {
+                        return false;
+                    }
+
+                    payload = new PayloadCartoncino
+                    {
+                        Tipo = TipoCartoncino.Impostazione,
+                        Impostazione = chiave == "MISURA"
+                            ? TipoImpostazione.Misura
+                            : TipoImpostazione.Collegamento,
+                        Valore = valore
+                    };
+                    return true;
+
+                case "AB":
+                    if (campi.Length != 5
+                        || !TryParseNumero(campi[3], out int primo)
+                        || !TryParseNumero(campi[4], out int secondo))
+                    {
+                        return false;
+                    }
+
+                    payload = new PayloadCartoncino
+                    {
+                        Tipo = TipoCartoncino.Impostazione,
+                        Impostazione = TipoImpostazione.IntervalloAb,
+                        Valore = primo,
+                        ValoreB = secondo
+                    };
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         private static bool TryParseNota(string[] campi, out PayloadCartoncino payload)

@@ -81,9 +81,71 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void Misura_Valida()
+        {
+            bool ok = ParserPayload.TryParse("VMBL1;S;MISURA;3", out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Tipo, Is.EqualTo(TipoCartoncino.Impostazione));
+            Assert.That(payload.Impostazione, Is.EqualTo(TipoImpostazione.Misura));
+            Assert.That(payload.Valore, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void Link_Valido()
+        {
+            bool ok = ParserPayload.TryParse("VMBL1;S;LINK;6", out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Tipo, Is.EqualTo(TipoCartoncino.Impostazione));
+            Assert.That(payload.Impostazione, Is.EqualTo(TipoImpostazione.Collegamento));
+            Assert.That(payload.Valore, Is.EqualTo(6));
+        }
+
+        [Test]
+        public void Ab_Valido()
+        {
+            bool ok = ParserPayload.TryParse("VMBL1;S;AB;2;5", out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Tipo, Is.EqualTo(TipoCartoncino.Impostazione));
+            Assert.That(payload.Impostazione, Is.EqualTo(TipoImpostazione.IntervalloAb));
+            Assert.That(payload.Valore, Is.EqualTo(2));
+            Assert.That(payload.ValoreB, Is.EqualTo(5));
+        }
+
+        [Test]
+        public void ChiaveCaseInsensitive()
+        {
+            bool ok = ParserPayload.TryParse("VMBL1;S;misura;4", out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Impostazione, Is.EqualTo(TipoImpostazione.Misura));
+            Assert.That(payload.Valore, Is.EqualTo(4));
+        }
+
+        [TestCase("VMBL1;S")]
+        [TestCase("VMBL1;S;MISURA")]
+        [TestCase("VMBL1;S;MISURA;")]
+        [TestCase("VMBL1;S;MISURA;-1")]
+        [TestCase("VMBL1;S;MISURA;4;4")]
+        [TestCase("VMBL1;S;AB;2")]
+        [TestCase("VMBL1;S;AB;2;x")]
+        [TestCase("VMBL1;S;AB;1;2;3")]
+        [TestCase("VMBL1;S;COSA;1")]
+        [TestCase("VMBL1;S;LINK;١")]
+        public void RifiutatiSpeciali(string testo)
+        {
+            bool ok = true;
+
+            Assert.DoesNotThrow(() => ok = ParserPayload.TryParse(testo, out _));
+            Assert.That(ok, Is.False);
+        }
+
+        [Test]
         public void Fuzz_NonLanciaMai()
         {
-            const string alfabeto = "VMBL1NC;-+ 0123456789abcdefONESHOTTAP١٢\t\n";
+            const string alfabeto = "VMBL1NCS;-+ 0123456789abcdefONESHOTTAP١٢\t\n";
             var random = new Random(20261017);
             var sb = new StringBuilder();
 

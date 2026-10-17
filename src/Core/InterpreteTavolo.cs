@@ -13,6 +13,10 @@ namespace VisualMusicBlockLooper.Core
         private readonly Griglia griglia;
         private readonly RettangoloTavolo zonaComandi;
 
+        /// <summary>Crea l'interprete per la griglia data e la zona in cui i cartoncini diventano comandi.</summary>
+        /// <param name="griglia">Griglia di riferimento. Non può essere null (errore di programmazione).</param>
+        /// <param name="zonaComandi">Area normalizzata della zona comandi.</param>
+        /// <exception cref="ArgumentNullException">Lanciata se <paramref name="griglia"/> è null.</exception>
         public InterpreteTavolo(Griglia griglia, RettangoloTavolo zonaComandi)
         {
             this.griglia = griglia ?? throw new ArgumentNullException(nameof(griglia));
@@ -22,14 +26,10 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>
         /// Interpreta i cartoncini. Vengono elaborati in ordine di Area.X (poi Area.Y) così che,
         /// in caso di sovrapposizione sulla stessa traccia, il primo resti e il successivo sia scartato.
+        /// Una lista null è trattata come vuota; gli elementi null vengono ignorati.
         /// </summary>
         public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati)
         {
-            if (rilevati == null)
-            {
-                throw new ArgumentNullException(nameof(rilevati));
-            }
-
             var note = new List<CartoncinoNota>();
             var comandi = new List<ComandoRilevato>();
             var errori = new List<ErroreTavolo>();
@@ -37,7 +37,11 @@ namespace VisualMusicBlockLooper.Core
             // Occupazione per traccia: intervalli [inizio, fine) degli step già assegnati.
             var occupate = new Dictionary<int, List<(int Inizio, int Fine)>>();
 
-            IEnumerable<CartoncinoRilevato> ordinati = rilevati
+            IEnumerable<CartoncinoRilevato> validi = rilevati?
+                .Where(r => r != null)
+                ?? Enumerable.Empty<CartoncinoRilevato>();
+
+            IEnumerable<CartoncinoRilevato> ordinati = validi
                 .OrderBy(r => r.Area.X)
                 .ThenBy(r => r.Area.Y);
 

@@ -7,8 +7,41 @@ namespace VisualMusicBlockLooper.App
     /// <summary>Impostazioni della webcam salvate nel file di configurazione dell'applicazione.</summary>
     public class ConfigurazioneWebcam
     {
-        /// <summary>Indice di sistema della webcam da aprire all'avvio (0 = la prima).</summary>
+        /// <summary>Nome della webcam come lo vede Windows. È l'identità principale: ordine e numero possono cambiare.</summary>
+        public string Nome { get; set; }
+
+        /// <summary>Percorso univoco del dispositivo: distingue due webcam dello stesso modello.</summary>
+        public string Percorso { get; set; }
+
+        /// <summary>
+        /// Indice di sistema all'ultimo salvataggio. Si usa solo se nel file non ci sono nome né percorso
+        /// (configurazione di una versione precedente) o per informazione.
+        /// </summary>
         public int Indice { get; set; }
+
+        /// <summary>Copia nella configurazione l'identità della webcam in uso.</summary>
+        public void Imposta(InfoWebcam webcam)
+        {
+            if (webcam == null)
+            {
+                throw new ArgumentNullException(nameof(webcam));
+            }
+
+            Nome = webcam.Nome;
+            Percorso = webcam.Percorso;
+            Indice = webcam.Indice;
+        }
+
+        /// <summary>True se la webcam data è quella salvata (stesse regole di <see cref="AbbinamentoWebcam"/>).</summary>
+        public bool Corrisponde(InfoWebcam webcam)
+        {
+            if (webcam == null)
+            {
+                return false;
+            }
+
+            return AbbinamentoWebcam.Trova(new[] { webcam }, this) != null;
+        }
     }
 
     /// <summary>

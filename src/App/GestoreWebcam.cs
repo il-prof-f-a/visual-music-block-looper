@@ -15,6 +15,7 @@ namespace VisualMusicBlockLooper.App
         private readonly object blocco = new object();
         private volatile ISorgenteWebcam corrente;
         private int indiceCorrente = -1;
+        private InfoWebcam infoCorrente;
         private bool eliminato;
 
         /// <param name="apri">Apre la webcam con l'indice dato; restituisce null se non è disponibile.</param>
@@ -38,6 +39,18 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
+        /// <summary>Identità (nome, percorso, indice) della webcam aperta, oppure null.</summary>
+        public InfoWebcam Info
+        {
+            get
+            {
+                lock (blocco)
+                {
+                    return corrente == null ? null : infoCorrente;
+                }
+            }
+        }
+
         /// <summary>Larghezza dei frame della webcam corrente (0 se assente).</summary>
         public int Larghezza => corrente?.Larghezza ?? 0;
 
@@ -51,6 +64,18 @@ namespace VisualMusicBlockLooper.App
         /// <returns>True se la webcam richiesta è ora quella corrente.</returns>
         public bool Apri(int indice)
         {
+            return Apri(new InfoWebcam(indice));
+        }
+
+        /// <summary>Come <see cref="Apri(int)"/> ma conserva nome e percorso della webcam scelta.</summary>
+        public bool Apri(InfoWebcam webcam)
+        {
+            if (webcam == null)
+            {
+                throw new ArgumentNullException(nameof(webcam));
+            }
+
+            int indice = webcam.Indice;
             lock (blocco)
             {
                 if (eliminato)
@@ -60,6 +85,7 @@ namespace VisualMusicBlockLooper.App
 
                 if (corrente != null && indiceCorrente == indice)
                 {
+                    infoCorrente = webcam;
                     return true;
                 }
 
@@ -81,6 +107,7 @@ namespace VisualMusicBlockLooper.App
                 ISorgenteWebcam vecchia = corrente;
                 corrente = nuova;
                 indiceCorrente = indice;
+                infoCorrente = webcam;
                 vecchia?.Dispose();
                 return true;
             }
@@ -111,6 +138,7 @@ namespace VisualMusicBlockLooper.App
                 ISorgenteWebcam vecchia = corrente;
                 corrente = null;
                 indiceCorrente = -1;
+                infoCorrente = null;
                 vecchia?.Dispose();
             }
         }

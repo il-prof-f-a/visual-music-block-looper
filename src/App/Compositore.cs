@@ -21,7 +21,7 @@ namespace VisualMusicBlockLooper.App
 
         /// <summary>Crea il compositore e il relativo motore musicale.</summary>
         /// <param name="ingresso">Ingresso MIDI; può essere null.</param>
-        /// <param name="zonaComandi">Zona dei comandi; se null si usa <see cref="ZonaComandiDefault"/>.</param>
+        /// <param name="layout">Zone speciali del tavolo; se null si usa solo la zona comandi di default (<see cref="ZonaComandiDefault"/>).</param>
         /// <param name="orologioMs">Orologio in millisecondi per il motore; se null un cronometro interno.</param>
         /// <exception cref="ArgumentNullException">Lanciata se rilevatore, uscita, mappatura o config sono null.</exception>
         public Compositore(
@@ -30,7 +30,7 @@ namespace VisualMusicBlockLooper.App
             IIngressoMidi ingresso,
             IMappaturaMidi mappatura,
             ConfigGriglia config,
-            RettangoloTavolo? zonaComandi = null,
+            LayoutTavolo layout = null,
             Func<long> orologioMs = null)
         {
             this.rilevatore = rilevatore ?? throw new ArgumentNullException(nameof(rilevatore));
@@ -49,9 +49,13 @@ namespace VisualMusicBlockLooper.App
                 throw new ArgumentNullException(nameof(config));
             }
 
-            interprete = new InterpreteTavolo(new Griglia(config), zonaComandi ?? ZonaComandiDefault);
+            Layout = layout ?? LayoutTavolo.ConSoloComandi(ZonaComandiDefault);
+            interprete = new InterpreteTavolo(new Griglia(config), Layout);
             Motore = new MotoreMusicale(new Sequencer(config), uscita, ingresso, mappatura, 120, orologioMs);
         }
+
+        /// <summary>Zone speciali del tavolo usate per interpretare i cartoncini.</summary>
+        public LayoutTavolo Layout { get; }
 
         /// <summary>Motore musicale pilotato dal compositore.</summary>
         public MotoreMusicale Motore { get; }

@@ -24,7 +24,7 @@ namespace VisualMusicBlockLooper.App
             List<string> avvisi = new List<string>();
             List<IDisposable> risorse = new List<IDisposable>();
 
-            ConfigGriglia config = new ConfigGriglia { Area = new RettangoloTavolo(0.02, 0.04, 0.80, 0.92) };
+            ConfigGriglia config = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
             Stopwatch cronometro = Stopwatch.StartNew();
             Func<long> orologioMs = () => cronometro.ElapsedMilliseconds;
 
@@ -47,7 +47,7 @@ namespace VisualMusicBlockLooper.App
                 percorsoCalibrazione, webcam, rilevatore, avvisi);
 
             Compositore compositore = new Compositore(
-                rilevatore, uscita, ingresso, mappatura, config, null, orologioMs);
+                rilevatore, uscita, ingresso, mappatura, config, LayoutTavolo.Default, orologioMs);
             FormProiettore proiettore = new FormProiettore(config);
             string testoPorte = $"MIDI uscita: {configMidi.PortaUscita}  |  ingresso: {configMidi.PortaIngresso}"
                 + (avvisi.Exists(a => a.StartsWith("Porta MIDI")) ? "  (non disponibile)" : string.Empty);

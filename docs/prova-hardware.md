@@ -11,7 +11,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 | Windows 10/11 a 64 bit | L'app è net472. Nei progetti non è impostato `PlatformTarget` (compilazione AnyCPU di default). |
 | loopMIDI | Driver MIDI virtuale. Creare due porte con nome esatto **`VMBL`** (usata dall'app in uscita e in ingresso) e, solo per i test automatici, **`VMBL Test`**. |
 | Ableton Live | Con preferenze MIDI accessibili (sezione Link/Tempo/MIDI). |
-| Webcam | Indice 0 (la prima camera di sistema). Non deve essere usata da altre app (Teams, OBS, Zoom). |
+| Webcam | All'avvio si apre la webcam indicata in `configurazione.json` (indice 0 = la prima, se il file non c'è). Si cambia dalla lista "Webcam" della finestra di controllo. Non deve essere usata da altre app (Teams, OBS, Zoom). |
 | Proiettore | Su secondo schermo, meglio in modalità "solo secondo schermo" (estendi). |
 | Cartoncini | Stampati a 100% da `assets/cartoncini/` (6 colori x 8 clip, 5 comandi). |
 
@@ -39,6 +39,23 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 3. Avviare l'exe. Nella finestra di controllo leggere la riga delle porte:
    - `MIDI uscita: VMBL | ingresso: VMBL` senza "(non disponibile)": porte aperte.
    - Riga di avviso "Webcam non trovata: modalità simulazione": la camera non è stata aperta (vedi sezione 10).
+
+### Scelta della webcam e `configurazione.json`
+
+- La lista **Webcam** della finestra di controllo mostra le webcam trovate all'avvio (`Webcam 0`, `Webcam 1`, ...). **Aggiorna elenco** le rileva di nuovo (la webcam in uso non viene riaperta).
+- Scegliendo una webcam dalla lista l'app la apre subito; se non si apre resta attiva la precedente e compare un avviso.
+- Cambiare webcam spegne il riconoscimento: la calibrazione è legata alla webcam e alla sua risoluzione, quindi va rifatta (viene ricaricata da sola solo se era stata salvata con quella stessa webcam).
+- **Dopo una calibrazione riuscita** l'app scrive `configurazione.json` accanto all'exe con la webcam in uso. All'avvio rilegge il file, apre quella webcam e ricarica `calibrazione.txt`. Si può anche modificare il file a mano:
+
+  ```json
+  {
+    "Webcam": {
+      "Indice": 1
+    }
+  }
+  ```
+
+- Se la webcam indicata nel file non è disponibile l'app parte in modalità simulazione con un avviso e si sceglie un'altra webcam dalla lista. Se il file è assente si usa l'indice 0.
 
 ## 5. Calibrazione (4 click)
 

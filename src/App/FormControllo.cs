@@ -27,9 +27,11 @@ namespace VisualMusicBlockLooper.App
 
         private readonly Compositore compositore;
         private readonly FormProiettore proiettore;
-        private readonly WebcamFonte webcam;
+        private readonly GestoreWebcam webcam;
         private readonly RilevatoreCommutabile rilevatore;
         private readonly string percorsoCalibrazione;
+        private readonly ConfigurazioneApplicazione configurazione;
+        private readonly string percorsoConfigurazione;
         private readonly Func<long> orologioMs;
         private readonly List<IDisposable> risorse;
         private readonly string testoPorte;
@@ -49,6 +51,9 @@ namespace VisualMusicBlockLooper.App
         private Button pulsanteModo;
         private Button pulsanteTap;
         private ComboBox comboMonitor;
+        private ComboBox comboWebcam;
+        private Button pulsanteAggiornaWebcam;
+        private bool aggiornamentoComboWebcam;
         private Screen[] schermi = new Screen[0];
         private bool inCalibrazione;
         private bool calibrazionePresente;
@@ -56,15 +61,21 @@ namespace VisualMusicBlockLooper.App
         private Size dimensioniFrame;
 
         /// <summary>Crea la finestra. Thread e ciclo di cattura partono solo quando la finestra viene mostrata.</summary>
-        /// <param name="webcam">Webcam aperta, o null in modalità simulazione.</param>
+        /// <param name="webcam">Gestore della webcam (può non avere una webcam aperta: modalità simulazione).</param>
+        /// <param name="configurazione">Configurazione dell'applicazione; riscritta dopo ogni calibrazione riuscita.</param>
+        /// <param name="percorsoConfigurazione">File in cui salvare la configurazione.</param>
+        /// <param name="elencoWebcam">Webcam rilevate all'avvio, mostrate nella lista.</param>
         /// <param name="calibrazionePresente">True se un rilevatore calibrato è già stato impostato.</param>
         /// <param name="risorse">Oggetti da rilasciare alla chiusura (porte MIDI, ...).</param>
         public FormControllo(
             Compositore compositore,
             FormProiettore proiettore,
-            WebcamFonte webcam,
+            GestoreWebcam webcam,
             RilevatoreCommutabile rilevatore,
             string percorsoCalibrazione,
+            ConfigurazioneApplicazione configurazione,
+            string percorsoConfigurazione,
+            IReadOnlyList<InfoWebcam> elencoWebcam,
             Func<long> orologioMs,
             string testoPorte,
             IEnumerable<string> avvisi,
@@ -75,8 +86,10 @@ namespace VisualMusicBlockLooper.App
             this.proiettore = proiettore ?? throw new ArgumentNullException(nameof(proiettore));
             this.rilevatore = rilevatore ?? throw new ArgumentNullException(nameof(rilevatore));
             this.orologioMs = orologioMs ?? throw new ArgumentNullException(nameof(orologioMs));
-            this.webcam = webcam;
+            this.webcam = webcam ?? throw new ArgumentNullException(nameof(webcam));
             this.percorsoCalibrazione = percorsoCalibrazione;
+            this.configurazione = configurazione ?? new ConfigurazioneApplicazione();
+            this.percorsoConfigurazione = percorsoConfigurazione;
             this.testoPorte = testoPorte ?? string.Empty;
             this.avvisi = (avvisi ?? Enumerable.Empty<string>()).ToList();
             this.risorse = (risorse ?? Enumerable.Empty<IDisposable>()).ToList();
@@ -86,6 +99,7 @@ namespace VisualMusicBlockLooper.App
             cicloCattura = new CicloCattura(PassoCattura);
 
             CostruisciInterfaccia();
+            PopolaElencoWebcam(elencoWebcam ?? new List<InfoWebcam>());
             timerInterfaccia.Tick += (mittente, argomenti) => AggiornaInterfaccia();
         }
 
@@ -142,7 +156,7 @@ namespace VisualMusicBlockLooper.App
             }
 
             proiettore.Dispose();
-            webcam?.Dispose();
+            webcam.Dispose();
             foreach (IDisposable risorsa in risorse)
             {
                 try
@@ -193,6 +207,12 @@ namespace VisualMusicBlockLooper.App
 
             comboMonitor.SelectedIndexChanged += OnMonitorSelezionato;
 
+            Label etichettaWebcam = new Label { Left = 545, Top = 308, Width = 200, Height = 18, Text = "Webcam" };
+            comboWebcam = new ComboBox { Left = 545, Top = 330, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            comboWebcam.SelectedIndexChanged += OnWebcamSelezionata;
+            pulsanteAggiornaWebcam = new Button { Text = "Aggiorna elenco", Left = 545, Top = 360, Width = 200, Height = 28 };
+            pulsanteAggiornaWebcam.Click += (m, a) => AggiornaElencoWebcam();
+
             etichettaAvviso = new Label
             {
                 Left = 10, Top = 462, Width = 740, Height = 90, ForeColor = Color.DarkRed
@@ -201,7 +221,8 @@ namespace VisualMusicBlockLooper.App
             Controls.AddRange(new Control[]
             {
                 etichettaStato, etichettaPorte, anteprima, pulsanteCalibra, pulsanteAvviaFerma,
-                pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor, etichettaAvviso
+                pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor,
+                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, etichettaAvviso
             });
 
             AggiornaInterfaccia();
@@ -274,7 +295,7 @@ namespace VisualMusicBlockLooper.App
             pulsanteTap.Enabled = motore.Modo == ModoSincronia.Master;
 
             List<string> righe = new List<string>(avvisi);
-            if (webcam == null)
+            if (!webcam.Disponibile)
             {
                 righe.Add("Webcam non trovata: modalità simulazione.");
             }
@@ -294,7 +315,7 @@ namespace VisualMusicBlockLooper.App
 
         private void AggiornaAnteprima()
         {
-            Bitmap nuova = webcam?.Anteprima();
+            Bitmap nuova = webcam.Anteprima();
             if (nuova == null)
             {
                 return;
@@ -307,7 +328,7 @@ namespace VisualMusicBlockLooper.App
 
         private void AvviaCalibrazione()
         {
-            if (webcam == null)
+            if (!webcam.Disponibile)
             {
                 MessageBox.Show(this, "Webcam non disponibile: impossibile calibrare.", Text);
                 return;
@@ -364,6 +385,8 @@ namespace VisualMusicBlockLooper.App
                 {
                     avvisi.Add(avvisoSalvataggio);
                 }
+
+                SalvaWebcamInConfigurazione();
             }
             catch (Exception eccezione)
             {
@@ -374,6 +397,92 @@ namespace VisualMusicBlockLooper.App
             puntiSchermo.Clear();
             anteprima.Invalidate();
         }
+
+        /// <summary>Dopo una calibrazione riuscita salva nel file di configurazione la webcam in uso.</summary>
+        private void SalvaWebcamInConfigurazione()
+        {
+            if (string.IsNullOrEmpty(percorsoConfigurazione) || webcam.IndiceCorrente < 0)
+            {
+                return;
+            }
+
+            try
+            {
+                configurazione.Webcam.Indice = webcam.IndiceCorrente;
+                configurazione.Salva(percorsoConfigurazione);
+            }
+            catch (Exception eccezione)
+            {
+                avvisi.Add("Configurazione non salvata su disco: " + eccezione.Message);
+            }
+        }
+
+        private void PopolaElencoWebcam(IReadOnlyList<InfoWebcam> elenco)
+        {
+            aggiornamentoComboWebcam = true;
+            try
+            {
+                comboWebcam.Items.Clear();
+                foreach (InfoWebcam info in elenco)
+                {
+                    comboWebcam.Items.Add(info);
+                }
+
+                comboWebcam.SelectedItem = elenco.FirstOrDefault(i => i.Indice == webcam.IndiceCorrente);
+            }
+            finally
+            {
+                aggiornamentoComboWebcam = false;
+            }
+        }
+
+        private void AggiornaElencoWebcam()
+        {
+            // Le webcam libere vengono provate aprendole; quella in uso non si riapre.
+            PopolaElencoWebcam(ElencoWebcam.RilevaReali(webcam.IndiceCorrente));
+        }
+
+        private void OnWebcamSelezionata(object mittente, EventArgs argomenti)
+        {
+            if (aggiornamentoComboWebcam || !(comboWebcam.SelectedItem is InfoWebcam scelta))
+            {
+                return;
+            }
+
+            if (scelta.Indice == webcam.IndiceCorrente)
+            {
+                return;
+            }
+
+            avvisi.RemoveAll(a => a.StartsWith(PrefissoAvvisoWebcam));
+            if (!webcam.Apri(scelta.Indice))
+            {
+                avvisi.Add(PrefissoAvvisoWebcam + scelta.Indice + " non apribile: resta attiva la precedente.");
+                aggiornamentoComboWebcam = true;
+                try
+                {
+                    comboWebcam.SelectedItem = comboWebcam.Items.Cast<InfoWebcam>()
+                        .FirstOrDefault(i => i.Indice == webcam.IndiceCorrente);
+                }
+                finally
+                {
+                    aggiornamentoComboWebcam = false;
+                }
+
+                return;
+            }
+
+            // La calibrazione è legata alla webcam e alla sua risoluzione: la si ricarica solo se quella
+            // salvata è stata fatta con questa stessa webcam.
+            rilevatore.Imposta(null);
+            avvisi.RemoveAll(a => a == ApplicazioneCalibrazione.AvvisoRisoluzioneDiversa
+                || a == ApplicazioneCalibrazione.AvvisoRisoluzioneSconosciuta);
+            calibrazionePresente = configurazione.Webcam.Indice == scelta.Indice
+                && ApplicazioneCalibrazione.TentaCaricamento(percorsoCalibrazione, webcam, rilevatore, avvisi);
+            AggiornaInterfaccia();
+        }
+
+        private const string PrefissoAvvisoWebcam = "Webcam ";
 
         private void OnPaintAnteprima(object mittente, PaintEventArgs argomenti)
         {

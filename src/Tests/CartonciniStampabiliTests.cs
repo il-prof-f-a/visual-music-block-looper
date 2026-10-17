@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -40,15 +41,51 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         // Rigenera i PNG in assets/cartoncini (eseguire a mano con --filter Name=GeneraCartoncini).
+        // Parametri opzionali da variabili d'ambiente: VMBL_PASSO_MM (mm per passo, 15-60) e
+        // VMBL_PASSI (passi per cartoncino, 2-8). Senza variabili: 30 mm e 2 passi.
+        // ATTENZIONE: ogni esecuzione riscrive tutti i 53 PNG in assets/cartoncini.
         [Test, Explicit("Rigenera il materiale stampabile in assets/cartoncini")]
         public void GeneraCartoncini()
         {
             string dir = GeneratoreCartoncini.CartellaCartoncini();
             Assert.IsNotNull(dir);
 
-            GeneratoreCartoncini.Genera(dir);
+            double passoMm = LeggiDouble("VMBL_PASSO_MM", GeneratoreCartoncini.PassoMmDefault, 15, 60);
+            int passi = LeggiIntero("VMBL_PASSI", GeneratoreCartoncini.PassiDefault, 2, 8);
+
+            GeneratoreCartoncini.Genera(dir, passoMm, GeneratoreCartoncini.AltezzaMmDefault, passi);
 
             Assert.That(Directory.GetFiles(dir, "*.png"), Has.Length.EqualTo(53));
+        }
+
+        private static int LeggiIntero(string nome, int predefinito, int minimo, int massimo)
+        {
+            string testo = Environment.GetEnvironmentVariable(nome);
+            if (string.IsNullOrWhiteSpace(testo))
+            {
+                return predefinito;
+            }
+
+            bool ok = int.TryParse(testo, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out int valore);
+            Assert.That(ok && valore >= minimo && valore <= massimo, Is.True,
+                $"{nome} deve essere un intero tra {minimo} e {massimo}: '{testo}'");
+            return valore;
+        }
+
+        private static double LeggiDouble(string nome, double predefinito, double minimo, double massimo)
+        {
+            string testo = Environment.GetEnvironmentVariable(nome);
+            if (string.IsNullOrWhiteSpace(testo))
+            {
+                return predefinito;
+            }
+
+            bool ok = double.TryParse(testo, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double valore);
+            Assert.That(ok && valore >= minimo && valore <= massimo, Is.True,
+                $"{nome} deve essere un numero tra {minimo} e {massimo}: '{testo}'");
+            return valore;
         }
 
         // Guardia del generatore: i cartoncini generati devono essere letti dal rilevatore reale

@@ -8,7 +8,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 
 | Elemento | Note |
 |---|---|
-| Windows 10/11 x64 | L'app è net472 x64. |
+| Windows 10/11 a 64 bit | L'app è net472. Nei progetti non è impostato `PlatformTarget` (compilazione AnyCPU di default). |
 | loopMIDI | Driver MIDI virtuale. Creare due porte con nome esatto **`VMBL`** (usata dall'app in uscita e in ingresso) e, solo per i test automatici, **`VMBL Test`**. |
 | Ableton Live | Con preferenze MIDI accessibili (sezione Link/Tempo/MIDI). |
 | Webcam | Indice 0 (la prima camera di sistema). Non deve essere usata da altre app (Teams, OBS, Zoom). |
@@ -18,7 +18,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 ## 2. Installazione loopMIDI
 
 1. Installare loopMIDI.
-2. Creare la porta **`VMBL`**. Verificare che compaia con questo nome esatto: il nome è confrontato alla lettera dall'app.
+2. Creare la porta **`VMBL`**. Il nome deve essere esattamente `VMBL`: l'app lo cerca con `GetByName` di DryWetMIDI (primo dispositivo con quel nome). Se non lo trova, l'avviso elenca le porte disponibili.
 3. Facoltativo, solo per i test automatici di hardware: creare la porta **`VMBL Test`**. I test di categoria `Hardware` (`MidiIntegrazioneTests`) vengono saltati se questa porta manca (messaggio: "Porta MIDI 'VMBL Test' non presente").
 4. Lasciare loopMIDI aperto durante tutta la prova.
 
@@ -49,7 +49,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
    3. basso-destra
    4. basso-sinistra
 
-   L'etichetta della finestra indica l'angolo atteso ("clicca l'angolo 2/4 ...").
+   Il testo nell'area avvisi in basso nella finestra di controllo indica l'angolo atteso ("clicca l'angolo 2/4 ..."). La riga di stato in alto mostra invece BPM, modo e stato di esecuzione.
 3. Dopo il quarto click la calibrazione viene calcolata e salvata in `calibrazione.txt`, accanto all'exe. Il messaggio "Calibrazione mancante" scompare.
 4. Se i click sono sbagliati, premere di nuovo **Calibra** e ripetere.
 5. Controllo: appoggiare un cartoncino nero o colorato su una zona nota e verificare che la guida proiettata lo riconosca nella cella giusta (vedi sezione 7).
@@ -97,11 +97,11 @@ Procedura:
 4. Premere **Ferma** (o `VMBL1;C;STOP`): invia MIDI Stop, Ableton si ferma e le note in corso vengono spente.
 5. Osservare il BPM nella riga di stato: il clock è inviato in continuo anche da fermo.
 
-Nota: lo stesso nome di porta è usato in uscita e in ingresso. Il clock e le note che l'app invia sulla porta rientrano nell'app stessa: in Master l'app ignora il proprio clock in ingresso (nessun doppio tick) e ignora le proprie note.
+Nota: lo stesso nome di porta è usato in uscita e in ingresso, quindi ciò che l'app invia rientra nel suo ingresso. In Master il clock ricevuto è ignorato (nessun doppio tick). L'ingresso MIDI dell'app gestisce solo clock, Start, Stop e Continue: le note ricevute non hanno effetto sul motore.
 
 ### Slave (Ableton guida il clock)
 
-1. Premere **Master / Slave** fino a che la riga di stato mostra **Slave** (il modo cambia fermando la riproduzione).
+1. Premere una volta **Master / Slave**: è un pulsante unico che alterna i due modi. Verificare che la riga di stato mostri **Slave** (il cambio di modo ferma la riproduzione).
 2. In Ableton, preferenze MIDI: abilitare l'**uscita** verso **VMBL** con sincronizzazione (Sync On). Ableton invia clock e Start/Stop alla porta.
 3. Avviare la riproduzione in Ableton: l'app riceve Start e segue i tick (6 tick = 1 step).
 4. Fermare la riproduzione in Ableton: l'app riceve Stop e spegne le note.

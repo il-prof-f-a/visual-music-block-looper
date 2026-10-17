@@ -9,7 +9,8 @@ Descrizione funzionale del sistema: come un fotogramma della webcam diventa note
 | Cattura | `CicloCattura` | circa 66 ms (circa 15 fps) | Esegue `Compositore.Passo`: visione, interpretazione, stabilizzazione, motore. |
 | Clock interno | `TickMaster` | priorità alta, un tick ogni 60000 / (BPM x 24) ms | Chiama `MotoreMusicale.TickInterno` in Master; controlla il timeout del clock esterno ogni 100 ms. |
 | MIDI in ingresso | libreria DryWetMIDI | su evento | Solleva `ClockRicevuto`, `StartRicevuto`, `StopRicevuto`, `ContinueRicevuto`. |
-| Interfaccia | `FormControllo`, `FormProiettore` | evento / timer 150 ms | Pulsanti, anteprima, disegno della guida. |
+| Interfaccia | `FormControllo` | timer di 150 ms (aggiornamento etichette e anteprima) | Pulsanti, anteprima webcam, calibrazione. |
+| Proiezione | `FormProiettore` | su richiesta (`Invalidate` a ogni passo di cattura) | Disegno della guida tramite `RenderGuida`. |
 
 Lo stato del motore è protetto da un unico lock (`MotoreMusicale.bloccoLock`).
 

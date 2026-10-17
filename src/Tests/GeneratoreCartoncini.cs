@@ -28,6 +28,9 @@ namespace VisualMusicBlockLooper.Tests
         /// <summary>Passi minimi di un cartoncino: sotto questa larghezza il QR non entra con la sua zona quieta.</summary>
         public const int PassiMinimi = 2;
 
+        /// <summary>Passi di default per cartoncino.</summary>
+        public const int PassiDefault = 2;
+
         /// <summary>Nota MIDI base per clip, come in mappatura-default.json (36 + idClip).</summary>
         public const int NotaBase = 36;
 
@@ -82,7 +85,7 @@ namespace VisualMusicBlockLooper.Tests
         /// Rigenera tutti i cartoncini in <paramref name="cartella"/>: 6 colori x 8 clip di nota e 5 comandi.
         /// </summary>
         public static void Genera(string cartella, double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault,
-            int passi = 2)
+            int passi = PassiDefault)
         {
             Directory.CreateDirectory(cartella);
 
@@ -176,7 +179,7 @@ namespace VisualMusicBlockLooper.Tests
         public static string CartellaCartoncini()
         {
             string dir = AppDomain.CurrentDomain.BaseDirectory;
-            while (dir != null && !Directory.Exists(Path.Combine(dir, "assets", "prova")))
+            while (dir != null && !Directory.Exists(Path.Combine(dir, "assets", "config")))
             {
                 dir = Path.GetDirectoryName(dir);
             }

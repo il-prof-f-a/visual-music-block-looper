@@ -38,21 +38,28 @@ Payload dei comandi: `VMBL1;C;PLAY`, `VMBL1;C;STOP`, `VMBL1;C;TAP`, `VMBL1;C;MOD
 
 La durata di una nota è la larghezza del corpo colorato, in passi (arrotondata, minimo 1). Per una nota di 3 passi il cartoncino deve essere largo 90 mm; per 4 passi 120 mm.
 
-- Modo consigliato: rigenerare il cartoncino con il numero di passi voluto (vedi sotto, parametro `passi`) e stampare solo quel file.
+- Modo consigliato: impostare `VMBL_PASSI` (vedi sotto) e rigenerare: tutti i 53 file vengono riscritti con quel numero di passi; si stampano solo quelli necessari.
 - Modo manuale: incollare sul lato destro una striscia dello **stesso colore** e della stessa altezza, lunga un multiplo di 30 mm. Il bordo di giunzione deve essere allineato al passo; eventuali strisce di colore diverso o bordi neri interrompono la misura della durata.
 
 ## Rigenerare il materiale
 
-Il generatore è il test esplicito `GeneraCartoncini` in `src/Tests/CartonciniStampabiliTests.cs`, implementato in `src/Tests/GeneratoreCartoncini.cs`. Dalla radice del repository:
+Il generatore è il test esplicito `GeneraCartoncini` in `src/Tests/CartonciniStampabiliTests.cs`, con la logica in `src/Tests/GeneratoreCartoncini.cs`. Dalla radice del repository:
 
 ```
 dotnet test src/Tests --filter "Name=GeneraCartoncini"
 ```
 
-I parametri stanno in `GeneratoreCartoncini.Genera(cartella, passoMm, altezzaMm, passi)`:
+Il test legge due variabili d'ambiente opzionali (senza variabili valgono 30 mm e 2 passi):
 
-- `passoMm` (default 30): larghezza di un passo in mm. Cambiarlo solo se si cambia la scala della griglia anche in `ConfigGriglia`.
-- `altezzaMm` (default 40): altezza del cartoncino.
-- `passi` (default 2, minimo 2): numero di passi per tutti i cartoncini generati.
+- `VMBL_PASSO_MM`: larghezza di un passo in mm, tra 15 e 60. Esempio: `set VMBL_PASSO_MM=25` (PowerShell: `$env:VMBL_PASSO_MM = "25"`), poi lo stesso comando.
+- `VMBL_PASSI`: passi per cartoncino, intero tra 2 e 8. Esempio: `set VMBL_PASSI=3`.
 
-Il test sovrascrive i PNG esistenti. Il test non esplicito `Rileva_CartoncinoGenerato_PayloadEColoreCorretti` verifica che i cartoncini generati siano letti dal rilevatore reale con il payload e il colore attesi.
+Valori fuori intervallo fanno fallire il test con un messaggio che indica la variabile sbagliata.
+
+Attenzione:
+
+- **Ogni esecuzione riscrive tutti i 53 PNG**, anche con i valori di default. Con i valori di default i file risultano invariati byte per byte; con altri valori cambiano tutti. Per tornare alla versione committata usare `git checkout -- assets/cartoncini`.
+- La scala fisica dei PNG è nei metadati di risoluzione (300 dpi) e nelle dimensioni in pixel: cambiare `VMBL_PASSO_MM` cambia la larghezza in mm di tutti i cartoncini. Il materiale committato usa 30 mm.
+- Il generatore usa il font **Arial** per le etichette. Su macchine con font diversi i byte dei PNG e la posizione del testo possono differire leggermente; il contenuto dei QR è identico.
+
+Il test non esplicito `Rileva_CartoncinoGenerato_PayloadEColoreCorretti` verifica che i cartoncini generati siano letti dal rilevatore reale con il payload e il colore attesi.

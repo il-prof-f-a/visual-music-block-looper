@@ -1,0 +1,11 @@
+{
+  "PortaUscita": "VMBL",
+  "PortaIngresso": "VMBL",
+  "Velocity": 100,
+  "CanalePerTraccia": [ 0, 1, 2, 3, 4, 5 ],
+  "NotaPerClip": {
+    "0": 36,
+    "1": 37,
+    "9": 45
+  }
+}

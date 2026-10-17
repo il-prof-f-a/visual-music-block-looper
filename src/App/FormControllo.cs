@@ -130,8 +130,10 @@ namespace VisualMusicBlockLooper.App
 
             try
             {
-                // Spegne note e invia Stop al DAW prima di chiudere le porte.
+                // Invia Stop al DAW (Master), poi spegne comunque note e one-shot in qualsiasi
+                // modo, prima di chiudere le porte.
                 compositore.Motore.Arresta();
+                compositore.Motore.Silenzia();
             }
             catch (Exception)
             {

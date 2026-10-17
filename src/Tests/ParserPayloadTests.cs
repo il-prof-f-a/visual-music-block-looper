@@ -39,6 +39,28 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(payload.Parametro, Is.EqualTo(60));
         }
 
+        [TestCase("VMBL1;C;ONESHOT;0", 0)]
+        [TestCase("VMBL1;C;ONESHOT;127", 127)]
+        public void OneShotLimitiAccettati(string testo, int atteso)
+        {
+            bool ok = ParserPayload.TryParse(testo, out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Comando, Is.EqualTo(TipoComando.OneShot));
+            Assert.That(payload.Parametro, Is.EqualTo(atteso));
+        }
+
+        [TestCase("VMBL1;C;ONESHOT;128")]
+        [TestCase("VMBL1;C;ONESHOT;-1")]
+        [TestCase("VMBL1;C;ONESHOT;1000")]
+        public void OneShotFuoriLimiteRifiutato(string testo)
+        {
+            bool ok = true;
+
+            Assert.DoesNotThrow(() => ok = ParserPayload.TryParse(testo, out _));
+            Assert.That(ok, Is.False);
+        }
+
         [TestCase(null)]
         [TestCase("")]
         [TestCase("   ")]

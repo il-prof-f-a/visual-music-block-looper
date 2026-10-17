@@ -246,6 +246,83 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void SlaveTimeoutSpegneOneShotConDawFermo()
+        {
+            Banco banco = new Banco();
+            banco.Ora = 1000;
+            banco.Motore.AggiornaTavolo(Stato(null, Comando(TipoComando.Modo)));
+            banco.Motore.AggiornaTavolo(Stato(null, Comando(TipoComando.OneShot, 60)));
+            Assert.That(banco.Motore.InEsecuzione, Is.False);
+
+            banco.Motore.ControllaTimeoutClock(1500);
+            Assert.That(banco.Uscita.Registro, Is.EqualTo(new[] { "NotaOn:0:60:100" }));
+
+            banco.Motore.ControllaTimeoutClock(1501);
+
+            Assert.That(banco.Uscita.Registro, Is.EqualTo(new[] { "NotaOn:0:60:100", "NotaOff:0:60" }));
+            banco.Motore.ControllaTimeoutClock(3000);
+            Assert.That(banco.Uscita.Registro.Count(r => r == "NotaOff:0:60"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SilenziaInSlaveSpegneNotaESuonaOneShot()
+        {
+            Banco banco = new Banco();
+            banco.Motore.AggiornaTavolo(Stato(new List<CartoncinoNota> { Nota(0, 0, 2, 0) }, Comando(TipoComando.Modo)));
+            banco.Ingresso.RaiseStart();
+            banco.Ingresso.RaiseClock();
+            banco.Motore.AggiornaTavolo(Stato(new List<CartoncinoNota> { Nota(0, 0, 2, 0) }, Comando(TipoComando.OneShot, 60)));
+            banco.Uscita.Registro.Clear();
+
+            banco.Motore.Silenzia();
+
+            Assert.That(banco.Motore.InEsecuzione, Is.False);
+            Assert.That(banco.Uscita.Registro, Is.EquivalentTo(new[] { "NotaOff:0:36", "NotaOff:0:60" }));
+            Assert.That(banco.Uscita.Registro, Has.None.EqualTo("Start"));
+            Assert.That(banco.Uscita.Registro, Has.None.EqualTo("Stop"));
+        }
+
+        [Test]
+        public void SilenziaEIdempotente()
+        {
+            Banco banco = new Banco();
+            banco.Motore.AggiornaTavolo(Stato(new List<CartoncinoNota> { Nota(0, 0, 2, 0) }, Comando(TipoComando.Play), Comando(TipoComando.OneShot, 60)));
+            TickMaster(banco, 1);
+            banco.Motore.Silenzia();
+            int dopoPrima = banco.Uscita.Registro.Count;
+
+            banco.Motore.Silenzia();
+
+            Assert.That(banco.Uscita.Registro.Count, Is.EqualTo(dopoPrima));
+            Assert.That(banco.Uscita.Registro, Has.None.EqualTo("Stop"));
+        }
+
+        [Test]
+        public void ArrestaSpegneOneShotPendenti()
+        {
+            Banco banco = new Banco();
+            banco.Motore.AggiornaTavolo(Stato(null, Comando(TipoComando.OneShot, 60)));
+
+            banco.Motore.Arresta();
+
+            Assert.That(banco.Uscita.Registro, Is.EqualTo(new[] { "NotaOn:0:60:100", "NotaOff:0:60" }));
+        }
+
+        [Test]
+        public void CartoncinoRimossoMentreSuonaRiceveNotaOff()
+        {
+            Banco banco = new Banco();
+            banco.Motore.AggiornaTavolo(Stato(new List<CartoncinoNota> { Nota(0, 0, 8, 0) }, Comando(TipoComando.Play)));
+            TickMaster(banco, 1);
+            Assert.That(banco.Uscita.Registro, Contains.Item("NotaOn:0:36:100"));
+
+            banco.Motore.AggiornaTavolo(Stato(new List<CartoncinoNota>()));
+            TickMaster(banco, 8);
+
+            Assert.That(banco.Uscita.Registro, Contains.Item("NotaOff:0:36"));
+        }
+
+        [Test]
         public void OneShotSuonaSubito()
         {
             Banco banco = new Banco();

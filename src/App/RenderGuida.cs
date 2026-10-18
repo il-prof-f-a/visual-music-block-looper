@@ -163,10 +163,16 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
+        /// <summary>Testo della zona di collegamento: singolare per una riga, plurale altrimenti.</summary>
+        public static string EtichettaRighe(int righe)
+        {
+            return righe + (righe == 1 ? " riga" : " righe");
+        }
+
         private void DisegnaZone(Graphics g, Size dimensione, StrutturaTavolo struttura)
         {
             DisegnaZona(g, dimensione, layout.Misura, "MISURA", struttura.BattitiPerMisura + "/4");
-            DisegnaZona(g, dimensione, layout.Collegamento, "COLLEGA", struttura.RigheCollegate + " righe");
+            DisegnaZona(g, dimensione, layout.Collegamento, "COLLEGA", EtichettaRighe(struttura.RigheCollegate));
             DisegnaZona(g, dimensione, layout.Ab, "A-B", struttura.AInizio + "-" + struttura.AFine);
             DisegnaZona(g, dimensione, layout.Comandi, "COMANDI", null);
         }
@@ -244,7 +250,7 @@ namespace VisualMusicBlockLooper.App
                 foreach (CartoncinoNota nota in stato.Note)
                 {
                     if (nota == null
-                        || nota.Traccia < 0 || nota.Traccia >= config.Tracce
+                        || nota.Riga < 0 || nota.Riga >= config.Tracce
                         || nota.StepIniziale < 0 || nota.StepIniziale >= Math.Min(config.Step, struttura.StepPerMisura))
                     {
                         continue;
@@ -254,9 +260,9 @@ namespace VisualMusicBlockLooper.App
                     int durata = Math.Min(Math.Max(nota.DurataStep, 1), Math.Min(config.Step, struttura.StepPerMisura) - nota.StepIniziale);
                     var area = Rectangle.FromLTRB(
                         BordoX(griglia, nota.StepIniziale),
-                        BordoY(griglia, nota.Traccia),
+                        BordoY(griglia, nota.Riga),
                         BordoX(griglia, nota.StepIniziale + durata),
-                        BordoY(griglia, nota.Traccia + 1));
+                        BordoY(griglia, nota.Riga + 1));
 
                     g.FillRectangle(pennello, area);
                     g.DrawRectangle(penna, area);

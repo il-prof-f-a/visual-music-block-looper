@@ -89,6 +89,7 @@ namespace VisualMusicBlockLooper.Tests
         {
             var nota = new CartoncinoNota
             {
+                Riga = 1,
                 Traccia = 1,
                 StepIniziale = 2,
                 DurataStep = 3,
@@ -154,6 +155,7 @@ namespace VisualMusicBlockLooper.Tests
 
             var nota = new CartoncinoNota
             {
+                Riga = 1,
                 Traccia = 1,
                 StepIniziale = 2,
                 DurataStep = 1,
@@ -185,6 +187,7 @@ namespace VisualMusicBlockLooper.Tests
 
             var nota = new CartoncinoNota
             {
+                Riga = 1,
                 Traccia = 1,
                 StepIniziale = 15,
                 DurataStep = 4,
@@ -334,7 +337,101 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(bmp.GetPixel(p1.X, p1.Y).ToArgb(), Is.EqualTo(Bianco));
                 Assert.That(bmp.GetPixel(p3.X, p3.Y).ToArgb(), Is.EqualTo(attenuato));
                 Assert.That(bmp.GetPixel(p4.X, p4.Y).ToArgb(), Is.EqualTo(Bianco));
+
+                // Le righe esattamente su B (posizione 3 nel gruppo) restano piene, quelle sopra A sono attenuate.
+                Point p2 = CentroTavolo(2, 5), p5 = CentroTavolo(5, 5);
+                Assert.That(bmp.GetPixel(p2.X, p2.Y).ToArgb(), Is.EqualTo(Bianco));
+                Assert.That(bmp.GetPixel(p5.X, p5.Y).ToArgb(), Is.EqualTo(Bianco));
             }
+        }
+
+        private static bool EVerde(Color c)
+        {
+            return c.G > c.R && c.G > c.B;
+        }
+
+        private static Bitmap DisegnaTavoloConNote(StrutturaTavolo struttura, params CartoncinoNota[] note)
+        {
+            var stato = new StatoTavolo(new List<CartoncinoNota>(note), null, null, struttura);
+            return DisegnaTavolo(stato, new PosizioneGiro(0, 0, new[] { 0 }), false);
+        }
+
+        private static CartoncinoNota Nota(int riga, int traccia, int step, int durata)
+        {
+            return new CartoncinoNota
+            {
+                Riga = riga,
+                Traccia = traccia,
+                StepIniziale = step,
+                DurataStep = durata,
+                IdClip = 1,
+                Colore = ColoreTraccia.Arancione
+            };
+        }
+
+        [Test]
+        public void NotaDisegnataNellaRiga_NonNellaRigaDelColore()
+        {
+            using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(3, 0, 2, 2)))
+            {
+                Point dentro = CentroTavolo(3, 2), sbagliata = CentroTavolo(0, 2);
+                Assert.That(EVerde(bmp.GetPixel(dentro.X, dentro.Y)), Is.True);
+                Assert.That(EVerde(bmp.GetPixel(sbagliata.X, sbagliata.Y)), Is.False);
+            }
+        }
+
+        [Test]
+        public void NotaInRigaZeroColoreQuattro_RiempieRigaZero()
+        {
+            using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(0, 4, 2, 2)))
+            {
+                Point dentro = CentroTavolo(0, 2), sbagliata = CentroTavolo(4, 2);
+                Assert.That(EVerde(bmp.GetPixel(dentro.X, dentro.Y)), Is.True);
+                Assert.That(EVerde(bmp.GetPixel(sbagliata.X, sbagliata.Y)), Is.False);
+            }
+        }
+
+        [Test]
+        public void DueColoriNellaStessaRiga_SonoEntrambiDisegnati()
+        {
+            using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(2, 0, 1, 2), Nota(2, 3, 6, 2)))
+            {
+                Point a = CentroTavolo(2, 1), b = CentroTavolo(2, 6);
+                Assert.That(EVerde(bmp.GetPixel(a.X, a.Y)), Is.True);
+                Assert.That(EVerde(bmp.GetPixel(b.X, b.Y)), Is.True);
+            }
+        }
+
+        [Test]
+        public void NotaOltreLaMisuraNonDisegnata()
+        {
+            Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 6, out StrutturaTavolo s), Is.True);
+            using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 13, 2)))
+            {
+                Point p = CentroTavolo(1, 13);
+                Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
+            }
+        }
+
+        [Test]
+        public void NotaLungaTroncataAFineMisura()
+        {
+            // Misura 3/4 = 12 step: la nota dallo step 10 lunga 6 arriva al massimo allo step 11.
+            Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 6, out StrutturaTavolo s), Is.True);
+            using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 10, 6)))
+            {
+                Point ultimo = CentroTavolo(1, 11), oltre = CentroTavolo(1, 12);
+                Assert.That(EVerde(bmp.GetPixel(ultimo.X, ultimo.Y)), Is.True);
+                Assert.That(bmp.GetPixel(oltre.X, oltre.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
+            }
+        }
+
+        [Test]
+        public void EtichettaRighe_SingolarePlurale()
+        {
+            Assert.That(RenderGuida.EtichettaRighe(1), Is.EqualTo("1 riga"));
+            Assert.That(RenderGuida.EtichettaRighe(2), Is.EqualTo("2 righe"));
+            Assert.That(RenderGuida.EtichettaRighe(6), Is.EqualTo("6 righe"));
         }
 
         [Test]

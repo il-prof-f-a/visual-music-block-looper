@@ -421,6 +421,71 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(banco.Motore.Struttura, Is.EqualTo(Crea(4, 1, 1, 1)));
         }
 
+        private static CartoncinoNota NotaInRiga(int riga, int traccia, int stepIniziale, int durataStep, int idClip)
+        {
+            return new CartoncinoNota
+            {
+                Riga = riga,
+                Traccia = traccia,
+                StepIniziale = stepIniziale,
+                DurataStep = durataStep,
+                IdClip = idClip
+            };
+        }
+
+        private static List<CartoncinoNota> DueRigheStessoColoreEClip()
+        {
+            return new List<CartoncinoNota>
+            {
+                NotaInRiga(0, 0, 0, 2, 3),
+                NotaInRiga(1, 0, 0, 4, 3)
+            };
+        }
+
+        [Test]
+        public void NoteSovrapposteStessoCanaleENota_RetriggerEUnSoloNoteOff()
+        {
+            Banco banco = new Banco();
+            banco.Motore.AggiornaTavolo(new StatoTavolo(
+                DueRigheStessoColoreEClip(), new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1)));
+
+            TickMaster(banco, 1);
+            Assert.That(
+                banco.Uscita.Registro.Where(r => r != "Clock" && r != "Start").ToList(),
+                Is.EqualTo(new[] { "NotaOn:0:39:100", "NotaOff:0:39", "NotaOn:0:39:100" }));
+
+            // Fine della nota breve (tick 12): nessun note-off, la nota lunga suona ancora.
+            TickMaster(banco, 12);
+            Assert.That(banco.Uscita.Registro.Count(r => r.StartsWith("NotaOff")), Is.EqualTo(1));
+
+            // Fine della nota lunga (tick 24): un solo note-off.
+            TickMaster(banco, 12);
+            Assert.That(banco.Uscita.Registro.Count(r => r.StartsWith("NotaOff")), Is.EqualTo(2));
+            Assert.That(banco.Uscita.Registro.Last(), Is.EqualTo("NotaOff:0:39"));
+        }
+
+        [Test]
+        public void Silenzia_AzzeraIlContatore_ProssimoNoteOnSemplice()
+        {
+            Banco banco = new Banco();
+            StatoTavolo play = new StatoTavolo(
+                DueRigheStessoColoreEClip(), new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1));
+            banco.Motore.AggiornaTavolo(play);
+            TickMaster(banco, 1);
+
+            banco.Motore.Silenzia();
+            banco.Uscita.Registro.Clear();
+
+            // Con una sola nota il contatore pulito deve dare un NoteOn semplice, senza retrigger.
+            var sola = new List<CartoncinoNota> { NotaInRiga(0, 0, 0, 2, 3) };
+            banco.Motore.AggiornaTavolo(new StatoTavolo(sola, new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1)));
+            TickMaster(banco, 1);
+
+            Assert.That(
+                banco.Uscita.Registro.Where(r => r != "Clock" && r != "Start").ToList(),
+                Is.EqualTo(new[] { "NotaOn:0:39:100" }));
+        }
+
         [Test]
         public void PosizioneDelMotore()
         {

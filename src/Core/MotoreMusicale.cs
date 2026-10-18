@@ -24,6 +24,9 @@ namespace VisualMusicBlockLooper.Core
         private readonly Func<long> orologioMs;
         private readonly TapTempo tapTempo = new TapTempo();
         private readonly List<OneShotPendente> oneShotPendenti = new List<OneShotPendente>();
+        // Note del sequencer attualmente sonanti per (canale, nota MIDI): note diverse con stesso colore e clip
+        // condividono la stessa coppia, quindi il note-off va inviato solo quando l'ultima termina.
+        private readonly Dictionary<(int Canale, int Nota), int> noteSonanti = new Dictionary<(int Canale, int Nota), int>();
         private List<CartoncinoNota> noteCorrenti = new List<CartoncinoNota>();
         private StrutturaTavolo struttura = StrutturaTavolo.Default;
         private long ultimoClock;
@@ -349,12 +352,26 @@ namespace VisualMusicBlockLooper.Core
             {
                 int canale = mappatura.Canale(evento.Traccia);
                 int nota = mappatura.Nota(evento.IdClip);
+                var chiave = (canale, nota);
+                noteSonanti.TryGetValue(chiave, out int conteggio);
                 if (evento.NoteOn)
                 {
+                    if (conteggio > 0)
+                    {
+                        // Stessa nota già sonante: la si riattacca invece di sovrapporre due NoteOn.
+                        uscita.NotaOff(canale, nota);
+                    }
+
                     uscita.NotaOn(canale, nota, mappatura.Velocity);
+                    noteSonanti[chiave] = conteggio + 1;
+                }
+                else if (conteggio > 1)
+                {
+                    noteSonanti[chiave] = conteggio - 1;
                 }
                 else
                 {
+                    noteSonanti.Remove(chiave);
                     uscita.NotaOff(canale, nota);
                 }
             }
@@ -368,6 +385,8 @@ namespace VisualMusicBlockLooper.Core
             {
                 uscita.NotaOff(mappatura.Canale(evento.Traccia), mappatura.Nota(evento.IdClip));
             }
+
+            noteSonanti.Clear();
         }
 
         private void OnClockRicevuto()

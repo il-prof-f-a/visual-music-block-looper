@@ -162,5 +162,28 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.DoesNotThrow(() => ParserPayload.TryParse(testo, out _), "Input: \"" + testo + "\"");
             }
         }
+
+        [Test]
+        public void Fuzz_ConPrefissoValido_RaggiungeRamiNotaComandoSpeciale()
+        {
+            const string alfabeto = "VMBL1NCS;-+ 0123456789abcdefONESHOTTAP١٢\t\n";
+            var random = new Random(20261018);
+            var sb = new StringBuilder();
+            string[] rami = { "N", "C", "S" };
+
+            for (int i = 0; i < 3000; i++)
+            {
+                sb.Clear();
+                sb.Append("VMBL1;").Append(rami[random.Next(rami.Length)]);
+                int lunghezza = random.Next(0, 20);
+                for (int j = 0; j < lunghezza; j++)
+                {
+                    sb.Append(alfabeto[random.Next(alfabeto.Length)]);
+                }
+
+                string testo = sb.ToString();
+                Assert.DoesNotThrow(() => ParserPayload.TryParse(testo, out _), "Input: \"" + testo + "\"");
+            }
+        }
     }
 }

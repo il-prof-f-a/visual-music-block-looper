@@ -89,6 +89,8 @@ Dato lo step assoluto `s` (sedicesimi dall'avvio, 6 tick per step), `PosizioneGi
 
 Una nota suona quando la sua riga è attiva e il suo step iniziale è uguale a `stepInMisura`. Termina al più tardi a fine misura: la durata è troncata a `StepPerMisura - StepIniziale`.
 
+Comportamenti noti: cambiando la MISURA durante la riproduzione lo step assoluto continua, quindi il playhead salta e le note in corso vengono interrotte. Due note con stesso colore e stessa clip che suonano insieme condividono canale e nota MIDI: `MotoreMusicale` le riattacca (note-off, note-on) e invia il note-off solo alla fine dell'ultima, con un contatore per (canale, nota).
+
 ## Stati di trasporto: Master, Slave, in esecuzione
 
 Il trasporto è in uno dei quattro stati: Master o Slave, con la sequenza ferma o in esecuzione. Gli stati sono derivati da `MotoreMusicale` (`Modo`, `InEsecuzione`).

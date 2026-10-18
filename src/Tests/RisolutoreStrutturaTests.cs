@@ -127,6 +127,55 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void AbPrimaDelLink_StessoRisultatoDellOrdineInverso()
+        {
+            var link = (Imp(TipoImpostazione.Collegamento, 3), Area(0.01, 0.36), ZonaSpeciale.Collegamento);
+            var ab = (Imp(TipoImpostazione.IntervalloAb, 2, 3), Area(0.01, 0.68), ZonaSpeciale.Ab);
+
+            var abPrima = RisolutoreStruttura.Risolvi(new[] { ab, link });
+            var linkPrima = RisolutoreStruttura.Risolvi(new[] { link, ab });
+
+            Assert.That(abPrima.Struttura, Is.EqualTo(linkPrima.Struttura));
+            Assert.That(abPrima.Struttura.RigheCollegate, Is.EqualTo(3));
+            Assert.That(abPrima.Struttura.AInizio, Is.EqualTo(2));
+            Assert.That(abPrima.Struttura.AFine, Is.EqualTo(3));
+            Assert.That(abPrima.Errori, Is.Empty);
+        }
+
+        [Test]
+        public void PrimoCartoncinoInvalido_SecondoValidoIgnoratoComeSovrapposto()
+        {
+            var inAlto = Area(0.01, 0.04);
+            var inBasso = Area(0.01, 0.20);
+
+            var risultato = RisolutoreStruttura.Risolvi(new[]
+            {
+                (Imp(TipoImpostazione.Misura, 5), inAlto, ZonaSpeciale.Misura),
+                (Imp(TipoImpostazione.Misura, 3), inBasso, ZonaSpeciale.Misura),
+            });
+
+            Assert.That(risultato.Struttura.BattitiPerMisura, Is.EqualTo(StrutturaTavolo.Default.BattitiPerMisura));
+            Assert.That(risultato.Errori.Count, Is.EqualTo(2));
+            Assert.That(risultato.Errori.Count(e => e.Tipo == TipoErrore.Sovrapposto && e.Area.Y == inBasso.Y), Is.EqualTo(1));
+            Assert.That(risultato.Errori.Count(e => e.Tipo == TipoErrore.ImpostazioneNonValida && e.Area.Y == inAlto.Y), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AbUnoUno_ConLinkUno_ErroreEDefault()
+        {
+            var risultato = RisolutoreStruttura.Risolvi(new[]
+            {
+                (Imp(TipoImpostazione.Collegamento, 1), Area(0.01, 0.36), ZonaSpeciale.Collegamento),
+                (Imp(TipoImpostazione.IntervalloAb, 1, 1), Area(0.01, 0.68), ZonaSpeciale.Ab),
+            });
+
+            Assert.That(risultato.Errori.Single().Tipo, Is.EqualTo(TipoErrore.ImpostazioneNonValida));
+            Assert.That(risultato.Struttura.RigheCollegate, Is.EqualTo(1));
+            Assert.That(risultato.Struttura.AInizio, Is.EqualTo(1));
+            Assert.That(risultato.Struttura.AFine, Is.EqualTo(1));
+        }
+
+        [Test]
         public void AbConUnaRiga()
         {
             var risultato = RisolutoreStruttura.Risolvi(new[]

@@ -42,6 +42,12 @@ namespace VisualMusicBlockLooper.App
         private readonly TickMaster tickMaster;
         private readonly CicloCattura cicloCattura;
         private readonly Timer timerInterfaccia = new Timer { Interval = 150 };
+
+        // Debounce dei regoli della webcam: risoluzione al rilascio (500 ms), fuoco/esposizione dal vivo (150 ms)
+        // e salvataggio nel file di configurazione (500 ms).
+        private readonly Timer timerRisoluzione = new Timer { Interval = 500 };
+        private readonly Timer timerApplicaImpostazioni = new Timer { Interval = 150 };
+        private readonly Timer timerSalvaConfigurazione = new Timer { Interval = 500 };
         private volatile int ultimoStepProiettato = -1;
 
         private Label etichettaStato;
@@ -59,6 +65,20 @@ namespace VisualMusicBlockLooper.App
         private Button pulsanteAggiornaWebcam;
         private Button pulsanteSalvaFrame;
         private bool aggiornamentoComboWebcam;
+        private Label etichettaRisoluzione;
+        private Label etichettaFuoco;
+        private Label etichettaEsposizione;
+        private Label etichettaFps;
+        private TrackBar regoloRisoluzione;
+        private TrackBar regoloFuoco;
+        private TrackBar regoloEsposizione;
+        private CheckBox casellaFuocoAuto;
+        private CheckBox casellaEsposizioneAuto;
+        private bool aggiornamentoRegoli;
+        private bool fuocoSupportato;
+        private bool esposizioneSupportata;
+        private double fpsDichiarati;
+        private ConfigurazioneWebcam impostazioniInSospeso;
         private Screen[] schermi = new Screen[0];
         private bool inCalibrazione;
         private bool calibrazionePresente;
@@ -106,6 +126,12 @@ namespace VisualMusicBlockLooper.App
             CostruisciInterfaccia();
             PopolaElencoWebcam(elencoWebcam ?? new List<InfoWebcam>());
             timerInterfaccia.Tick += (mittente, argomenti) => AggiornaInterfaccia();
+            timerRisoluzione.Tick += (mittente, argomenti) => ApplicaRisoluzione();
+            timerApplicaImpostazioni.Tick += (mittente, argomenti) => ApplicaImpostazioniInSospeso();
+            timerSalvaConfigurazione.Tick += (mittente, argomenti) => SalvaDaTimer();
+
+            // Una sola lettura (con sonda) della webcam all'avvio: il timer da 150 ms non la ripete mai.
+            AggiornaStatoControlli();
         }
 
         /// <summary>Avvia thread di clock, ciclo di cattura e aggiornamento dell'interfaccia.</summary>
@@ -130,6 +156,9 @@ namespace VisualMusicBlockLooper.App
             {
                 Chiudi();
                 timerInterfaccia.Dispose();
+                timerRisoluzione.Dispose();
+                timerApplicaImpostazioni.Dispose();
+                timerSalvaConfigurazione.Dispose();
             }
 
             base.Dispose(disposing);
@@ -145,6 +174,17 @@ namespace VisualMusicBlockLooper.App
 
             chiusuraEseguita = true;
             timerInterfaccia.Stop();
+            timerRisoluzione.Stop();
+            timerApplicaImpostazioni.Stop();
+
+            // Un salvataggio ancora in attesa del debounce non va perso alla chiusura.
+            bool salvataggioInSospeso = timerSalvaConfigurazione.Enabled;
+            timerSalvaConfigurazione.Stop();
+            if (salvataggioInSospeso)
+            {
+                SalvaConfigurazione();
+            }
+
             cicloCattura.Ferma();
             tickMaster.Ferma();
 
@@ -178,7 +218,15 @@ namespace VisualMusicBlockLooper.App
         private void CostruisciInterfaccia()
         {
             Text = "Visual Music Block Looper - Controllo";
-            ClientSize = new Size(760, 580);
+            // Layout (coordinate in pixel del client, 760 x 668):
+            //  - fascia alta x 10..750: stato (y 10), porte (y 38);
+            //  - anteprima x 10..530, y 64..454; sotto di lei, larghe come lei (520) e a capo, la descrizione
+            //    dell'anteprima (y 458..510) e gli avvisi (y 514..664), così non toccano la colonna destra;
+            //  - colonna destra x 545..745 (larghezza 200): pulsanti fino a «Salva frame» (y 394..422), poi
+            //    Risoluzione (etichetta y 428, regolo y 446..476), Messa a fuoco (etichetta y 484,
+            //    «Auto» + regolo y 504..534), Esposizione (etichetta y 542, «Auto» + regolo y 562..592)
+            //    e l'etichetta dei fps (y 598..662, va a capo).
+            ClientSize = new Size(760, 668);
             StartPosition = FormStartPosition.CenterScreen;
 
             etichettaStato = new Label
@@ -222,23 +270,56 @@ namespace VisualMusicBlockLooper.App
 
             etichettaAnteprima = new Label
             {
-                Left = 10, Top = 458, Width = 740, Height = 40, ForeColor = Color.DarkBlue,
+                Left = 10, Top = 458, Width = 520, Height = 52, ForeColor = Color.DarkBlue,
                 Font = new Font(Font.FontFamily, 9f, FontStyle.Bold), Text = AnteprimaTavolo.TestoGrezza
             };
 
             etichettaAvviso = new Label
             {
-                Left = 10, Top = 502, Width = 740, Height = 70, ForeColor = Color.DarkRed
+                Left = 10, Top = 514, Width = 520, Height = 150, ForeColor = Color.DarkRed
             };
+
+            etichettaRisoluzione = new Label { Left = 545, Top = 428, Width = 200, Height = 18 };
+            regoloRisoluzione = CreaRegolo(545, 446, 200, 0, PresetRisoluzione.Elenco.Count - 1, 1, 1);
+            regoloRisoluzione.Scroll += OnScrollRisoluzione;
+
+            etichettaFuoco = new Label { Left = 545, Top = 484, Width = 200, Height = 18 };
+            casellaFuocoAuto = new CheckBox { Text = "Auto", Left = 545, Top = 507, Width = 58, Height = 22 };
+            regoloFuoco = CreaRegolo(605, 504, 140, 0, PresentatoreRegoliWebcam.RegoloFuocoMax, 1, 5);
+            casellaFuocoAuto.CheckedChanged += OnCambioFuoco;
+            regoloFuoco.Scroll += OnCambioFuoco;
+            regoloFuoco.MouseUp += (m, a) => RilasciaRegolo();
+
+            etichettaEsposizione = new Label { Left = 545, Top = 542, Width = 200, Height = 18 };
+            casellaEsposizioneAuto = new CheckBox { Text = "Auto", Left = 545, Top = 565, Width = 58, Height = 22 };
+            regoloEsposizione = CreaRegolo(
+                605, 562, 140, PresentatoreRegoliWebcam.RegoloEsposizioneMin, PresentatoreRegoliWebcam.RegoloEsposizioneMax, 1, 2);
+            casellaEsposizioneAuto.CheckedChanged += OnCambioEsposizione;
+            regoloEsposizione.Scroll += OnCambioEsposizione;
+            regoloEsposizione.MouseUp += (m, a) => RilasciaRegolo();
+
+            etichettaFps = new Label { Left = 545, Top = 598, Width = 200, Height = 64 };
 
             Controls.AddRange(new Control[]
             {
                 etichettaStato, etichettaPorte, anteprima, pulsanteCalibra, pulsanteAvviaFerma,
                 pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor,
-                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, pulsanteSalvaFrame, etichettaAnteprima, etichettaAvviso
+                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, pulsanteSalvaFrame, etichettaAnteprima, etichettaAvviso,
+                etichettaRisoluzione, regoloRisoluzione, etichettaFuoco, casellaFuocoAuto, regoloFuoco,
+                etichettaEsposizione, casellaEsposizioneAuto, regoloEsposizione, etichettaFps
             });
 
             AggiornaInterfaccia();
+        }
+
+        private static TrackBar CreaRegolo(int sinistra, int alto, int larghezza, int minimo, int massimo, int piccolo, int grande)
+        {
+            return new TrackBar
+            {
+                AutoSize = false, Left = sinistra, Top = alto, Width = larghezza, Height = 30,
+                Minimum = minimo, Maximum = massimo, SmallChange = piccolo, LargeChange = grande,
+                TickStyle = TickStyle.BottomRight, TickFrequency = Math.Max(1, (massimo - minimo) / 10)
+            };
         }
 
         private static Button CreaPulsante(string testo, int sinistra, int alto, EventHandler gestore)
@@ -338,6 +419,8 @@ namespace VisualMusicBlockLooper.App
             }
 
             etichettaAvviso.Text = string.Join(Environment.NewLine, righe);
+            etichettaFps.Text = PresentatoreRegoliWebcam.TestoFps(
+                webcam.FpsCatturati, fpsDichiarati, cicloCattura.PassiAlSecondo, webcam.Larghezza, webcam.Altezza);
             AggiornaAnteprima();
         }
 
@@ -466,16 +549,30 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
+            // Si salva l'identità (nome e percorso), non solo la posizione: al prossimo avvio
+            // l'ordine delle webcam può essere diverso.
+            configurazione.Webcam.Imposta(inUso);
+            SalvaConfigurazione();
+        }
+
+        private const string PrefissoAvvisoConfigurazione = "Configurazione non salvata su disco: ";
+
+        /// <summary>Scrive il file di configurazione; un errore di scrittura diventa un avviso e non fa crollare la finestra.</summary>
+        private void SalvaConfigurazione()
+        {
+            if (string.IsNullOrEmpty(percorsoConfigurazione))
+            {
+                return;
+            }
+
+            avvisi.RemoveAll(a => a.StartsWith(PrefissoAvvisoConfigurazione));
             try
             {
-                // Si salva l'identità (nome e percorso), non solo la posizione: al prossimo avvio
-                // l'ordine delle webcam può essere diverso.
-                configurazione.Webcam.Imposta(inUso);
                 configurazione.Salva(percorsoConfigurazione);
             }
             catch (Exception eccezione)
             {
-                avvisi.Add("Configurazione non salvata su disco: " + eccezione.Message);
+                avvisi.Add(PrefissoAvvisoConfigurazione + eccezione.Message);
             }
         }
 
@@ -562,14 +659,240 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            // La calibrazione è legata alla webcam e alla sua risoluzione: la si ricarica solo se quella
-            // salvata è stata fatta con questa stessa webcam.
+            RicaricaCalibrazione(scelta);
+            AggiornaStatoControlli();
+            AggiornaInterfaccia();
+        }
+
+        /// <summary>
+        /// La calibrazione è legata alla webcam e alla sua risoluzione: la si ricarica solo se quella
+        /// salvata è stata fatta con questa stessa webcam (avvisi di risoluzione compresi).
+        /// </summary>
+        private void RicaricaCalibrazione(InfoWebcam inUso)
+        {
             rilevatore.Imposta(null);
             avvisi.RemoveAll(a => a == ApplicazioneCalibrazione.AvvisoRisoluzioneDiversa
                 || a == ApplicazioneCalibrazione.AvvisoRisoluzioneSconosciuta);
-            calibrazionePresente = configurazione.Webcam.Corrisponde(scelta)
+            calibrazionePresente = inUso != null
+                && configurazione.Webcam.Corrisponde(inUso)
                 && ApplicazioneCalibrazione.TentaCaricamento(percorsoCalibrazione, webcam, rilevatore, avvisi);
+        }
+
+        /// <summary>
+        /// Rilegge UNA volta lo stato della webcam (la lettura imposta proprietà del driver: va chiamata solo
+        /// all'avvio e dopo un cambio di webcam o di risoluzione, mai dal timer) e riposiziona i controlli:
+        /// valori dal file di configurazione se presenti, altrimenti quelli letti. Senza webcam, o per le
+        /// impostazioni che il driver non accetta, i controlli sono disabilitati.
+        /// </summary>
+        private void AggiornaStatoControlli()
+        {
+            bool conWebcam = webcam.Disponibile;
+            StatoImpostazioniWebcam stato = StatoImpostazioniWebcam.NonSupportato();
+            if (conWebcam)
+            {
+                try
+                {
+                    stato = webcam.LeggiImpostazioni() ?? stato;
+                }
+                catch (Exception)
+                {
+                    // Lettura fallita: si tratta come webcam senza impostazioni.
+                }
+            }
+
+            fpsDichiarati = stato.FpsDichiarati;
+            fuocoSupportato = conWebcam && stato.FuocoSupportato;
+            esposizioneSupportata = conWebcam && stato.EsposizioneSupportata;
+            ConfigurazioneWebcam config = configurazione.Webcam;
+
+            aggiornamentoRegoli = true;
+            try
+            {
+                regoloRisoluzione.Value = EntroLimiti(regoloRisoluzione, PresentatoreRegoliWebcam.RegoloRisoluzione(
+                    config.Larghezza, config.Altezza, webcam.Larghezza, webcam.Altezza));
+                casellaFuocoAuto.Checked = PresentatoreRegoliWebcam.FuocoAutomaticoIniziale(config, stato);
+                regoloFuoco.Value = EntroLimiti(regoloFuoco, PresentatoreRegoliWebcam.RegoloFuocoIniziale(config, stato));
+                casellaEsposizioneAuto.Checked = PresentatoreRegoliWebcam.EsposizioneAutomaticaIniziale(config, stato);
+                regoloEsposizione.Value = EntroLimiti(
+                    regoloEsposizione, PresentatoreRegoliWebcam.RegoloEsposizioneIniziale(config, stato));
+            }
+            finally
+            {
+                aggiornamentoRegoli = false;
+            }
+
+            regoloRisoluzione.Enabled = conWebcam;
+            AggiornaTestiRegoli();
+        }
+
+        private static int EntroLimiti(TrackBar regolo, int valore)
+        {
+            return Math.Min(regolo.Maximum, Math.Max(regolo.Minimum, valore));
+        }
+
+        /// <summary>Aggiorna le etichette e abilita/disabilita caselle «Auto» e regoli di fuoco ed esposizione.</summary>
+        private void AggiornaTestiRegoli()
+        {
+            etichettaRisoluzione.Text = PresentatoreRegoliWebcam.EtichettaRisoluzione(regoloRisoluzione.Value);
+            etichettaFuoco.Text = PresentatoreRegoliWebcam.EtichettaFuoco(
+                fuocoSupportato, casellaFuocoAuto.Checked, regoloFuoco.Value);
+            casellaFuocoAuto.Enabled = fuocoSupportato;
+            regoloFuoco.Enabled = fuocoSupportato && !casellaFuocoAuto.Checked;
+            etichettaEsposizione.Text = PresentatoreRegoliWebcam.EtichettaEsposizione(
+                esposizioneSupportata, casellaEsposizioneAuto.Checked, regoloEsposizione.Value);
+            casellaEsposizioneAuto.Enabled = esposizioneSupportata;
+            regoloEsposizione.Enabled = esposizioneSupportata && !casellaEsposizioneAuto.Checked;
+        }
+
+        private static void Riavvia(Timer timer)
+        {
+            timer.Stop();
+            timer.Start();
+        }
+
+        private void OnScrollRisoluzione(object mittente, EventArgs argomenti)
+        {
+            if (aggiornamentoRegoli)
+            {
+                return;
+            }
+
+            etichettaRisoluzione.Text = PresentatoreRegoliWebcam.EtichettaRisoluzione(regoloRisoluzione.Value);
+            Riavvia(timerRisoluzione);
+        }
+
+        /// <summary>
+        /// Dopo il debounce del regolo: riapre la webcam alla nuova risoluzione, la salva nel file di
+        /// configurazione e ricarica la calibrazione con le regole di un cambio webcam.
+        /// </summary>
+        private void ApplicaRisoluzione()
+        {
+            timerRisoluzione.Stop();
+            if (!webcam.Disponibile)
+            {
+                return;
+            }
+
+            int indice = regoloRisoluzione.Value;
+            (int larghezza, int altezza) = PresentatoreRegoliWebcam.RisoluzioneDaRegolo(indice);
+            avvisi.RemoveAll(a => a.StartsWith(PrefissoAvvisoWebcam));
+
+            if (larghezza != webcam.Larghezza || altezza != webcam.Altezza)
+            {
+                if (!webcam.CambiaRisoluzione(larghezza, altezza))
+                {
+                    avvisi.Add(PrefissoAvvisoWebcam + "non riaperta a " + PresetRisoluzione.Etichetta(indice)
+                        + ": resta la risoluzione precedente.");
+                    AggiornaStatoControlli();
+                    if (webcam.Disponibile)
+                    {
+                        // Il regolo torna sul preset della risoluzione realmente in uso.
+                        aggiornamentoRegoli = true;
+                        try
+                        {
+                            regoloRisoluzione.Value = EntroLimiti(
+                                regoloRisoluzione, PresetRisoluzione.IndiceVicino(webcam.Larghezza, webcam.Altezza));
+                        }
+                        finally
+                        {
+                            aggiornamentoRegoli = false;
+                        }
+
+                        AggiornaTestiRegoli();
+                    }
+
+                    AggiornaInterfaccia();
+                    return;
+                }
+
+                RicaricaCalibrazione(webcam.Info);
+            }
+
+            PresentatoreRegoliWebcam.Unisci(configurazione.Webcam, PresentatoreRegoliWebcam.ParzialeRisoluzione(indice));
+            SalvaConfigurazione();
+            AggiornaStatoControlli();
             AggiornaInterfaccia();
+        }
+
+        private void OnCambioFuoco(object mittente, EventArgs argomenti)
+        {
+            if (aggiornamentoRegoli)
+            {
+                return;
+            }
+
+            AggiornaTestiRegoli();
+            ConfigurazioneWebcam parziale = PresentatoreRegoliWebcam.ParzialeFuoco(casellaFuocoAuto.Checked, regoloFuoco.Value);
+            PresentatoreRegoliWebcam.Unisci(configurazione.Webcam, parziale);
+            ConfigurazioneWebcam sospeso = InSospeso();
+            sospeso.FuocoAutomatico = parziale.FuocoAutomatico;
+            sospeso.Fuoco = parziale.Fuoco;
+            Riavvia(timerApplicaImpostazioni);
+            Riavvia(timerSalvaConfigurazione);
+        }
+
+        private void OnCambioEsposizione(object mittente, EventArgs argomenti)
+        {
+            if (aggiornamentoRegoli)
+            {
+                return;
+            }
+
+            AggiornaTestiRegoli();
+            ConfigurazioneWebcam parziale = PresentatoreRegoliWebcam.ParzialeEsposizione(
+                casellaEsposizioneAuto.Checked, regoloEsposizione.Value);
+            PresentatoreRegoliWebcam.Unisci(configurazione.Webcam, parziale);
+            ConfigurazioneWebcam sospeso = InSospeso();
+            sospeso.EsposizioneAutomatica = parziale.EsposizioneAutomatica;
+            sospeso.Esposizione = parziale.Esposizione;
+            Riavvia(timerApplicaImpostazioni);
+            Riavvia(timerSalvaConfigurazione);
+        }
+
+        /// <summary>Configurazione parziale in attesa del debounce (solo i campi cambiati; gli altri restano null).</summary>
+        private ConfigurazioneWebcam InSospeso()
+        {
+            return impostazioniInSospeso ?? (impostazioniInSospeso = new ConfigurazioneWebcam());
+        }
+
+        /// <summary>Dopo il debounce: invia alla webcam i soli campi cambiati. Non rilegge la webcam.</summary>
+        private void ApplicaImpostazioniInSospeso()
+        {
+            timerApplicaImpostazioni.Stop();
+            ConfigurazioneWebcam daApplicare = impostazioniInSospeso;
+            impostazioniInSospeso = null;
+            if (daApplicare == null || !webcam.Disponibile)
+            {
+                return;
+            }
+
+            try
+            {
+                webcam.ApplicaImpostazioni(daApplicare);
+            }
+            catch (Exception eccezione)
+            {
+                avvisi.RemoveAll(a => a.StartsWith(PrefissoAvvisoWebcam));
+                avvisi.Add(PrefissoAvvisoWebcam + "impostazioni non applicate: " + eccezione.Message);
+            }
+        }
+
+        private void SalvaDaTimer()
+        {
+            timerSalvaConfigurazione.Stop();
+            SalvaConfigurazione();
+        }
+
+        /// <summary>Al rilascio del mouse su un regolo: applica e salva subito, senza attendere il debounce.</summary>
+        private void RilasciaRegolo()
+        {
+            if (impostazioniInSospeso == null && !timerSalvaConfigurazione.Enabled)
+            {
+                return;
+            }
+
+            ApplicaImpostazioniInSospeso();
+            SalvaDaTimer();
         }
 
         private const string PrefissoAvvisoWebcam = "Webcam ";

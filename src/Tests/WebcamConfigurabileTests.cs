@@ -254,6 +254,12 @@ namespace VisualMusicBlockLooper.Tests
                 return null;
             }
 
+            public void ApplicaImpostazioni(ConfigurazioneWebcam impostazioni) { }
+
+            public StatoImpostazioniWebcam LeggiImpostazioni() { return StatoImpostazioniWebcam.NonSupportato(); }
+
+            public double FpsCatturati => 0;
+
             public void Dispose()
             {
                 Rilasciata = true;
@@ -420,6 +426,12 @@ namespace VisualMusicBlockLooper.Tests
             public Bitmap Anteprima() { return null; }
 
             public Bitmap AnteprimaRaddrizzata(VisualMusicBlockLooper.Vision.Calibrazione calibrazione, int larghezza, int altezza) { return null; }
+
+            public void ApplicaImpostazioni(ConfigurazioneWebcam impostazioni) { }
+
+            public StatoImpostazioniWebcam LeggiImpostazioni() { return StatoImpostazioniWebcam.NonSupportato(); }
+
+            public double FpsCatturati => 0;
 
             public void Dispose() { }
         }

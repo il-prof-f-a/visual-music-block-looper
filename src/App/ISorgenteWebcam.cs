@@ -21,5 +21,17 @@ namespace VisualMusicBlockLooper.App
         /// o null se non c'è ancora un frame; il chiamante la rilascia.
         /// </summary>
         Bitmap AnteprimaRaddrizzata(Calibrazione calibrazione, int larghezza, int altezza);
+
+        /// <summary>
+        /// Applica le impostazioni di fuoco ed esposizione: solo i campi non null (null = non toccare il driver).
+        /// La risoluzione non si cambia qui (si riapre la webcam).
+        /// </summary>
+        void ApplicaImpostazioni(ConfigurazioneWebcam impostazioni);
+
+        /// <summary>Valori effettivi riletti dalla webcam e supporto reale di fuoco ed esposizione.</summary>
+        StatoImpostazioniWebcam LeggiImpostazioni();
+
+        /// <summary>Frame realmente consegnati da <see cref="IFonteImmagini.Frame"/> al secondo, nell'ultima finestra.</summary>
+        double FpsCatturati { get; }
     }
 }

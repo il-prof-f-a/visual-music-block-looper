@@ -19,6 +19,15 @@ namespace VisualMusicBlockLooper.App
         /// </summary>
         public int Indice { get; set; }
 
+        /// <summary>
+        /// Larghezza di cattura richiesta in pixel (0 = predefinita, 1280). Più pixel rendono leggibili QR piccoli;
+        /// cambiando risoluzione la calibrazione va rifatta.
+        /// </summary>
+        public int Larghezza { get; set; }
+
+        /// <summary>Altezza di cattura richiesta in pixel (0 = predefinita, 720).</summary>
+        public int Altezza { get; set; }
+
         /// <summary>Copia nella configurazione l'identità della webcam in uso.</summary>
         public void Imposta(InfoWebcam webcam)
         {

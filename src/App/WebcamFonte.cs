@@ -38,7 +38,7 @@ namespace VisualMusicBlockLooper.App
         /// DirectShow, il cui indice coincide con l'ordine dei nomi di <see cref="DispositiviDirectShow"/>;
         /// se non si apre si ripiega sul backend automatico.
         /// </summary>
-        public static WebcamFonte Apri(int indice = 0)
+        public static WebcamFonte Apri(int indice = 0, int larghezzaRichiesta = 0, int altezzaRichiesta = 0)
         {
             try
             {
@@ -56,8 +56,8 @@ namespace VisualMusicBlockLooper.App
                 }
 
                 // Se il driver rifiuta la risoluzione richiesta si usa quella che concede.
-                cattura.Set(VideoCaptureProperties.FrameWidth, LarghezzaRichiesta);
-                cattura.Set(VideoCaptureProperties.FrameHeight, AltezzaRichiesta);
+                cattura.Set(VideoCaptureProperties.FrameWidth, larghezzaRichiesta > 0 ? larghezzaRichiesta : LarghezzaRichiesta);
+                cattura.Set(VideoCaptureProperties.FrameHeight, altezzaRichiesta > 0 ? altezzaRichiesta : AltezzaRichiesta);
                 int larghezza = (int)cattura.Get(VideoCaptureProperties.FrameWidth);
                 int altezza = (int)cattura.Get(VideoCaptureProperties.FrameHeight);
                 if (larghezza <= 0 || altezza <= 0)

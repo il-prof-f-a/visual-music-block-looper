@@ -104,6 +104,28 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void SalvaECarica_ConservaLaRisoluzioneRichiesta()
+        {
+            string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
+            new ConfigurazioneApplicazione { Webcam = new ConfigurazioneWebcam { Larghezza = 1920, Altezza = 1080 } }.Salva(percorso);
+
+            ConfigurazioneWebcam webcam = ConfigurazioneApplicazione.Carica(percorso).Webcam;
+            Assert.That(webcam.Larghezza, Is.EqualTo(1920));
+            Assert.That(webcam.Altezza, Is.EqualTo(1080));
+        }
+
+        [Test]
+        public void ConfigurazioneSenzaRisoluzione_UsaIlDefault()
+        {
+            string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
+            File.WriteAllText(percorso, "{ \"Webcam\": { \"Nome\": \"X\", \"Indice\": 1 } }");
+
+            ConfigurazioneWebcam webcam = ConfigurazioneApplicazione.Carica(percorso).Webcam;
+            Assert.That(webcam.Larghezza, Is.EqualTo(0), "0 = risoluzione predefinita (1280x720)");
+            Assert.That(webcam.Altezza, Is.EqualTo(0));
+        }
+
+        [Test]
         public void JsonLeggibileDaUmano_ContieneLaSezioneWebcam()
         {
             string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);

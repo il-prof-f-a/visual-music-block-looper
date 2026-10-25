@@ -38,7 +38,7 @@ namespace VisualMusicBlockLooper.App
 
             // L'elenco si rileva prima di aprire la webcam configurata: una webcam aperta risulterebbe occupata.
             IReadOnlyList<InfoWebcam> elencoWebcam = ElencoWebcam.RilevaReali();
-            GestoreWebcam webcam = new GestoreWebcam(indice => WebcamFonte.Apri(indice));
+            GestoreWebcam webcam = new GestoreWebcam(indice => WebcamFonte.Apri(indice, configurazione.Webcam.Larghezza, configurazione.Webcam.Altezza));
             ApriWebcamConfigurata(webcam, elencoWebcam, configurazione.Webcam, avvisi);
 
             RilevatoreCommutabile rilevatore = new RilevatoreCommutabile();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using VisualMusicBlockLooper.Core;
@@ -56,6 +57,7 @@ namespace VisualMusicBlockLooper.App
         private ComboBox comboMonitor;
         private ComboBox comboWebcam;
         private Button pulsanteAggiornaWebcam;
+        private Button pulsanteSalvaFrame;
         private bool aggiornamentoComboWebcam;
         private Screen[] schermi = new Screen[0];
         private bool inCalibrazione;
@@ -215,6 +217,8 @@ namespace VisualMusicBlockLooper.App
             comboWebcam.SelectedIndexChanged += OnWebcamSelezionata;
             pulsanteAggiornaWebcam = new Button { Text = "Aggiorna elenco", Left = 545, Top = 360, Width = 200, Height = 28 };
             pulsanteAggiornaWebcam.Click += (m, a) => AggiornaElencoWebcam();
+            pulsanteSalvaFrame = new Button { Text = "Salva frame", Left = 545, Top = 394, Width = 200, Height = 28 };
+            pulsanteSalvaFrame.Click += (m, a) => SalvaFrame();
 
             etichettaAnteprima = new Label
             {
@@ -231,7 +235,7 @@ namespace VisualMusicBlockLooper.App
             {
                 etichettaStato, etichettaPorte, anteprima, pulsanteCalibra, pulsanteAvviaFerma,
                 pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor,
-                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, etichettaAnteprima, etichettaAvviso
+                etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, pulsanteSalvaFrame, etichettaAnteprima, etichettaAvviso
             });
 
             AggiornaInterfaccia();
@@ -491,6 +495,23 @@ namespace VisualMusicBlockLooper.App
             finally
             {
                 aggiornamentoComboWebcam = false;
+            }
+        }
+
+        /// <summary>Salva l'ultimo frame grezzo della webcam accanto all'eseguibile, per analizzare i QR non letti.</summary>
+        private void SalvaFrame()
+        {
+            using (Bitmap frame = webcam.Anteprima())
+            {
+                if (frame == null)
+                {
+                    MessageBox.Show(this, "Nessun frame disponibile: la webcam non è attiva.", Text);
+                    return;
+                }
+
+                string percorso = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"frame-{DateTime.Now:yyyyMMdd-HHmmss}.png");
+                frame.Save(percorso, System.Drawing.Imaging.ImageFormat.Png);
+                MessageBox.Show(this, $"Frame {frame.Width}x{frame.Height} salvato in: {percorso}", Text);
             }
         }
 

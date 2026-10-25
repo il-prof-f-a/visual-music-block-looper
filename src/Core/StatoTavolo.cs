@@ -9,7 +9,7 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Riga della griglia (indice 0-based): la riga-misura in cui sta la nota.</summary>
         public int Riga { get; set; }
 
-        /// <summary>Traccia della griglia, uguale al colore del cartoncino (indice 0-based).</summary>
+        /// <summary>Traccia della griglia, uguale alla riga (indice 0-based): determina il canale MIDI.</summary>
         public int Traccia { get; set; }
 
         /// <summary>Step iniziale della nota.</summary>
@@ -21,7 +21,7 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Identificativo del clip associato.</summary>
         public int IdClip { get; set; }
 
-        /// <summary>Colore del cartoncino.</summary>
+        /// <summary>Colore associato alla riga, solo per la visualizzazione.</summary>
         public ColoreTraccia Colore { get; set; }
 
         /// <summary>Chiave univoca della nota: clip, traccia, riga e step iniziale.</summary>

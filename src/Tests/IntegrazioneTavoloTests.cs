@@ -110,7 +110,7 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
-        /// <summary>Colore della riga: riga 0 Rosso, 1 Arancione, 2 Verde, 3 Blu, 4 Viola, 5 Giallo (canali 0,1,3,4,5,2).</summary>
+        /// <summary>Colore del cartoncino della riga (solo estetico): il canale MIDI e' la riga.</summary>
         private static readonly ColoreTraccia[] ColoriRighe =
         {
             ColoreTraccia.Rosso,
@@ -182,28 +182,28 @@ namespace VisualMusicBlockLooper.Tests
             banco.Passi(4);
             banco.Tick(205);
 
-            // Righe 0,2,4 nella prima misura (canali 0,3,5); righe 1,3,5 nella seconda (canali 1,2,4).
+            // Righe 0,2,4 nella prima misura (canali 0,2,4); righe 1,3,5 nella seconda (canali 1,3,5).
             // Ogni nota dura 2 step = 12 tick e termina 12 tick dopo l'inizio.
             var attesi = new List<string>
             {
                 "0 NotaOn:0:36:100",
-                "0 NotaOn:3:38:100",
-                "0 NotaOn:5:40:100",
+                "0 NotaOn:2:38:100",
+                "0 NotaOn:4:40:100",
                 "12 NotaOff:0:36",
-                "12 NotaOff:3:38",
-                "12 NotaOff:5:40",
+                "12 NotaOff:2:38",
+                "12 NotaOff:4:40",
                 "96 NotaOn:1:37:100",
-                "96 NotaOn:2:41:100",
-                "96 NotaOn:4:39:100",
+                "96 NotaOn:3:39:100",
+                "96 NotaOn:5:41:100",
                 "108 NotaOff:1:37",
-                "108 NotaOff:2:41",
-                "108 NotaOff:4:39",
+                "108 NotaOff:3:39",
+                "108 NotaOff:5:41",
                 "192 NotaOn:0:36:100",
-                "192 NotaOn:3:38:100",
-                "192 NotaOn:5:40:100",
+                "192 NotaOn:2:38:100",
+                "192 NotaOn:4:40:100",
                 "204 NotaOff:0:36",
-                "204 NotaOff:3:38",
-                "204 NotaOff:5:40",
+                "204 NotaOff:2:38",
+                "204 NotaOff:4:40",
             };
             Assert.That(banco.Eventi, Is.EqualTo(attesi));
         }
@@ -233,17 +233,17 @@ namespace VisualMusicBlockLooper.Tests
             {
                 int base0 = giro * 192;
                 attesi.Add($"{base0} NotaOn:1:37:100");
-                attesi.Add($"{base0} NotaOn:5:40:100");
+                attesi.Add($"{base0} NotaOn:4:40:100");
                 attesi.Add($"{base0 + 12} NotaOff:1:37");
-                attesi.Add($"{base0 + 12} NotaOff:5:40");
-                attesi.Add($"{base0 + 96} NotaOn:2:41:100");
-                attesi.Add($"{base0 + 96} NotaOn:3:38:100");
-                attesi.Add($"{base0 + 108} NotaOff:2:41");
-                attesi.Add($"{base0 + 108} NotaOff:3:38");
+                attesi.Add($"{base0 + 12} NotaOff:4:40");
+                attesi.Add($"{base0 + 96} NotaOn:2:38:100");
+                attesi.Add($"{base0 + 96} NotaOn:5:41:100");
+                attesi.Add($"{base0 + 108} NotaOff:2:38");
+                attesi.Add($"{base0 + 108} NotaOff:5:41");
             }
 
             Assert.That(banco.Eventi, Is.EqualTo(attesi));
-            Assert.That(banco.Eventi.Any(e => e.Contains("NotaOn:0:36") || e.Contains("NotaOn:4:39")), Is.False,
+            Assert.That(banco.Eventi.Any(e => e.Contains("NotaOn:0:36") || e.Contains("NotaOn:3:39")), Is.False,
                 "Le righe 0 e 3 (0-based) non devono mai suonare con A-B = [2,3].");
         }
 
@@ -314,7 +314,7 @@ namespace VisualMusicBlockLooper.Tests
                 .ToList();
 
             var riga1 = noteDopoCambio.Where(e => e.Corpo.StartsWith("NotaOn:1:37")).ToList();
-            var riga2 = noteDopoCambio.Where(e => e.Corpo.StartsWith("NotaOn:3:38")).ToList();
+            var riga2 = noteDopoCambio.Where(e => e.Corpo.StartsWith("NotaOn:2:38")).ToList();
             Assert.That(riga1, Is.Not.Empty);
             Assert.That(riga2, Is.Not.Empty);
             Assert.That(riga1.All(e => e.Tick % 96 == 0 && (e.Tick / 96) % 6 == 1), Is.True,

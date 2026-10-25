@@ -41,6 +41,7 @@ namespace VisualMusicBlockLooper.App
         private readonly TickMaster tickMaster;
         private readonly CicloCattura cicloCattura;
         private readonly Timer timerInterfaccia = new Timer { Interval = 150 };
+        private volatile int ultimoStepProiettato = -1;
 
         private Label etichettaStato;
         private Label etichettaPorte;
@@ -97,7 +98,7 @@ namespace VisualMusicBlockLooper.App
             this.risorse = (risorse ?? Enumerable.Empty<IDisposable>()).ToList();
             this.calibrazionePresente = calibrazionePresente;
 
-            tickMaster = new TickMaster(compositore.Motore, orologioMs);
+            tickMaster = new TickMaster(compositore.Motore, orologioMs, AggiornaProiezioneSeCambiaStep);
             cicloCattura = new CicloCattura(PassoCattura);
 
             CostruisciInterfaccia();
@@ -291,6 +292,21 @@ namespace VisualMusicBlockLooper.App
 
             MotoreMusicale motore = compositore.Motore;
             proiettore.Aggiorna(compositore.UltimoStato, motore.Posizione, motore.InEsecuzione);
+        }
+
+        /// <summary>Sul thread dei tick: ridisegna il proiettore appena cambia lo step, senza attendere il frame webcam.</summary>
+        private void AggiornaProiezioneSeCambiaStep()
+        {
+            MotoreMusicale motore = compositore.Motore;
+            PosizioneGiro posizione = motore.Posizione;
+            int chiave = posizione.MisuraNelGiro * 1000 + posizione.StepInMisura;
+            if (chiave == ultimoStepProiettato)
+            {
+                return;
+            }
+
+            ultimoStepProiettato = chiave;
+            proiettore.Aggiorna(compositore.UltimoStato, posizione, motore.InEsecuzione);
         }
 
         private void AggiornaInterfaccia()

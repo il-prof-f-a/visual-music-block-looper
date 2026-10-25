@@ -15,14 +15,17 @@ namespace VisualMusicBlockLooper.App
 
         private readonly MotoreMusicale motore;
         private readonly Func<long> orologioMs;
+        private readonly Action dopoTick;
         private Thread thread;
         private volatile bool fermare;
 
         /// <param name="orologioMs">Stesso orologio del motore, usato per il controllo del timeout del clock.</param>
-        public TickMaster(MotoreMusicale motore, Func<long> orologioMs)
+        /// <param name="dopoTick">Opzionale: chiamata sul thread dei tick dopo ogni tick, per aggiornare subito la proiezione.</param>
+        public TickMaster(MotoreMusicale motore, Func<long> orologioMs, Action dopoTick = null)
         {
             this.motore = motore ?? throw new ArgumentNullException(nameof(motore));
             this.orologioMs = orologioMs ?? throw new ArgumentNullException(nameof(orologioMs));
+            this.dopoTick = dopoTick;
         }
 
         /// <summary>Avvia il thread; non fa nulla se è già avviato.</summary>
@@ -93,6 +96,7 @@ namespace VisualMusicBlockLooper.App
                     try
                     {
                         motore.TickInterno();
+                        dopoTick?.Invoke();
                     }
                     catch (Exception)
                     {

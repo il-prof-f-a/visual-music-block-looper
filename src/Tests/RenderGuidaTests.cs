@@ -99,12 +99,21 @@ namespace VisualMusicBlockLooper.Tests
 
             using (Bitmap bmp = Disegna(ConfigPiena(), StatoCon(nota), 0, false))
             {
+                // Solo il bordo: il centro resta bianco, altrimenti il proiettore colorerebbe il cartoncino.
+                int mezzaCella = (CentroPieno(1, 3).X - CentroPieno(1, 2).X) / 2;
+                Point sinistra = new Point(CentroPieno(1, 2).X - mezzaCella + 1, CentroPieno(1, 2).Y);
+                Point destra = new Point(CentroPieno(1, 4).X + mezzaCella - 2, CentroPieno(1, 4).Y);
+                foreach (Point p in new[] { sinistra, destra })
+                {
+                    Color c = bmp.GetPixel(p.X, p.Y);
+                    Assert.That(c.G, Is.GreaterThan(c.R), $"bordo {p}");
+                    Assert.That(c.G, Is.GreaterThan(c.B), $"bordo {p}");
+                }
+
                 foreach (int step in new[] { 2, 3, 4 })
                 {
-                    Point p = CentroPieno(1, step);
-                    Color c = bmp.GetPixel(p.X, p.Y);
-                    Assert.That(c.G, Is.GreaterThan(c.R), $"step {step}");
-                    Assert.That(c.G, Is.GreaterThan(c.B), $"step {step}");
+                    Point centro = CentroPieno(1, step);
+                    Assert.That(bmp.GetPixel(centro.X, centro.Y).ToArgb(), Is.EqualTo(Color.White.ToArgb()), $"centro step {step}");
                 }
 
                 Point fuori = CentroPieno(1, 5);
@@ -168,9 +177,10 @@ namespace VisualMusicBlockLooper.Tests
                 // Griglia: x 128..1152, y 72..648; cella 64x96.
                 Assert.That(bmp.GetPixel(0, 0).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
 
-                Color centro = bmp.GetPixel(128 + 2 * 64 + 32, 72 + 1 * 96 + 48);
-                Assert.That(centro.G, Is.GreaterThan(centro.R));
-                Assert.That(centro.G, Is.GreaterThan(centro.B));
+                Color bordo = bmp.GetPixel(128 + 2 * 64 + 1, 72 + 1 * 96 + 48);
+                Assert.That(bordo.G, Is.GreaterThan(bordo.R));
+                Assert.That(bordo.G, Is.GreaterThan(bordo.B));
+                Assert.That(bmp.GetPixel(128 + 2 * 64 + 32, 72 + 1 * 96 + 48).ToArgb(), Is.EqualTo(Color.White.ToArgb()), "Il centro non va colorato");
             }
         }
 
@@ -200,8 +210,8 @@ namespace VisualMusicBlockLooper.Tests
 
             using (bmp)
             {
-                // Ultima colonna della griglia (step 15, x 1088..1152): dentro la griglia è verde.
-                Color dentro = bmp.GetPixel(1120, 216);
+                // Ultima colonna della griglia (step 15, x 1088..1152): il bordo destro, dentro la griglia, è verde.
+                Color dentro = bmp.GetPixel(1152 - 2, 216);
                 Assert.That(dentro.G, Is.GreaterThan(dentro.R));
                 Assert.That(dentro.G, Is.GreaterThan(dentro.B));
 
@@ -259,6 +269,12 @@ namespace VisualMusicBlockLooper.Tests
         private static Point CentroTavolo(int riga, int colonna)
         {
             return new Point((int)(GrigliaX + (colonna + 0.5) * CellaL), (int)(GrigliaY + (riga + 0.5) * CellaA));
+        }
+
+        // Le note sono disegnate solo col bordo: si campiona appena dentro il bordo sinistro della prima colonna.
+        private static Point BordoSinistroNota(int riga, int colonna)
+        {
+            return new Point((int)(GrigliaX + colonna * CellaL) + 1, (int)(GrigliaY + (riga + 0.5) * CellaA));
         }
 
         private static bool BordoSinistroDisegnato(Bitmap bmp, RettangoloTavolo zona)
@@ -374,7 +390,7 @@ namespace VisualMusicBlockLooper.Tests
         {
             using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(3, 0, 2, 2)))
             {
-                Point dentro = CentroTavolo(3, 2), sbagliata = CentroTavolo(0, 2);
+                Point dentro = BordoSinistroNota(3, 2), sbagliata = CentroTavolo(0, 2);
                 Assert.That(EVerde(bmp.GetPixel(dentro.X, dentro.Y)), Is.True);
                 Assert.That(EVerde(bmp.GetPixel(sbagliata.X, sbagliata.Y)), Is.False);
             }
@@ -385,7 +401,7 @@ namespace VisualMusicBlockLooper.Tests
         {
             using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(0, 4, 2, 2)))
             {
-                Point dentro = CentroTavolo(0, 2), sbagliata = CentroTavolo(4, 2);
+                Point dentro = BordoSinistroNota(0, 2), sbagliata = CentroTavolo(4, 2);
                 Assert.That(EVerde(bmp.GetPixel(dentro.X, dentro.Y)), Is.True);
                 Assert.That(EVerde(bmp.GetPixel(sbagliata.X, sbagliata.Y)), Is.False);
             }
@@ -396,7 +412,7 @@ namespace VisualMusicBlockLooper.Tests
         {
             using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(2, 0, 1, 2), Nota(2, 3, 6, 2)))
             {
-                Point a = CentroTavolo(2, 1), b = CentroTavolo(2, 6);
+                Point a = BordoSinistroNota(2, 1), b = BordoSinistroNota(2, 6);
                 Assert.That(EVerde(bmp.GetPixel(a.X, a.Y)), Is.True);
                 Assert.That(EVerde(bmp.GetPixel(b.X, b.Y)), Is.True);
             }
@@ -420,7 +436,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 6, out StrutturaTavolo s), Is.True);
             using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 10, 6)))
             {
-                Point ultimo = CentroTavolo(1, 11), oltre = CentroTavolo(1, 12);
+                Point ultimo = new Point((int)(GrigliaX + 12 * CellaL) - 3, CentroTavolo(1, 11).Y), oltre = CentroTavolo(1, 12);
                 Assert.That(EVerde(bmp.GetPixel(ultimo.X, ultimo.Y)), Is.True);
                 Assert.That(bmp.GetPixel(oltre.X, oltre.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
             }

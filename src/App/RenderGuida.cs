@@ -15,9 +15,7 @@ namespace VisualMusicBlockLooper.App
         private static readonly Color ColorePlayhead = Color.FromArgb(90, 255, 140, 0);
         private static readonly Color ColoreContornoPlayhead = Color.Gray;
         private static readonly Color ColoreNota = Color.FromArgb(255, 60, 179, 75);
-        private static readonly Color ColoreBordoNota = Color.FromArgb(255, 30, 110, 45);
         private static readonly Color ColoreErrore = Color.FromArgb(255, 220, 30, 30);
-        private static readonly Color ColoreErroreFondo = Color.FromArgb(60, 255, 120, 120);
 
         private static readonly Color ColoreColonnaOltreMisura = Color.FromArgb(255, 215, 215, 215);
         private static readonly Color ColoreRigaFuoriAb = Color.FromArgb(255, 240, 240, 240);
@@ -244,8 +242,8 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            using (var pennello = new SolidBrush(ColoreNota))
-            using (var penna = new Pen(ColoreBordoNota, 2))
+            // Solo il bordo: il proiettore illumina il tavolo, un riempimento colorerebbe il cartoncino sotto.
+            using (var penna = new Pen(ColoreNota, 4) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset })
             {
                 foreach (CartoncinoNota nota in stato.Note)
                 {
@@ -264,7 +262,6 @@ namespace VisualMusicBlockLooper.App
                         BordoX(griglia, nota.StepIniziale + durata),
                         BordoY(griglia, nota.Riga + 1));
 
-                    g.FillRectangle(pennello, area);
                     g.DrawRectangle(penna, area);
                 }
             }
@@ -277,7 +274,6 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            using (var pennello = new SolidBrush(ColoreErroreFondo))
             using (var penna = new Pen(ColoreErrore, 3))
             {
                 foreach (ErroreTavolo errore in stato.Errori)
@@ -288,7 +284,6 @@ namespace VisualMusicBlockLooper.App
                     }
 
                     Rectangle area = InPixel(errore.Area, dimensione);
-                    g.FillRectangle(pennello, area);
                     g.DrawRectangle(penna, area);
                 }
             }

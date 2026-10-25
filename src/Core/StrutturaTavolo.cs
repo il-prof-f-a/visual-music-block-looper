@@ -16,7 +16,7 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Passo (sedicesimo) all'interno della misura corrente.</summary>
         public int StepInMisura { get; }
 
-        /// <summary>Indice della misura nel giro, 0-based.</summary>
+        /// <summary>Indice della riga nel gruppo (la misura in cui si trova il giro), 0-based.</summary>
         public int MisuraNelGiro { get; }
 
         /// <summary>Righe attive (0-based), una per gruppo.</summary>
@@ -43,12 +43,15 @@ namespace VisualMusicBlockLooper.Core
             AFine = aFine;
         }
 
-        /// <summary>Struttura di default: 4/4, sei righe collegate, A-B = [1, 6].</summary>
-        public static StrutturaTavolo Default { get; } = new StrutturaTavolo(4, RigheTotali, 1, RigheTotali);
+        /// <summary>Step (sedicesimi) in una battuta.</summary>
+        public const int StepPerBattuta = 4;
+
+        /// <summary>Struttura di default: 4/4, sei righe collegate, A-B = tutte le battute [1, 24].</summary>
+        public static StrutturaTavolo Default { get; } = new StrutturaTavolo(4, RigheTotali, 1, RigheTotali * 4);
 
         /// <summary>
-        /// Crea una struttura se i valori sono validi. Con una sola riga per gruppo l'A-B è [1, 1];
-        /// altrimenti deve valere 1 ≤ a &lt; b ≤ righeCollegate.
+        /// Crea una struttura se i valori sono validi. A-B è un intervallo di battute (estremi inclusi) lungo
+        /// le righe collegate del gruppo: deve valere 1 ≤ a &lt; b ≤ righeCollegate × battiti.
         /// </summary>
         public static bool TryCrea(int battiti, int righeCollegate, int aInizio, int aFine, out StrutturaTavolo struttura)
         {
@@ -58,9 +61,7 @@ namespace VisualMusicBlockLooper.Core
                 return false;
             }
 
-            bool abValido = righeCollegate == 1
-                ? aInizio == 1 && aFine == 1
-                : aInizio >= 1 && aInizio < aFine && aFine <= righeCollegate;
+            bool abValido = aInizio >= 1 && aInizio < aFine && aFine <= righeCollegate * battiti;
             if (!abValido)
             {
                 return false;
@@ -76,11 +77,14 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Righe per gruppo (1, 2, 3 o 6).</summary>
         public int RigheCollegate { get; }
 
-        /// <summary>Prima riga (1-based) dell'intervallo A-B, dentro il gruppo.</summary>
+        /// <summary>Prima battuta (1-based) dell'intervallo A-B, contata lungo le righe collegate del gruppo.</summary>
         public int AInizio { get; }
 
-        /// <summary>Ultima riga (1-based) dell'intervallo A-B, dentro il gruppo.</summary>
+        /// <summary>Ultima battuta (1-based, inclusa) dell'intervallo A-B.</summary>
         public int AFine { get; }
+
+        /// <summary>Battute del gruppo di righe collegate: righe collegate × battiti per misura.</summary>
+        public int BattuteGruppo => RigheCollegate * BattitiPerMisura;
 
         /// <summary>Passi (sedicesimi) per misura: 4 × battiti.</summary>
         public int StepPerMisura => 4 * BattitiPerMisura;
@@ -88,8 +92,8 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Numero di gruppi di righe collegate.</summary>
         public int NumeroGruppi => RigheTotali / RigheCollegate;
 
-        /// <summary>Lunghezza del giro in misure.</summary>
-        public int LunghezzaGiro => AFine - AInizio + 1;
+        /// <summary>Lunghezza del giro in step: le battute di A-B per 4 step.</summary>
+        public int StepGiro => (AFine - AInizio + 1) * StepPerBattuta;
 
         /// <summary>Posizione del giro allo step assoluto dato (sedicesimi dall'avvio).</summary>
         public PosizioneGiro Posizione(long stepAssoluto)
@@ -99,13 +103,16 @@ namespace VisualMusicBlockLooper.Core
                 throw new ArgumentOutOfRangeException(nameof(stepAssoluto), "Lo step assoluto non può essere negativo.");
             }
 
-            int misuraNelGiro = (int)((stepAssoluto / StepPerMisura) % LunghezzaGiro);
-            int stepInMisura = (int)(stepAssoluto % StepPerMisura);
+            // Posizione nella sequenza delle righe collegate (in step dall'inizio del gruppo): il giro parte
+            // dalla battuta A, dura fino alla battuta B inclusa e poi si ripete.
+            int posizioneNelGruppo = (AInizio - 1) * StepPerBattuta + (int)(stepAssoluto % StepGiro);
+            int misuraNelGiro = posizioneNelGruppo / StepPerMisura;
+            int stepInMisura = posizioneNelGruppo % StepPerMisura;
 
             var righeAttive = new int[NumeroGruppi];
             for (int gruppo = 0; gruppo < NumeroGruppi; gruppo++)
             {
-                righeAttive[gruppo] = gruppo * RigheCollegate + (AInizio - 1) + misuraNelGiro;
+                righeAttive[gruppo] = gruppo * RigheCollegate + misuraNelGiro;
             }
 
             return new PosizioneGiro(stepInMisura, misuraNelGiro, righeAttive);

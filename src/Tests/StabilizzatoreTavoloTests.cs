@@ -137,7 +137,7 @@ namespace VisualMusicBlockLooper.Tests
         public void StrutturaCambiaDopoNFrame()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
-            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            StrutturaTavolo x = Struttura(3, 6, 1, 18);
 
             Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
             Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
@@ -148,7 +148,7 @@ namespace VisualMusicBlockLooper.Tests
         public void StrutturaSfarfallio_NonCambia()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
-            StrutturaTavolo x = Struttura(4, 2, 1, 2);
+            StrutturaTavolo x = Struttura(4, 2, 1, 8);
 
             for (int frame = 1; frame <= 6; frame++)
             {
@@ -162,7 +162,7 @@ namespace VisualMusicBlockLooper.Tests
         public void TornaAlDefaultDopoNFrameDiAssenza()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
-            StrutturaTavolo x = Struttura(2, 1, 1, 1);
+            StrutturaTavolo x = Struttura(2, 1, 1, 2);
             for (int frame = 1; frame <= 3; frame++)
             {
                 stabilizzatore.Aggiorna(Stato(struttura: x));
@@ -180,8 +180,8 @@ namespace VisualMusicBlockLooper.Tests
         public void CandidataCheCambia_RipartiDaUno()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
-            StrutturaTavolo x = Struttura(3, 6, 1, 6);
-            StrutturaTavolo y = Struttura(4, 2, 1, 2);
+            StrutturaTavolo x = Struttura(3, 6, 1, 18);
+            StrutturaTavolo y = Struttura(4, 2, 1, 8);
 
             Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
             Assert.That(stabilizzatore.Aggiorna(Stato(struttura: y)).Struttura, Is.EqualTo(StrutturaTavolo.Default));
@@ -195,8 +195,8 @@ namespace VisualMusicBlockLooper.Tests
         public void CandidataCheCambia_ContatoreRipartiDaUnoAnchePoiCheXAvevaDueFrame()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
-            StrutturaTavolo x = Struttura(3, 6, 1, 6);
-            StrutturaTavolo y = Struttura(4, 2, 1, 2);
+            StrutturaTavolo x = Struttura(3, 6, 1, 18);
+            StrutturaTavolo y = Struttura(4, 2, 1, 8);
 
             var output = new List<StrutturaTavolo>();
             foreach (StrutturaTavolo struttura in new[] { x, x, y, y, y })
@@ -216,8 +216,8 @@ namespace VisualMusicBlockLooper.Tests
         public void CandidataCheCambia_NonEreditaIContatoriPrecedenti()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 4);
-            StrutturaTavolo x = Struttura(3, 6, 1, 6);
-            StrutturaTavolo y = Struttura(4, 2, 1, 2);
+            StrutturaTavolo x = Struttura(3, 6, 1, 18);
+            StrutturaTavolo y = Struttura(4, 2, 1, 8);
 
             var output = new List<StrutturaTavolo>();
             foreach (StrutturaTavolo struttura in new[] { x, x, x, y, y, y, y })
@@ -238,7 +238,7 @@ namespace VisualMusicBlockLooper.Tests
         public void FramePresenzaUnoCambiaSubito()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 1);
-            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            StrutturaTavolo x = Struttura(3, 6, 1, 18);
 
             Assert.That(stabilizzatore.Aggiorna(Stato(struttura: x)).Struttura, Is.EqualTo(x));
         }
@@ -247,7 +247,7 @@ namespace VisualMusicBlockLooper.Tests
         public void NoteEComandiInvariati_AlCambioDiStruttura()
         {
             var stabilizzatore = new StabilizzatoreTavolo(framePresenza: 3);
-            StrutturaTavolo x = Struttura(3, 6, 1, 6);
+            StrutturaTavolo x = Struttura(3, 6, 1, 18);
             CartoncinoNota nota = Nota(3, 2);
             ComandoRilevato play = new ComandoRilevato { Tipo = TipoComando.Play, Parametro = 0 };
 

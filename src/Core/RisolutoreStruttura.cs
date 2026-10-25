@@ -61,13 +61,12 @@ namespace VisualMusicBlockLooper.Core
             int battiti = ValoreMisura(misura, errori);
             int righe = ValoreCollegamento(collegamento, errori);
             int aInizio = 1;
-            int aFine = righe;
+            int aFine = righe * battiti;
 
             if (ab.HasValue)
             {
                 var (payload, area) = ab.Value;
-                bool abValido = righe != 1
-                    && IsImpostazione(payload, TipoImpostazione.IntervalloAb)
+                bool abValido = IsImpostazione(payload, TipoImpostazione.IntervalloAb)
                     && StrutturaTavolo.TryCrea(battiti, righe, payload.Valore, payload.ValoreB, out _);
                 if (abValido)
                 {

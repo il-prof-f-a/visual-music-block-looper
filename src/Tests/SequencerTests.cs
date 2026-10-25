@@ -21,7 +21,7 @@ namespace VisualMusicBlockLooper.Tests
             };
         }
 
-        private static readonly StrutturaTavolo UnaRiga = Struttura(4, 1, 1, 1);
+        private static readonly StrutturaTavolo UnaRiga = Struttura(4, 1, 1, 4);
 
         private static StrutturaTavolo Struttura(int battiti, int righeCollegate, int a, int b)
         {
@@ -203,7 +203,7 @@ namespace VisualMusicBlockLooper.Tests
                 NotaInRiga(4, 3, 0, 1, 4)
             };
 
-            List<string> righe = Raccogli(sequencer, note, 96, Struttura(4, 3, 1, 3));
+            List<string> righe = Raccogli(sequencer, note, 96, Struttura(4, 3, 1, 12));
 
             Assert.That(righe, Is.EqualTo(new[]
             {
@@ -223,7 +223,7 @@ namespace VisualMusicBlockLooper.Tests
                 NotaInRiga(2, 2, 0, 1, 12)
             };
 
-            List<string> righe = Raccogli(sequencer, note, 192, Struttura(4, 3, 2, 3));
+            List<string> righe = Raccogli(sequencer, note, 192, Struttura(4, 3, 5, 12));
 
             Assert.That(righe, Is.EqualTo(new[]
             {
@@ -239,7 +239,7 @@ namespace VisualMusicBlockLooper.Tests
             Sequencer sequencer = new Sequencer(new ConfigGriglia());
             List<CartoncinoNota> note = new List<CartoncinoNota> { Nota(0, 0, 20, 1) };
 
-            List<string> righe = Raccogli(sequencer, note, 72, Struttura(3, 1, 1, 1));
+            List<string> righe = Raccogli(sequencer, note, 72, Struttura(3, 1, 1, 3));
 
             Assert.That(righe, Is.EqualTo(new[] { "0:0:1:ON", "72:0:1:OFF", "72:0:1:ON" }));
         }
@@ -250,7 +250,7 @@ namespace VisualMusicBlockLooper.Tests
             Sequencer sequencer = new Sequencer(new ConfigGriglia());
             List<CartoncinoNota> note = new List<CartoncinoNota> { Nota(0, 6, 4, 1) };
 
-            List<string> righe = Raccogli(sequencer, note, 48, Struttura(2, 1, 1, 1));
+            List<string> righe = Raccogli(sequencer, note, 48, Struttura(2, 1, 1, 2));
 
             Assert.That(righe, Is.EqualTo(new[] { "36:0:1:ON", "48:0:1:OFF" }));
         }
@@ -263,12 +263,12 @@ namespace VisualMusicBlockLooper.Tests
             sequencer.Tick(note, UnaRiga);
 
             IReadOnlyList<EventoNota> eventi = null;
-            Assert.DoesNotThrow(() => eventi = sequencer.Tick(note, Struttura(3, 1, 1, 1)));
+            Assert.DoesNotThrow(() => eventi = sequencer.Tick(note, Struttura(3, 1, 1, 3)));
 
             Assert.That(eventi.Select(e => $"{e.Traccia}:{e.IdClip}:{e.NoteOn}"), Is.EqualTo(new[] { "0:4:False", "1:5:False" }));
 
             // Nessuna nota bloccata: a fine corsa non arrivano altri note-off.
-            Assert.That(Raccogli(sequencer, new List<CartoncinoNota>(), 100, Struttura(3, 1, 1, 1)), Is.Empty);
+            Assert.That(Raccogli(sequencer, new List<CartoncinoNota>(), 100, Struttura(3, 1, 1, 3)), Is.Empty);
         }
 
         [Test]
@@ -278,7 +278,7 @@ namespace VisualMusicBlockLooper.Tests
             List<CartoncinoNota> note = new List<CartoncinoNota> { Nota(0, 0, 8, 4) };
             sequencer.Tick(note, UnaRiga);
 
-            IReadOnlyList<EventoNota> eventi = sequencer.Tick(note, Struttura(2, 1, 1, 1));
+            IReadOnlyList<EventoNota> eventi = sequencer.Tick(note, Struttura(2, 1, 1, 2));
 
             Assert.That(eventi.Count, Is.EqualTo(1));
             Assert.That(eventi[0].NoteOn, Is.False);
@@ -291,7 +291,7 @@ namespace VisualMusicBlockLooper.Tests
             List<CartoncinoNota> note = new List<CartoncinoNota> { Nota(0, 0, 8, 4) };
             sequencer.Tick(note, UnaRiga);
 
-            IReadOnlyList<EventoNota> eventi = sequencer.Tick(note, Struttura(4, 1, 1, 1));
+            IReadOnlyList<EventoNota> eventi = sequencer.Tick(note, Struttura(4, 1, 1, 4));
 
             Assert.That(eventi, Is.Empty);
         }
@@ -327,7 +327,7 @@ namespace VisualMusicBlockLooper.Tests
         public void PosizioneEsposta()
         {
             Sequencer sequencer = new Sequencer(new ConfigGriglia());
-            StrutturaTavolo struttura = Struttura(4, 3, 1, 3);
+            StrutturaTavolo struttura = Struttura(4, 3, 1, 12);
             Assert.That(sequencer.Posizione.StepInMisura, Is.EqualTo(0));
             Assert.That(sequencer.Posizione.RigheAttive, Is.EqualTo(new[] { 0 }));
 

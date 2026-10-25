@@ -333,7 +333,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void ColonneOltreLaMisuraOscurate()
         {
-            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(3, 6, 1, 6), new PosizioneGiro(0, 0, new[] { 3 }), false))
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(3, 6, 1, 18), new PosizioneGiro(0, 0, new[] { 3 }), false))
             {
                 Point p = CentroTavolo(0, 12);
                 Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
@@ -343,9 +343,24 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void BattuteFuoriDaAbAttenuate_ACellaNonARiga()
+        {
+            // 4/4, 2 righe collegate (8 battute), A-B 1-2: nella riga 0 gli step 0..7 sono dentro, 8..15 fuori;
+            // la riga 1 (battute 5..8) e' tutta fuori.
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 2), new PosizioneGiro(0, 0, new[] { 0, 2, 4 }), false))
+            {
+                int attenuato = Color.FromArgb(255, 240, 240, 240).ToArgb();
+                Point dentro = CentroTavolo(0, 7), fuori = CentroTavolo(0, 8), rigaDue = CentroTavolo(1, 0);
+                Assert.That(bmp.GetPixel(dentro.X, dentro.Y).ToArgb(), Is.EqualTo(Bianco));
+                Assert.That(bmp.GetPixel(fuori.X, fuori.Y).ToArgb(), Is.EqualTo(attenuato));
+                Assert.That(bmp.GetPixel(rigaDue.X, rigaDue.Y).ToArgb(), Is.EqualTo(attenuato));
+            }
+        }
+
+        [Test]
         public void RigheFuoriDaAbAttenuate()
         {
-            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 3, 2, 3), new PosizioneGiro(0, 0, new[] { 1, 4 }), false))
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 3, 5, 12), new PosizioneGiro(0, 0, new[] { 1, 4 }), false))
             {
                 int attenuato = Color.FromArgb(255, 240, 240, 240).ToArgb();
                 Point p0 = CentroTavolo(0, 5), p1 = CentroTavolo(1, 5), p3 = CentroTavolo(3, 5), p4 = CentroTavolo(4, 5);
@@ -421,7 +436,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void NotaOltreLaMisuraNonDisegnata()
         {
-            Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 6, out StrutturaTavolo s), Is.True);
+            Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 18, out StrutturaTavolo s), Is.True);
             using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 13, 2)))
             {
                 Point p = CentroTavolo(1, 13);
@@ -433,7 +448,7 @@ namespace VisualMusicBlockLooper.Tests
         public void NotaLungaTroncataAFineMisura()
         {
             // Misura 3/4 = 12 step: la nota dallo step 10 lunga 6 arriva al massimo allo step 11.
-            Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 6, out StrutturaTavolo s), Is.True);
+            Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 18, out StrutturaTavolo s), Is.True);
             using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 10, 6)))
             {
                 Point ultimo = new Point((int)(GrigliaX + 12 * CellaL) - 3, CentroTavolo(1, 11).Y), oltre = CentroTavolo(1, 12);
@@ -453,7 +468,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void PlayheadSoloNelleRigheAttive()
         {
-            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 2), new PosizioneGiro(3, 0, new[] { 1, 3, 5 }), true))
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 8), new PosizioneGiro(3, 0, new[] { 1, 3, 5 }), true))
             {
                 foreach (int riga in new[] { 1, 3, 5 })
                 {
@@ -487,7 +502,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void BarreDiGruppo()
         {
-            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 2), new PosizioneGiro(0, 0, new[] { 0, 2, 4 }), false))
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(4, 2, 1, 8), new PosizioneGiro(0, 0, new[] { 0, 2, 4 }), false))
             {
                 int x = (int)(GrigliaX - 10);
                 int unione = (int)Math.Round(GrigliaY + CellaA);
@@ -501,7 +516,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void StrutturaDelloStatoUsata()
         {
-            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(2, 6, 1, 6), new PosizioneGiro(0, 0, new[] { 0 }), false))
+            using (Bitmap bmp = DisegnaTavolo(StatoStruttura(2, 6, 1, 12), new PosizioneGiro(0, 0, new[] { 0 }), false))
             {
                 Point p = CentroTavolo(2, 9);
                 Assert.That(bmp.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
@@ -514,7 +529,7 @@ namespace VisualMusicBlockLooper.Tests
             var form = new FormProiettore(ConfigTavolo(), LayoutTavolo.Default);
             try
             {
-                StatoTavolo origine = StatoStruttura(3, 2, 1, 2);
+                StatoTavolo origine = StatoStruttura(3, 2, 1, 6);
                 form.Aggiorna(origine, 0, false);
                 Assert.That(form.StatoCorrente.Struttura, Is.EqualTo(origine.Struttura));
             }

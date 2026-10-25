@@ -77,7 +77,7 @@ namespace VisualMusicBlockLooper.Tests
             public long Ora { get; set; }
         }
 
-        private static readonly StrutturaTavolo UnaRiga = Crea(4, 1, 1, 1);
+        private static readonly StrutturaTavolo UnaRiga = Crea(4, 1, 1, 4);
 
         private static StrutturaTavolo Crea(int battiti, int righeCollegate, int a, int b)
         {
@@ -413,12 +413,12 @@ namespace VisualMusicBlockLooper.Tests
         {
             Banco banco = new Banco();
             List<CartoncinoNota> note = new List<CartoncinoNota> { Nota(0, 0, 1, 0), Nota(1, 0, 1, 1) };
-            banco.Motore.AggiornaTavolo(new StatoTavolo(note, new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1)));
+            banco.Motore.AggiornaTavolo(new StatoTavolo(note, new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 4)));
 
             TickMaster(banco, 1);
 
             Assert.That(banco.Uscita.Registro.Count(r => r.StartsWith("NotaOn")), Is.EqualTo(2));
-            Assert.That(banco.Motore.Struttura, Is.EqualTo(Crea(4, 1, 1, 1)));
+            Assert.That(banco.Motore.Struttura, Is.EqualTo(Crea(4, 1, 1, 4)));
         }
 
         private static CartoncinoNota NotaInRiga(int riga, int traccia, int stepIniziale, int durataStep, int idClip)
@@ -447,7 +447,7 @@ namespace VisualMusicBlockLooper.Tests
         {
             Banco banco = new Banco();
             banco.Motore.AggiornaTavolo(new StatoTavolo(
-                DueRigheStessoColoreEClip(), new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1)));
+                DueRigheStessoColoreEClip(), new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 4)));
 
             TickMaster(banco, 1);
             Assert.That(
@@ -469,7 +469,7 @@ namespace VisualMusicBlockLooper.Tests
         {
             Banco banco = new Banco();
             StatoTavolo play = new StatoTavolo(
-                DueRigheStessoColoreEClip(), new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1));
+                DueRigheStessoColoreEClip(), new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 4));
             banco.Motore.AggiornaTavolo(play);
             TickMaster(banco, 1);
 
@@ -478,7 +478,7 @@ namespace VisualMusicBlockLooper.Tests
 
             // Con una sola nota il contatore pulito deve dare un NoteOn semplice, senza retrigger.
             var sola = new List<CartoncinoNota> { NotaInRiga(0, 0, 0, 2, 3) };
-            banco.Motore.AggiornaTavolo(new StatoTavolo(sola, new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 1)));
+            banco.Motore.AggiornaTavolo(new StatoTavolo(sola, new[] { Comando(TipoComando.Play) }, null, Crea(4, 1, 1, 4)));
             TickMaster(banco, 1);
 
             Assert.That(
@@ -493,7 +493,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(banco.Motore.Struttura, Is.SameAs(StrutturaTavolo.Default));
             Assert.That(banco.Motore.Posizione.StepInMisura, Is.EqualTo(0));
 
-            banco.Motore.AggiornaTavolo(new StatoTavolo(null, new[] { Comando(TipoComando.Play) }, null, Crea(4, 3, 1, 3)));
+            banco.Motore.AggiornaTavolo(new StatoTavolo(null, new[] { Comando(TipoComando.Play) }, null, Crea(4, 3, 1, 12)));
             TickMaster(banco, 31);
 
             Assert.That(banco.Motore.Posizione.StepInMisura, Is.EqualTo(5));

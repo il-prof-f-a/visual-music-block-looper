@@ -62,7 +62,7 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(risultato.Struttura.RigheCollegate, Is.EqualTo(2));
             Assert.That(risultato.Struttura.AInizio, Is.EqualTo(1));
-            Assert.That(risultato.Struttura.AFine, Is.EqualTo(2));
+            Assert.That(risultato.Struttura.AFine, Is.EqualTo(8), "Default: tutte le battute (2 righe x 4 battiti)");
             Assert.That(risultato.Errori, Is.Empty);
         }
 
@@ -117,13 +117,14 @@ namespace VisualMusicBlockLooper.Tests
             var risultato = RisolutoreStruttura.Risolvi(new[]
             {
                 (Imp(TipoImpostazione.Collegamento, 2), Area(0.01, 0.36), ZonaSpeciale.Collegamento),
-                (Imp(TipoImpostazione.IntervalloAb, 1, 5), Area(0.01, 0.68), ZonaSpeciale.Ab),
+                (Imp(TipoImpostazione.IntervalloAb, 1, 9), Area(0.01, 0.68), ZonaSpeciale.Ab),
             });
 
+            // Con 2 righe in 4/4 le battute sono 8: A-B 1-9 e' fuori dal gruppo.
             Assert.That(risultato.Errori.Single().Tipo, Is.EqualTo(TipoErrore.ImpostazioneNonValida));
             Assert.That(risultato.Struttura.RigheCollegate, Is.EqualTo(2));
             Assert.That(risultato.Struttura.AInizio, Is.EqualTo(1));
-            Assert.That(risultato.Struttura.AFine, Is.EqualTo(2));
+            Assert.That(risultato.Struttura.AFine, Is.EqualTo(8));
         }
 
         [Test]
@@ -172,7 +173,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(risultato.Errori.Single().Tipo, Is.EqualTo(TipoErrore.ImpostazioneNonValida));
             Assert.That(risultato.Struttura.RigheCollegate, Is.EqualTo(1));
             Assert.That(risultato.Struttura.AInizio, Is.EqualTo(1));
-            Assert.That(risultato.Struttura.AFine, Is.EqualTo(1));
+            Assert.That(risultato.Struttura.AFine, Is.EqualTo(4), "Default: tutte le 4 battute della riga");
         }
 
         [Test]
@@ -184,10 +185,11 @@ namespace VisualMusicBlockLooper.Tests
                 (Imp(TipoImpostazione.IntervalloAb, 1, 2), Area(0.01, 0.68), ZonaSpeciale.Ab),
             });
 
-            Assert.That(risultato.Errori.Single().Tipo, Is.EqualTo(TipoErrore.ImpostazioneNonValida));
+            // A-B conta battute: con una riga (4 battute) l'intervallo 1-2 e' valido.
+            Assert.That(risultato.Errori, Is.Empty);
             Assert.That(risultato.Struttura.RigheCollegate, Is.EqualTo(1));
             Assert.That(risultato.Struttura.AInizio, Is.EqualTo(1));
-            Assert.That(risultato.Struttura.AFine, Is.EqualTo(1));
+            Assert.That(risultato.Struttura.AFine, Is.EqualTo(2));
         }
 
         [Test]

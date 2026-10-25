@@ -216,7 +216,7 @@ namespace VisualMusicBlockLooper.Tests
                 Cartoncini = new[]
                 {
                     NelCentro(LayoutTavolo.Default.Collegamento, "VMBL1;S;LINK;3"),
-                    NelCentro(LayoutTavolo.Default.Ab, "VMBL1;S;AB;2;3"),
+                    NelCentro(LayoutTavolo.Default.Ab, "VMBL1;S;AB;5;12"),
                     Comando("PLAY"),
                     Nota(0), Nota(1), Nota(2), Nota(3), Nota(4), Nota(5),
                 }
@@ -226,7 +226,7 @@ namespace VisualMusicBlockLooper.Tests
             banco.Passi(4);
             banco.Tick(576);
 
-            // Due gruppi di tre righe, A-B = [2,3] (1-based): il giro dura 2 misure = 192 tick.
+            // Due gruppi di tre righe (12 battute), A-B = battute 5-12 = righe 2 e 3 del gruppo: il giro dura 2 misure = 192 tick.
             // Misura 1 del giro: righe 1 e 4 (0-based). Misura 2: righe 2 e 5 (0-based).
             var attesi = new List<string>();
             for (int giro = 0; giro < 3; giro++)

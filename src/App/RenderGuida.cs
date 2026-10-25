@@ -106,8 +106,7 @@ namespace VisualMusicBlockLooper.App
             {
                 for (int traccia = 0; traccia < config.Tracce; traccia++)
                 {
-                    int posizioneNelGruppo = traccia % struttura.RigheCollegate + 1;
-                    bool fuoriAb = posizioneNelGruppo < struttura.AInizio || posizioneNelGruppo > struttura.AFine;
+                    int rigaNelGruppo = traccia % struttura.RigheCollegate;
 
                     for (int step = 0; step < config.Step; step++)
                     {
@@ -116,7 +115,7 @@ namespace VisualMusicBlockLooper.App
                         {
                             g.FillRectangle(fondoOltreMisura, cella);
                         }
-                        else if (fuoriAb)
+                        else if (FuoriAb(struttura, rigaNelGruppo, step))
                         {
                             g.FillRectangle(fondoFuoriAb, cella);
                         }
@@ -125,6 +124,13 @@ namespace VisualMusicBlockLooper.App
                     }
                 }
             }
+        }
+
+        // Battuta (1-based) della cella lungo le righe collegate del gruppo; fuori da A-B se non e' nell'intervallo.
+        private static bool FuoriAb(StrutturaTavolo struttura, int rigaNelGruppo, int step)
+        {
+            int battuta = rigaNelGruppo * struttura.BattitiPerMisura + step / StrutturaTavolo.StepPerBattuta + 1;
+            return battuta < struttura.AInizio || battuta > struttura.AFine;
         }
 
         private void DisegnaBarreGruppo(Graphics g, Rectangle griglia, StrutturaTavolo struttura)

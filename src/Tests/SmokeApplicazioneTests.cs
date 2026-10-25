@@ -229,7 +229,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(struttura.BattitiPerMisura, Is.EqualTo(3));
             Assert.That(struttura.RigheCollegate, Is.EqualTo(1));
             Assert.That(struttura.AInizio, Is.EqualTo(1));
-            Assert.That(struttura.AFine, Is.EqualTo(1));
+            Assert.That(struttura.AFine, Is.EqualTo(3), "Default: tutte le 3 battute della riga in 3/4");
         }
 
         [Test]

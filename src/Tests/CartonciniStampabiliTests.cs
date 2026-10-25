@@ -146,19 +146,20 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.AreEqual(TipoCartoncino.Impostazione, payload.Tipo, nome);
 
                 // Valori attesi: default per i parametri non letti dal cartoncino.
-                int battitiAttesi = 4, righeAttese = 6, aInizioAttesa = 1, aFineAttesa = 6;
+                int battitiAttesi = 4, righeAttese = 6, aInizioAttesa = 1, aFineAttesa = 24;
                 RisoluzioneStruttura risultato;
                 if (payload.Impostazione == TipoImpostazione.Misura)
                 {
                     misure.Add(payload.Valore);
                     battitiAttesi = payload.Valore;
+                    aFineAttesa = 6 * payload.Valore;
                     risultato = RisolutoreStruttura.Risolvi(new[] { (payload, areaMisura, ZonaSpeciale.Misura) });
                 }
                 else if (payload.Impostazione == TipoImpostazione.Collegamento)
                 {
                     collegamenti.Add(payload.Valore);
                     righeAttese = payload.Valore;
-                    aFineAttesa = payload.Valore;
+                    aFineAttesa = payload.Valore * 4;
                     risultato = RisolutoreStruttura.Risolvi(new[] { (payload, areaLink, ZonaSpeciale.Collegamento) });
                 }
                 else

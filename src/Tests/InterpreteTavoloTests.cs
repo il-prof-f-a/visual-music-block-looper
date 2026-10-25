@@ -129,7 +129,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Struttura.BattitiPerMisura, Is.EqualTo(3));
             Assert.That(stato.Struttura.RigheCollegate, Is.EqualTo(2));
             Assert.That(stato.Struttura.AInizio, Is.EqualTo(1));
-            Assert.That(stato.Struttura.AFine, Is.EqualTo(2));
+            Assert.That(stato.Struttura.AFine, Is.EqualTo(6), "Default: tutte le battute (2 righe x 3 battiti)");
         }
 
         [Test]

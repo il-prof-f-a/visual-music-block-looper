@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using OpenCvSharp;
 using VisualMusicBlockLooper.Core;
@@ -108,6 +109,44 @@ namespace VisualMusicBlockLooper.Tests
                 Assume.That(baseline, Is.False, "OpenCV legge gia' il QR senza la riserva");
                 Assert.That(lista, Has.Count.EqualTo(1));
                 Assert.That(lista[0].Payload, Is.EqualTo("VMBL1;N;3"));
+            }
+        }
+        // Camera capovolta, schermo con cornice scura, cartoncino speciale a ridosso del bordo dell'area calibrata:
+        // la cornice non deve fondersi con il corpo e il QR piccolo va letto comunque.
+        [Test]
+        public void CartoncinoSpecialeAlBordoDelloSchermo_LettoNonostanteLaCornice()
+        {
+            using (Bitmap carta = GeneratoreCartoncini.CartoncinoSpeciale("VMBL1;S;LINK;2", "2 righe", passi: 2))
+            using (Bitmap nota = GeneratoreCartoncini.CartoncinoNota(0, 3, passi: 2))
+            using (Bitmap tavolo = new Bitmap(Larghezza, Altezza))
+            using (Graphics g = Graphics.FromImage(tavolo))
+            {
+                g.Clear(Color.FromArgb(40, 40, 40));
+                g.FillRectangle(Brushes.White, 100, 50, 1080, 600);
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                carta.RotateFlip(RotateFlipType.Rotate180FlipNone);
+                int w = (int)(carta.Width * 0.15), h = (int)(carta.Height * 0.15);
+                g.DrawImage(carta, 1180 - w - 3, 300, w, h);
+
+                // Una nota grande e ben leggibile altrove: il suo QR e' dentro l'area del contorno fuso con la cornice.
+                g.DrawImage(nota, 300, 200, (int)(nota.Width * 0.35), (int)(nota.Height * 0.35));
+
+                Mat mat;
+                using (MemoryStream flusso = new MemoryStream())
+                {
+                    tavolo.Save(flusso, System.Drawing.Imaging.ImageFormat.Png);
+                    mat = Cv2.ImDecode(flusso.ToArray(), ImreadModes.Color);
+                }
+
+                using (mat)
+                {
+                    Calibrazione calibrazione = Calibrazione.Calcola(
+                        new[] { new PuntoImmagine(100, 50), new PuntoImmagine(1180, 50), new PuntoImmagine(1180, 650), new PuntoImmagine(100, 650) },
+                        new[] { new PuntoTavolo(0, 0), new PuntoTavolo(1, 0), new PuntoTavolo(1, 1), new PuntoTavolo(0, 1) });
+                    var lista = new RilevatoreCartoncini(new FonteMat(mat), calibrazione).Rileva();
+
+                    Assert.That(lista.Select(c => c.Payload), Is.EquivalentTo(new[] { "VMBL1;N;3", "VMBL1;S;LINK;2" }));
+                }
             }
         }
     }

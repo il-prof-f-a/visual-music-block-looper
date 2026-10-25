@@ -150,6 +150,57 @@ namespace VisualMusicBlockLooper.Vision
         }
 
         /// <summary>
+        /// Maschera (CV_8UC1, 255 dentro) dei pixel della camera che cadono nell'area calibrata del tavolo,
+        /// ristretta di <paramref name="restringi"/> pixel per escludere il bordo/la cornice.
+        /// </summary>
+        /// <param name="larghezzaCamera">Larghezza in pixel del frame della camera.</param>
+        /// <param name="altezzaCamera">Altezza in pixel del frame della camera.</param>
+        /// <param name="restringi">Pixel di cui restringere la maschera.</param>
+        /// <returns>Una nuova <see cref="Mat"/>: il chiamante la rilascia.</returns>
+        public Mat MascheraTavolo(int larghezzaCamera, int altezzaCamera, int restringi = 0)
+        {
+            const int Lato = 100;
+            double[] riga0 = { matrice[0] * Lato, matrice[1] * Lato, matrice[2] * Lato };
+            double[] riga1 = { matrice[3] * Lato, matrice[4] * Lato, matrice[5] * Lato };
+            double[] riga2 = { matrice[6], matrice[7], matrice[8] };
+
+            using (Mat tavolo = new Mat(Lato, Lato, MatType.CV_8UC1, Scalar.All(255)))
+            using (Mat trasformazione = new Mat(3, 3, MatType.CV_64FC1))
+            {
+                for (int c = 0; c < 3; c++)
+                {
+                    trasformazione.Set(0, c, riga0[c]);
+                    trasformazione.Set(1, c, riga1[c]);
+                    trasformazione.Set(2, c, riga2[c]);
+                }
+
+                Mat maschera = new Mat();
+                try
+                {
+                    // Con InverseMap la trasformazione porta i pixel della camera sui pixel del tavolo.
+                    Cv2.WarpPerspective(
+                        tavolo, maschera, trasformazione, new Size(larghezzaCamera, altezzaCamera),
+                        InterpolationFlags.Linear | InterpolationFlags.WarpInverseMap, BorderTypes.Constant, Scalar.All(0));
+                    Cv2.Threshold(maschera, maschera, 127, 255, ThresholdTypes.Binary);
+                    if (restringi > 0)
+                    {
+                        using (Mat nucleo = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(2 * restringi + 1, 2 * restringi + 1)))
+                        {
+                            Cv2.Erode(maschera, maschera, nucleo);
+                        }
+                    }
+
+                    return maschera;
+                }
+                catch
+                {
+                    maschera.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
         /// Raddrizza l'immagine della camera sull'area del tavolo definita dalla calibrazione: il risultato è
         /// una vista dall'alto, "stirata", in cui il rettangolo calibrato riempie tutta l'immagine
         /// (tavolo (0,0) in alto a sinistra, (1,1) in basso a destra). Ciò che sta fuori dall'area

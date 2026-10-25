@@ -34,11 +34,16 @@ namespace VisualMusicBlockLooper.Vision
         private const int FondoMinimo = 80;           // sotto questo livello l'immagine e' troppo scura per il corpo
         private const int AreaMinimaCorpo = 400;      // pixel: scarta macchie piu' piccole di un cartoncino
         private const int VuotiTollerati = 8;
-        private const int AltezzaMinimaRitaglio = 480;
-        private const double MargineRitaglio = 0.9;   // frazione della dimensione maggiore del corpo, per includere il QR a sinistra
+        private const double AltezzaTargetQr = 320;   // altezza in pixel a cui si ingrandisce il cartoncino per leggere il QR
+        private const double AreaMassimaCorpo = 0.25; // frazione del frame: contorni piu' grandi non sono cartoncini
+        private const int RestringiTavolo = 6;        // pixel: esclude la cornice dello schermo dal bordo dell'area calibrata
 
         private readonly IFonteImmagini fonte;
         private readonly Calibrazione calibrazione;
+
+        // QR recuperati con la lettura di riserva nel frame precedente, per corpo: la lettura di riserva e'
+        // costosa, quindi un cartoncino fermo non viene riletto a ogni frame.
+        private List<KeyValuePair<Rect, QrTrovato>> recuperati = new List<KeyValuePair<Rect, QrTrovato>>();
 
         public RilevatoreCartoncini(IFonteImmagini fonte, Calibrazione calibrazione)
         {
@@ -89,7 +94,7 @@ namespace VisualMusicBlockLooper.Vision
                     }
 
                     List<QrTrovato> qr = DecodificaQr(bgr);
-                    maschera = MascheraCorpo(bgr, out Rect[] corpi);
+                    maschera = MascheraCorpo(bgr, calibrazione, out Rect[] corpi);
                     qr.AddRange(RecuperaQrMancanti(bgr, qr, corpi));
                     if (qr.Count == 0)
                     {
@@ -197,13 +202,18 @@ namespace VisualMusicBlockLooper.Vision
         }
 
         // Per ogni corpo senza un QR letto vicino, ritenta la lettura sul ritaglio ingrandito e livellato.
-        private static List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, Rect[] corpi)
+        private List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, Rect[] corpi)
         {
             var nuovi = new List<QrTrovato>();
+            var attuali = new List<KeyValuePair<Rect, QrTrovato>>();
             foreach (Rect corpo in corpi)
             {
-                int margine = (int)Math.Round(Math.Max(corpo.Width, corpo.Height) * MargineRitaglio);
-                Rect regione = Gonfia(corpo, margine) & new Rect(0, 0, bgr.Cols, bgr.Rows);
+                // Il QR sta a un'estremita' del cartoncino (a sinistra, o a destra con camera capovolta):
+                // si include un margine laterale pari all'altezza e uno verticale ridotto.
+                int h = corpo.Height;
+                int margineY = (int)Math.Round(h * 0.3);
+                Rect regione = new Rect(corpo.X - h, corpo.Y - margineY, corpo.Width + 2 * h, corpo.Height + 2 * margineY)
+                    & new Rect(0, 0, bgr.Cols, bgr.Rows);
                 if (regione.Width < 8 || regione.Height < 8)
                 {
                     continue;
@@ -214,16 +224,36 @@ namespace VisualMusicBlockLooper.Vision
                     continue;
                 }
 
-                foreach (QrTrovato q in LeggiRitaglio(bgr, regione))
+                // Stesso corpo (quasi fermo) del frame precedente: si riusa il QR gia' recuperato.
+                KeyValuePair<Rect, QrTrovato>? memoria = recuperati
+                    .Where(r => Sovrapposizione(r.Key, corpo) >= 0.7)
+                    .Select(r => (KeyValuePair<Rect, QrTrovato>?)r)
+                    .FirstOrDefault();
+                List<QrTrovato> letti = memoria.HasValue
+                    ? new List<QrTrovato> { memoria.Value.Value }
+                    : LeggiRitaglio(bgr, regione);
+
+                foreach (QrTrovato q in letti)
                 {
                     if (!gia.Concat(nuovi).Any(e => e.Testo == q.Testo && Vicini(e, q)))
                     {
                         nuovi.Add(q);
+                        attuali.Add(new KeyValuePair<Rect, QrTrovato>(corpo, q));
                     }
                 }
             }
 
+            recuperati = attuali;
             return nuovi;
+        }
+
+        // Intersezione su unione dei due rettangoli (0..1).
+        private static double Sovrapposizione(Rect a, Rect b)
+        {
+            Rect inter = a & b;
+            double area = inter.Width * inter.Height;
+            double unione = a.Width * a.Height + b.Width * b.Height - area;
+            return unione <= 0 ? 0 : area / unione;
         }
 
         private static bool CentroDentro(QrTrovato q, Rect regione)
@@ -243,7 +273,7 @@ namespace VisualMusicBlockLooper.Vision
         private static List<QrTrovato> LeggiRitaglio(Mat bgr, Rect regione)
         {
             var trovati = new List<QrTrovato>();
-            double scala = Math.Max(2.0, Math.Min(5.0, AltezzaMinimaRitaglio / (double)regione.Height));
+            double scala = Math.Max(2.0, Math.Min(6.0, AltezzaTargetQr / Math.Max(1.0, regione.Height / 1.6)));
             using (var ritaglio = new Mat(bgr, regione))
             using (var grigio = new Mat())
             using (var ingrandito = new Mat())
@@ -396,7 +426,7 @@ namespace VisualMusicBlockLooper.Vision
 
         // Maschera del corpo: pixel il cui canale minimo e' molto sotto il livello locale della carta/sfondo
         // (qualsiasi colore pieno o grigio scuro; linee sottili e la griglia chiara sono escluse).
-        private static Mat MascheraCorpo(Mat bgr, out Rect[] rettangoli)
+        private static Mat MascheraCorpo(Mat bgr, Calibrazione calibrazione, out Rect[] rettangoli)
         {
             var maschera = new Mat();
             try
@@ -431,6 +461,12 @@ namespace VisualMusicBlockLooper.Vision
                     Cv2.BitwiseAnd(maschera, abbastanzaChiaro, maschera);
                 }
 
+                // Fuori dall'area calibrata (cornice dello schermo, mani, tavolo) non ci sono cartoncini.
+                using (Mat tavolo = calibrazione.MascheraTavolo(bgr.Cols, bgr.Rows, RestringiTavolo))
+                {
+                    Cv2.BitwiseAnd(maschera, tavolo, maschera);
+                }
+
                 using (var apertura = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoNucleoApertura, LatoNucleoApertura)))
                 using (var chiusura = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoNucleoChiusura, LatoNucleoChiusura)))
                 {
@@ -445,7 +481,8 @@ namespace VisualMusicBlockLooper.Vision
                         RetrievalModes.External, ContourApproximationModes.ApproxSimple);
                     rettangoli = contorni
                         .Select(Cv2.BoundingRect)
-                        .Where(r => r.Width * r.Height >= AreaMinimaCorpo)
+                        .Where(r => r.Width * r.Height >= AreaMinimaCorpo
+                            && r.Width * r.Height <= AreaMassimaCorpo * bgr.Cols * bgr.Rows)
                         .ToArray();
                 }
 

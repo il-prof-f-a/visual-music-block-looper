@@ -124,6 +124,23 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void TickMaster_ChiamaDopoTickPerOgniTick()
+        {
+            var uscita = new UscitaContaClock();
+            var motore = new MotoreMusicale(new Sequencer(new ConfigGriglia()), uscita, null, new MappaturaFinta(), 300);
+            int chiamate = 0;
+            using (var tickMaster = new TickMaster(motore, () => 0, () => Interlocked.Increment(ref chiamate)))
+            {
+                tickMaster.Avvia();
+                Thread.Sleep(400);
+                tickMaster.Ferma();
+            }
+
+            Assert.That(chiamate, Is.GreaterThan(10));
+            Assert.That(chiamate, Is.EqualTo(uscita.Clock_));
+        }
+
+        [Test]
         public void FormControllo_CreataSenzaMostrareESmaltita_NonLancia()
         {
             var config = new ConfigGriglia();

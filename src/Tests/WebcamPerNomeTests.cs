@@ -255,6 +255,12 @@ namespace VisualMusicBlockLooper.Tests
 
             public Bitmap AnteprimaRaddrizzata(VisualMusicBlockLooper.Vision.Calibrazione calibrazione, int larghezza, int altezza) { return null; }
 
+            public void ApplicaImpostazioni(ConfigurazioneWebcam impostazioni) { }
+
+            public StatoImpostazioniWebcam LeggiImpostazioni() { return StatoImpostazioniWebcam.NonSupportato(); }
+
+            public double FpsCatturati => 0;
+
             public void Dispose() { }
         }
 

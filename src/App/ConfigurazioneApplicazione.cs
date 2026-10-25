@@ -28,6 +28,27 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Altezza di cattura richiesta in pixel (0 = predefinita, 720).</summary>
         public int Altezza { get; set; }
 
+        /// <summary>
+        /// Messa a fuoco automatica. Null = non modificare il valore impostato nel driver della webcam.
+        /// </summary>
+        public bool? FuocoAutomatico { get; set; }
+
+        /// <summary>
+        /// Posizione del fuoco manuale (0..255). Null = non modificare il valore impostato nel driver della webcam.
+        /// </summary>
+        public int? Fuoco { get; set; }
+
+        /// <summary>
+        /// Esposizione automatica. Null = non modificare il valore impostato nel driver della webcam.
+        /// </summary>
+        public bool? EsposizioneAutomatica { get; set; }
+
+        /// <summary>
+        /// Esposizione manuale come log2 dei secondi (tipicamente -13..0, come in DirectShow). Null = non modificare
+        /// il valore impostato nel driver della webcam.
+        /// </summary>
+        public double? Esposizione { get; set; }
+
         /// <summary>Copia nella configurazione l'identità della webcam in uso.</summary>
         public void Imposta(InfoWebcam webcam)
         {

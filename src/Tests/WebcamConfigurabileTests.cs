@@ -115,6 +115,60 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void SalvaECarica_ConservaLeImpostazioniFuocoEsposizione()
+        {
+            string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
+            new ConfigurazioneApplicazione
+            {
+                Webcam = new ConfigurazioneWebcam
+                {
+                    FuocoAutomatico = false,
+                    Fuoco = 130,
+                    EsposizioneAutomatica = false,
+                    Esposizione = -6.5,
+                },
+            }.Salva(percorso);
+
+            ConfigurazioneWebcam webcam = ConfigurazioneApplicazione.Carica(percorso).Webcam;
+            Assert.That(webcam.FuocoAutomatico, Is.EqualTo(false));
+            Assert.That(webcam.Fuoco, Is.EqualTo(130));
+            Assert.That(webcam.EsposizioneAutomatica, Is.EqualTo(false));
+            Assert.That(webcam.Esposizione, Is.EqualTo(-6.5));
+        }
+
+        [Test]
+        public void ConfigurazioneSenzaImpostazioniFuocoEsposizione_TuttiNull()
+        {
+            string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
+            File.WriteAllText(percorso, "{ \"Webcam\": { \"Nome\": \"X\", \"Indice\": 1 } }");
+
+            ConfigurazioneWebcam webcam = ConfigurazioneApplicazione.Carica(percorso).Webcam;
+            Assert.That(webcam.FuocoAutomatico, Is.Null);
+            Assert.That(webcam.Fuoco, Is.Null);
+            Assert.That(webcam.EsposizioneAutomatica, Is.Null);
+            Assert.That(webcam.Esposizione, Is.Null);
+        }
+
+        [Test]
+        public void CampiNull_NonSovrascrivonoNessunValore()
+        {
+            string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
+            new ConfigurazioneApplicazione { Webcam = new ConfigurazioneWebcam { Indice = 2 } }.Salva(percorso);
+
+            ConfigurazioneWebcam webcam = ConfigurazioneApplicazione.Carica(percorso).Webcam;
+            Assert.That(webcam.Indice, Is.EqualTo(2));
+            Assert.That(webcam.FuocoAutomatico, Is.Null, "null = non toccare il valore del driver: niente default");
+            Assert.That(webcam.Fuoco, Is.Null);
+            Assert.That(webcam.EsposizioneAutomatica, Is.Null);
+            Assert.That(webcam.Esposizione, Is.Null);
+
+            File.WriteAllText(percorso, "{ \"Webcam\": { \"Fuoco\": null, \"Esposizione\": null } }");
+            webcam = ConfigurazioneApplicazione.Carica(percorso).Webcam;
+            Assert.That(webcam.Fuoco, Is.Null);
+            Assert.That(webcam.Esposizione, Is.Null);
+        }
+
+        [Test]
         public void ConfigurazioneSenzaRisoluzione_UsaIlDefault()
         {
             string percorso = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);

@@ -3,30 +3,39 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenCvSharp;
 using VisualMusicBlockLooper.Core;
+using ZXing;
+using ZXing.Common;
+using ZXing.Multi.QrCode;
 
 namespace VisualMusicBlockLooper.Vision
 {
     /// <summary>
     /// Rileva i cartoncini nel frame della camera.
-    /// Modello fisico: il cartoncino e' un rettangolo il cui corpo e' di un colore pieno che identifica la traccia,
-    /// con un codice QR (su un riquadro bianco con zona quieta) stampato sull'estremita' SINISTRA, anche a filo del bordo.
-    /// La larghezza del cartoncino (in unita' tavolo) codifica la durata, quindi viene misurata dal corpo colorato.
-    /// Cartoncini dello stesso colore possono toccarsi (note consecutive, righe adiacenti): il contorno della
-    /// maschera li fonde, quindi il rettangolo di ciascuno viene ritagliato con i riquadri QR dei vicini dello
-    /// stesso colore (a sinistra: bordo del proprio riquadro; a destra: bordo del riquadro del vicino;
-    /// sopra/sotto: punto medio tra i due QR). Le estensioni sono misurate sulla maschera lungo la fascia del
-    /// proprio QR (righe per la larghezza, colonne per l'altezza), cosi' vicini di dimensioni diverse non
-    /// falsano la misura.
+    /// Modello fisico: il cartoncino e' un rettangolo con un codice QR (su un riquadro bianco con zona quieta)
+    /// stampato sull'estremita' SINISTRA, anche a filo del bordo. Il QR contiene tutte le informazioni; il corpo
+    /// del cartoncino (di qualsiasi colore, piu' scuro della carta/sfondo) serve solo a misurarne la larghezza,
+    /// che codifica la durata della nota. Il colore non viene interpretato.
+    /// Cartoncini adiacenti possono toccarsi (note consecutive, righe adiacenti): il contorno della maschera li
+    /// fonde, quindi il rettangolo di ciascuno viene ritagliato con i riquadri QR dei vicini (a sinistra: bordo
+    /// del proprio riquadro; a destra: bordo del riquadro del vicino; sopra/sotto: punto medio tra i due QR).
+    /// Le estensioni sono misurate sulla maschera lungo la fascia del proprio QR (righe per la larghezza,
+    /// colonne per l'altezza), cosi' vicini di dimensioni diverse non falsano la misura.
+    /// La lettura del QR usa OpenCV; per i cartoncini il cui corpo e' visibile ma il QR non e' stato letto
+    /// (piccolo, sfocato, sovraesposto) si ritenta sul ritaglio ingrandito e livellato con ZXing e OpenCV.
     /// </summary>
     public sealed class RilevatoreCartoncini : IRilevatoreCartoncini
     {
         private const double FattoreZonaQuieta = 0.2; // zona quieta ~4 moduli su 21 (frazione del lato del QR)
         private const int TolleranzaContatto = 3;
-        private const int PuntiPerLato = 6;
-        private const double ScalaAnello = 1.7;
-        private const int VotiMinimi = 2;
         private const int LatoNucleoChiusura = 7;
+        private const int LatoNucleoApertura = 5;
+        private const int LatoFondoLocale = 101;      // finestra per stimare il livello locale della carta
+        private const double SogliaCorpo = 0.55;      // corpo = canale minimo sotto questa frazione del fondo locale
+        private const int FondoMinimo = 80;           // sotto questo livello l'immagine e' troppo scura per il corpo
+        private const int AreaMinimaCorpo = 400;      // pixel: scarta macchie piu' piccole di un cartoncino
         private const int VuotiTollerati = 8;
+        private const int AltezzaMinimaRitaglio = 480;
+        private const double MargineRitaglio = 0.9;   // frazione della dimensione maggiore del corpo, per includere il QR a sinistra
 
         private readonly IFonteImmagini fonte;
         private readonly Calibrazione calibrazione;
@@ -56,8 +65,7 @@ namespace VisualMusicBlockLooper.Vision
                 }
 
                 Mat convertito = null;
-                Mat hsv = null;
-                CacheCorpi corpi = null;
+                Mat maschera = null;
                 try
                 {
                     Mat bgr = frame;
@@ -81,20 +89,19 @@ namespace VisualMusicBlockLooper.Vision
                     }
 
                     List<QrTrovato> qr = DecodificaQr(bgr);
+                    maschera = MascheraCorpo(bgr, out Rect[] corpi);
+                    qr.AddRange(RecuperaQrMancanti(bgr, qr, corpi));
                     if (qr.Count == 0)
                     {
                         return risultato;
                     }
 
-                    hsv = new Mat();
-                    Cv2.CvtColor(bgr, hsv, ColorConversionCodes.BGR2HSV);
-                    corpi = new CacheCorpi(hsv);
                     var candidati = new List<Candidato>();
                     foreach (QrTrovato q in qr)
                     {
                         try
                         {
-                            Candidato c = Analizza(bgr, corpi, q);
+                            Candidato c = Analizza(corpi, q);
                             if (c != null)
                             {
                                 candidati.Add(c);
@@ -108,7 +115,7 @@ namespace VisualMusicBlockLooper.Vision
 
                     foreach (Candidato c in candidati)
                     {
-                        CartoncinoRilevato r = Converti(c, candidati, corpi);
+                        CartoncinoRilevato r = Converti(c, candidati, maschera);
                         if (r != null)
                         {
                             risultato.Add(r);
@@ -122,8 +129,7 @@ namespace VisualMusicBlockLooper.Vision
                 }
                 finally
                 {
-                    corpi?.Dispose();
-                    hsv?.Dispose();
+                    maschera?.Dispose();
                     convertito?.Dispose();
                 }
             }
@@ -140,51 +146,9 @@ namespace VisualMusicBlockLooper.Vision
         private sealed class Candidato
         {
             public string Testo;
-            public ColoreTraccia? Colore;
             public Rect Riquadro;   // bounding box del quadrilatero QR
             public Rect Zona;       // riquadro QR + zona quieta
-            public Rect? Corpo;     // bounding rect del contorno colorato (eventualmente fuso con i vicini)
-        }
-
-        // Rettangoli dei contorni esterni di ogni colore, calcolati una sola volta per frame e solo su richiesta.
-        private sealed class CacheCorpi : IDisposable
-        {
-            private readonly Mat hsv;
-            private readonly Dictionary<ColoreTraccia, Rect[]> cache = new Dictionary<ColoreTraccia, Rect[]>();
-            private readonly Dictionary<ColoreTraccia, Mat> maschere = new Dictionary<ColoreTraccia, Mat>();
-
-            public CacheCorpi(Mat hsv)
-            {
-                this.hsv = hsv;
-            }
-
-            public Rect[] Per(ColoreTraccia colore)
-            {
-                if (!cache.TryGetValue(colore, out Rect[] rettangoli))
-                {
-                    Mat maschera = Calcola(hsv, colore, out rettangoli);
-                    maschere[colore] = maschera;
-                    cache[colore] = rettangoli;
-                }
-
-                return rettangoli;
-            }
-
-            public Mat Maschera(ColoreTraccia colore)
-            {
-                Per(colore);
-                return maschere[colore];
-            }
-
-            public void Dispose()
-            {
-                foreach (Mat m in maschere.Values)
-                {
-                    m.Dispose();
-                }
-
-                maschere.Clear();
-            }
+            public Rect? Corpo;     // bounding rect del corpo (eventualmente fuso con i vicini)
         }
 
         private static List<QrTrovato> DecodificaQr(Mat bgr)
@@ -232,8 +196,270 @@ namespace VisualMusicBlockLooper.Vision
             return trovati;
         }
 
-        // Determina colore e corpo colorato associati a un QR.
-        private static Candidato Analizza(Mat bgr, CacheCorpi corpi, QrTrovato qr)
+        // Per ogni corpo senza un QR letto vicino, ritenta la lettura sul ritaglio ingrandito e livellato.
+        private static List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, Rect[] corpi)
+        {
+            var nuovi = new List<QrTrovato>();
+            foreach (Rect corpo in corpi)
+            {
+                int margine = (int)Math.Round(Math.Max(corpo.Width, corpo.Height) * MargineRitaglio);
+                Rect regione = Gonfia(corpo, margine) & new Rect(0, 0, bgr.Cols, bgr.Rows);
+                if (regione.Width < 8 || regione.Height < 8)
+                {
+                    continue;
+                }
+
+                if (gia.Concat(nuovi).Any(q => CentroDentro(q, regione)))
+                {
+                    continue;
+                }
+
+                foreach (QrTrovato q in LeggiRitaglio(bgr, regione))
+                {
+                    if (!gia.Concat(nuovi).Any(e => e.Testo == q.Testo && Vicini(e, q)))
+                    {
+                        nuovi.Add(q);
+                    }
+                }
+            }
+
+            return nuovi;
+        }
+
+        private static bool CentroDentro(QrTrovato q, Rect regione)
+        {
+            float cx = q.Angoli.Average(p => p.X), cy = q.Angoli.Average(p => p.Y);
+            return cx >= regione.Left && cx < regione.Right && cy >= regione.Top && cy < regione.Bottom;
+        }
+
+        private static bool Vicini(QrTrovato a, QrTrovato b)
+        {
+            float dx = a.Angoli.Average(p => p.X) - b.Angoli.Average(p => p.X);
+            float dy = a.Angoli.Average(p => p.Y) - b.Angoli.Average(p => p.Y);
+            double lato = Math.Max(BoundingBox(a.Angoli).Width, 1);
+            return Math.Sqrt(dx * dx + dy * dy) < lato;
+        }
+
+        private static List<QrTrovato> LeggiRitaglio(Mat bgr, Rect regione)
+        {
+            var trovati = new List<QrTrovato>();
+            double scala = Math.Max(2.0, Math.Min(5.0, AltezzaMinimaRitaglio / (double)regione.Height));
+            using (var ritaglio = new Mat(bgr, regione))
+            using (var grigio = new Mat())
+            using (var ingrandito = new Mat())
+            {
+                Cv2.CvtColor(ritaglio, grigio, ColorConversionCodes.BGR2GRAY);
+                Cv2.Resize(grigio, ingrandito, new Size(), scala, scala, InterpolationFlags.Cubic);
+
+                foreach (Mat variante in Varianti(ingrandito))
+                {
+                    using (variante)
+                    {
+                        foreach (QrTrovato q in DecodificaConZxing(variante).Concat(DecodificaConOpenCv(variante)))
+                        {
+                            Point2f[] angoli = q.Angoli
+                                .Select(p => new Point2f((float)(p.X / scala + regione.X), (float)(p.Y / scala + regione.Y)))
+                                .ToArray();
+                            trovati.Add(new QrTrovato { Testo = q.Testo, Angoli = angoli });
+                        }
+                    }
+
+                    if (trovati.Count > 0)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return trovati;
+        }
+
+        // Grigio, livellato (divide per lo sfondo sfocato: toglie bagliori e gradienti) e contrasto adattivo.
+        private static IEnumerable<Mat> Varianti(Mat grigio)
+        {
+            yield return grigio.Clone();
+
+            Mat livellato = new Mat();
+            using (var sfondo = new Mat())
+            {
+                int sigma = Math.Max(5, grigio.Rows / 12);
+                Cv2.GaussianBlur(grigio, sfondo, new Size(), sigma);
+                Cv2.Divide(grigio, sfondo, livellato, 255);
+            }
+
+            yield return livellato;
+
+            using (var clahe = Cv2.CreateCLAHE(2.0, new Size(8, 8)))
+            {
+                var contrasto = new Mat();
+                clahe.Apply(grigio, contrasto);
+                yield return contrasto;
+            }
+        }
+
+        private static IEnumerable<QrTrovato> DecodificaConOpenCv(Mat grigio)
+        {
+            var trovati = new List<QrTrovato>();
+            using (var rilevatore = new QRCodeDetector())
+            {
+                try
+                {
+                    string testo = rilevatore.DetectAndDecode(grigio, out Point2f[] angoli);
+                    if (!string.IsNullOrEmpty(testo) && angoli != null && angoli.Length >= 4)
+                    {
+                        trovati.Add(new QrTrovato { Testo = testo, Angoli = angoli.Take(4).ToArray() });
+                    }
+                }
+                catch (OpenCVException)
+                {
+                }
+            }
+
+            return trovati;
+        }
+
+        private static IEnumerable<QrTrovato> DecodificaConZxing(Mat grigio)
+        {
+            var trovati = new List<QrTrovato>();
+            try
+            {
+                byte[] byteGrigi = new byte[grigio.Rows * grigio.Cols];
+                System.Runtime.InteropServices.Marshal.Copy(grigio.Data, byteGrigi, 0, byteGrigi.Length);
+                var luminanza = new RGBLuminanceSource(byteGrigi, grigio.Cols, grigio.Rows, RGBLuminanceSource.BitmapFormat.Gray8);
+                var bitmap = new BinaryBitmap(new HybridBinarizer(luminanza));
+                var suggerimenti = new Dictionary<DecodeHintType, object>
+                {
+                    { DecodeHintType.TRY_HARDER, true },
+                    { DecodeHintType.POSSIBLE_FORMATS, new List<BarcodeFormat> { BarcodeFormat.QR_CODE } },
+                };
+
+                Result[] risultati = new QRCodeMultiReader().decodeMultiple(bitmap, suggerimenti);
+                if (risultati != null)
+                {
+                    foreach (Result r in risultati)
+                    {
+                        Point2f[] angoli = AngoliDaPunti(r.ResultPoints);
+                        if (!string.IsNullOrEmpty(r.Text) && angoli != null)
+                        {
+                            trovati.Add(new QrTrovato { Testo = r.Text, Angoli = angoli });
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Lettura non riuscita su questa variante: si passa alla successiva.
+            }
+
+            return trovati;
+        }
+
+        // ZXing restituisce i centri dei tre riquadri di posizione (basso-sinistra, alto-sinistra, alto-destra)
+        // e, se presente, il quarto punto di allineamento: si ricostruiscono i quattro angoli del QR.
+        private static Point2f[] AngoliDaPunti(ResultPoint[] punti)
+        {
+            if (punti == null || punti.Length < 3)
+            {
+                return null;
+            }
+
+            var bl = new Point2f(punti[0].X, punti[0].Y);
+            var tl = new Point2f(punti[1].X, punti[1].Y);
+            var tr = new Point2f(punti[2].X, punti[2].Y);
+            double lunghezza = Distanza(tl, tr);
+            double altezza = Distanza(tl, bl);
+            if (lunghezza < 1 || altezza < 1)
+            {
+                return null;
+            }
+
+            double moduli = punti.Length >= 4 ? 18.0 : 14.0; // distanza tra i centri dei riquadri, in moduli
+            double modulo = lunghezza / moduli;
+            var u = new Point2f((float)((tr.X - tl.X) / lunghezza), (float)((tr.Y - tl.Y) / lunghezza));
+            var v = new Point2f((float)((bl.X - tl.X) / altezza), (float)((bl.Y - tl.Y) / altezza));
+            float m = (float)(3.5 * modulo);
+
+            Point2f Angolo(Point2f p, float su, float sv)
+            {
+                return new Point2f(p.X + m * (su * u.X + sv * v.X), p.Y + m * (su * u.Y + sv * v.Y));
+            }
+
+            var br = new Point2f(tr.X + bl.X - tl.X, tr.Y + bl.Y - tl.Y);
+            return new[] { Angolo(tl, -1, -1), Angolo(tr, 1, -1), Angolo(br, 1, 1), Angolo(bl, -1, 1) };
+        }
+
+        private static double Distanza(Point2f a, Point2f b)
+        {
+            double dx = a.X - b.X, dy = a.Y - b.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        // Maschera del corpo: pixel il cui canale minimo e' molto sotto il livello locale della carta/sfondo
+        // (qualsiasi colore pieno o grigio scuro; linee sottili e la griglia chiara sono escluse).
+        private static Mat MascheraCorpo(Mat bgr, out Rect[] rettangoli)
+        {
+            var maschera = new Mat();
+            try
+            {
+                Mat[] canali = Cv2.Split(bgr);
+                using (var minimo = new Mat())
+                using (var fondo = new Mat())
+                using (var soglia = new Mat())
+                using (var abbastanzaChiaro = new Mat())
+                {
+                    try
+                    {
+                        Cv2.Min(canali[0], canali[1], minimo);
+                        Cv2.Min(minimo, canali[2], minimo);
+                    }
+                    finally
+                    {
+                        foreach (Mat c in canali)
+                        {
+                            c.Dispose();
+                        }
+                    }
+
+                    using (var finestra = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoFondoLocale, LatoFondoLocale)))
+                    {
+                        Cv2.Dilate(minimo, fondo, finestra);
+                    }
+
+                    Cv2.Multiply(fondo, Scalar.All(SogliaCorpo), soglia);
+                    Cv2.Compare(minimo, soglia, maschera, CmpType.LT);
+                    Cv2.Threshold(fondo, abbastanzaChiaro, FondoMinimo, 255, ThresholdTypes.Binary);
+                    Cv2.BitwiseAnd(maschera, abbastanzaChiaro, maschera);
+                }
+
+                using (var apertura = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoNucleoApertura, LatoNucleoApertura)))
+                using (var chiusura = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoNucleoChiusura, LatoNucleoChiusura)))
+                {
+                    Cv2.MorphologyEx(maschera, maschera, MorphTypes.Open, apertura);
+                    Cv2.MorphologyEx(maschera, maschera, MorphTypes.Close, chiusura);
+                }
+
+                // FindContours puo' modificare l'immagine in ingresso: lavora su una copia.
+                using (Mat copia = maschera.Clone())
+                {
+                    Cv2.FindContours(copia, out Point[][] contorni, out HierarchyIndex[] _,
+                        RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+                    rettangoli = contorni
+                        .Select(Cv2.BoundingRect)
+                        .Where(r => r.Width * r.Height >= AreaMinimaCorpo)
+                        .ToArray();
+                }
+
+                return maschera;
+            }
+            catch
+            {
+                maschera.Dispose();
+                throw;
+            }
+        }
+
+        // Associa a un QR il corpo con maggiore sovrapposizione con la zona del QR (contatto incluso).
+        private static Candidato Analizza(Rect[] corpi, QrTrovato qr)
         {
             Point2f[] a = qr.Angoli;
             if (a.Any(p => float.IsNaN(p.X) || float.IsNaN(p.Y) || float.IsInfinity(p.X) || float.IsInfinity(p.Y)))
@@ -246,68 +472,31 @@ namespace VisualMusicBlockLooper.Vision
             Rect zona = Gonfia(riquadro, margine);
             Rect zonaContatto = Gonfia(zona, TolleranzaContatto);
 
-            // Per ogni colore: contorno di maggiore sovrapposizione con la zona del QR (contatto incluso).
-            var trovati = new List<KeyValuePair<ColoreTraccia, Rect>>();
-            double[] punteggio = new double[6];
-            for (int i = 0; i < 6; i++)
-            {
-                var colore = (ColoreTraccia)i;
-                Rect migliore = default(Rect);
-                int areaMigliore = 0;
-                foreach (Rect r in corpi.Per(colore))
-                {
-                    Rect inter = r & zonaContatto;
-                    int area = inter.Width * inter.Height;
-                    if (inter.Width > 0 && inter.Height > 0 && area > areaMigliore)
-                    {
-                        areaMigliore = area;
-                        migliore = r;
-                    }
-                }
-
-                if (areaMigliore > 0)
-                {
-                    trovati.Add(new KeyValuePair<ColoreTraccia, Rect>(colore, migliore));
-                    punteggio[i] = areaMigliore;
-                }
-            }
-
             var c = new Candidato { Testo = qr.Testo, Riquadro = riquadro, Zona = zona };
-            if (trovati.Count == 0)
+            Rect migliore = default(Rect);
+            int areaMigliore = 0;
+            foreach (Rect r in corpi)
             {
-                return c;
-            }
-
-            KeyValuePair<ColoreTraccia, Rect> scelto = trovati.OrderByDescending(t => punteggio[(int)t.Key]).First();
-            if (trovati.Count > 1)
-            {
-                // Piu' colori a contatto: il voto sull'anello e' l'arbitro se raggiunge il quorum.
-                int[] voti = VotiAnello(bgr, a);
-                KeyValuePair<ColoreTraccia, Rect> votato = trovati.OrderByDescending(t => voti[(int)t.Key]).First();
-                if (voti[(int)votato.Key] >= VotiMinimi)
+                Rect inter = r & zonaContatto;
+                int area = inter.Width * inter.Height;
+                if (inter.Width > 0 && inter.Height > 0 && area > areaMigliore)
                 {
-                    scelto = votato;
+                    areaMigliore = area;
+                    migliore = r;
                 }
             }
 
-            c.Colore = scelto.Key;
-            c.Corpo = scelto.Value;
+            if (areaMigliore > 0)
+            {
+                c.Corpo = migliore;
+            }
+
             return c;
         }
 
-        private CartoncinoRilevato Converti(Candidato c, List<Candidato> tutti, CacheCorpi corpi)
+        private CartoncinoRilevato Converti(Candidato c, List<Candidato> tutti, Mat maschera)
         {
-            Rect rettangolo = c.Zona;
-            ColoreTraccia? colore = c.Colore;
-            if (c.Corpo.HasValue)
-            {
-                rettangolo = Ritaglia(c, tutti, corpi.Maschera(c.Colore.Value));
-            }
-            else
-            {
-                colore = null;
-                rettangolo = c.Riquadro;
-            }
+            Rect rettangolo = c.Corpo.HasValue ? Ritaglia(c, tutti, maschera) : c.Riquadro;
 
             try
             {
@@ -324,7 +513,6 @@ namespace VisualMusicBlockLooper.Vision
                 return new CartoncinoRilevato
                 {
                     Payload = c.Testo,
-                    Colore = colore,
                     Area = new RettangoloTavolo(minX, minY, maxX - minX, maxY - minY),
                 };
             }
@@ -335,7 +523,7 @@ namespace VisualMusicBlockLooper.Vision
             }
         }
 
-        // Unisce il contorno con la zona del QR e lo ritaglia con i vicini dello stesso colore.
+        // Unisce il corpo con la zona del QR e lo ritaglia con i vicini.
         private static Rect Ritaglia(Candidato c, List<Candidato> tutti, Mat maschera)
         {
             // Estensione lungo la fascia del QR: righe del riquadro per sinistra/destra, colonne per alto/basso.
@@ -349,7 +537,7 @@ namespace VisualMusicBlockLooper.Vision
 
             foreach (Candidato n in tutti)
             {
-                if (ReferenceEquals(n, c) || !n.Colore.HasValue || n.Colore != c.Colore)
+                if (ReferenceEquals(n, c))
                 {
                     continue;
                 }
@@ -434,100 +622,6 @@ namespace VisualMusicBlockLooper.Vision
             int x0 = (int)Math.Floor(a.Min(p => p.X)), x1 = (int)Math.Ceiling(a.Max(p => p.X));
             int y0 = (int)Math.Floor(a.Min(p => p.Y)), y1 = (int)Math.Ceiling(a.Max(p => p.Y));
             return new Rect(x0, y0, x1 - x0, y1 - y0);
-        }
-
-        // Voti dei punti di un anello appena fuori dal quadrilatero (lo sfondo neutro non vota).
-        private static int[] VotiAnello(Mat bgr, Point2f[] a)
-        {
-            var centro = new Point2f(a.Average(p => p.X), a.Average(p => p.Y));
-            var voti = new int[6];
-            for (int lato = 0; lato < 4; lato++)
-            {
-                Point2f p0 = a[lato], p1 = a[(lato + 1) % 4];
-                for (int i = 0; i < PuntiPerLato; i++)
-                {
-                    float t = (i + 0.5f) / PuntiPerLato;
-                    float x = p0.X + (p1.X - p0.X) * t;
-                    float y = p0.Y + (p1.Y - p0.Y) * t;
-                    int px = (int)Math.Round(centro.X + (x - centro.X) * ScalaAnello);
-                    int py = (int)Math.Round(centro.Y + (y - centro.Y) * ScalaAnello);
-                    if (px < 0 || py < 0 || px >= bgr.Cols || py >= bgr.Rows)
-                    {
-                        continue;
-                    }
-
-                    Vec3b v = bgr.At<Vec3b>(py, px);
-                    ColoreTraccia? k = ClassificatoreColore.Classifica(v.Item2, v.Item1, v.Item0);
-                    if (k.HasValue)
-                    {
-                        voti[(int)k.Value]++;
-                    }
-                }
-            }
-
-            return voti;
-        }
-
-        // Maschera chiusa del colore (restituita al chiamante, che la rilascia) e rettangoli dei suoi contorni esterni.
-        private static Mat Calcola(Mat hsv, ColoreTraccia colore, out Rect[] rettangoli)
-        {
-            Mat maschera = MascheraColore(hsv, colore);
-            try
-            {
-                using (Mat nucleo = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoNucleoChiusura, LatoNucleoChiusura)))
-                {
-                    Cv2.MorphologyEx(maschera, maschera, MorphTypes.Close, nucleo);
-                }
-
-                // FindContours puo' modificare l'immagine in ingresso: lavora su una copia.
-                using (Mat copia = maschera.Clone())
-                {
-                    Cv2.FindContours(copia, out Point[][] contorni, out HierarchyIndex[] _,
-                        RetrievalModes.External, ContourApproximationModes.ApproxSimple);
-                    rettangoli = contorni.Select(Cv2.BoundingRect).ToArray();
-                }
-
-                return maschera;
-            }
-            catch
-            {
-                maschera.Dispose();
-                throw;
-            }
-        }
-
-        private static Mat MascheraColore(Mat hsv, ColoreTraccia colore)
-        {
-            int sMin = (int)Math.Round(ClassificatoreColore.SaturazioneMinima * 255);
-            int vMin = (int)Math.Round(ClassificatoreColore.ValoreMinimo * 255);
-            double[] gradi = ClassificatoreColore.IntervalliGradi(colore);
-            var maschera = new Mat(hsv.Size(), MatType.CV_8UC1, Scalar.All(0));
-            try
-            {
-                for (int k = 0; k < gradi.Length; k += 2)
-                {
-                    // OpenCV usa H in 0..179 (gradi / 2); l'estremo superiore e' escluso.
-                    int da = (int)Math.Ceiling(gradi[k] / 2.0);
-                    int a = (int)Math.Ceiling(gradi[k + 1] / 2.0) - 1;
-                    if (a < da)
-                    {
-                        continue;
-                    }
-
-                    using (var parziale = new Mat())
-                    {
-                        Cv2.InRange(hsv, new Scalar(da, sMin, vMin), new Scalar(a, 255, 255), parziale);
-                        Cv2.BitwiseOr(maschera, parziale, maschera);
-                    }
-                }
-            }
-            catch
-            {
-                maschera.Dispose();
-                throw;
-            }
-
-            return maschera;
         }
     }
 }

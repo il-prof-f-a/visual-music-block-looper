@@ -89,8 +89,6 @@ namespace VisualMusicBlockLooper.Tests
 
                 Assert.IsNotNull(rosso);
                 Assert.IsNotNull(verde);
-                Assert.AreEqual(ColoreTraccia.Rosso, rosso.Colore);
-                Assert.AreEqual(ColoreTraccia.Verde, verde.Colore);
                 Assert.AreEqual(40 / 640.0, rosso.Area.X, 0.02);
                 Assert.AreEqual(160 / 640.0, rosso.Area.Larghezza, 0.02);
                 Assert.AreEqual(260 / 640.0, verde.Area.X, 0.02);
@@ -100,7 +98,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void Rileva_CartonciniAdiacentiStessoColore_ConfiniSeparati()
+        public void Rileva_CartonciniAdiacenti_ConfiniSeparati()
         {
             using (Mat img = Cv2.ImRead(Asset("cartoncini-adiacenti.png")))
             {
@@ -108,28 +106,28 @@ namespace VisualMusicBlockLooper.Tests
                 var lista = new RilevatoreCartoncini(new FonteMat(img), CalibrazioneIdentita()).Rileva();
                 Assert.AreEqual(4, lista.Count);
 
-                // (payload, colore, x, larghezza, y, altezza) in pixel dal generatore.
-                VerificaCartoncino(lista, "VMBL1;N;10", ColoreTraccia.Verde, 20, 160, 20, 140);
-                VerificaCartoncino(lista, "VMBL1;N;11", ColoreTraccia.Verde, 180, 300, 20, 140);
-                VerificaCartoncino(lista, "VMBL1;N;12", ColoreTraccia.Blu, 20, 200, 190, 130);
-                VerificaCartoncino(lista, "VMBL1;N;13", ColoreTraccia.Blu, 20, 120, 320, 130);
+                // (payload, x, larghezza, y, altezza) in pixel dal generatore.
+                VerificaCartoncino(lista, "VMBL1;N;10", 20, 160, 20, 140);
+                VerificaCartoncino(lista, "VMBL1;N;11", 180, 300, 20, 140);
+                VerificaCartoncino(lista, "VMBL1;N;12", 20, 200, 190, 130);
+                VerificaCartoncino(lista, "VMBL1;N;13", 20, 120, 320, 130);
             }
         }
 
         [Test]
-        public void Rileva_QrAFiloConIlBordo_ColoreEdAreaCorretti()
+        public void Rileva_QrAFiloConIlBordo_AreaCorretta()
         {
             using (Mat img = Cv2.ImRead(Asset("cartoncino-qr-a-filo.png")))
             {
                 Assert.IsFalse(img.Empty());
                 var lista = new RilevatoreCartoncini(new FonteMat(img), CalibrazioneIdentita()).Rileva();
                 Assert.AreEqual(1, lista.Count);
-                VerificaCartoncino(lista, "VMBL1;N;12", ColoreTraccia.Rosso, 100, 300, 100, 116);
+                VerificaCartoncino(lista, "VMBL1;N;12", 100, 300, 100, 116);
             }
         }
 
         private static void VerificaCartoncino(System.Collections.Generic.IReadOnlyList<CartoncinoRilevato> lista,
-            string payload, ColoreTraccia colore, double x, double larghezza, double y, double altezza)
+            string payload, double x, double larghezza, double y, double altezza)
         {
             CartoncinoRilevato c = null;
             foreach (CartoncinoRilevato k in lista)
@@ -138,7 +136,6 @@ namespace VisualMusicBlockLooper.Tests
             }
 
             Assert.IsNotNull(c, payload);
-            Assert.AreEqual(colore, c.Colore, payload);
             Assert.AreEqual(x / 640.0, c.Area.X, 0.02, payload + " X");
             Assert.AreEqual(larghezza / 640.0, c.Area.Larghezza, 0.02, payload + " Larghezza");
             Assert.AreEqual(y / 480.0, c.Area.Y, 0.02, payload + " Y");

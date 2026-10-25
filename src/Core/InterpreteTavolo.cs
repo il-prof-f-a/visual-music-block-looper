@@ -127,12 +127,6 @@ namespace VisualMusicBlockLooper.Core
                     continue;
                 }
 
-                if (rilevato.Colore == null)
-                {
-                    AggiungiErrore(errori, TipoErrore.ColoreMancante, rilevato);
-                    continue;
-                }
-
                 if (stepIniziale >= struttura.StepPerMisura)
                 {
                     AggiungiErrore(errori, TipoErrore.FuoriMisura, rilevato);
@@ -141,7 +135,8 @@ namespace VisualMusicBlockLooper.Core
 
                 durataStep = Math.Min(durataStep, struttura.StepPerMisura - stepIniziale);
 
-                int traccia = (int)rilevato.Colore.Value;
+                // Il colore del cartoncino non porta informazioni: lo strumento (canale MIDI) e' la riga.
+                int traccia = riga;
                 if (SovrapponeGiaOccupato(occupate, (riga, traccia), stepIniziale, durataStep))
                 {
                     AggiungiErrore(errori, TipoErrore.Sovrapposto, rilevato);
@@ -156,7 +151,7 @@ namespace VisualMusicBlockLooper.Core
                     StepIniziale = stepIniziale,
                     DurataStep = durataStep,
                     IdClip = payload.IdClip,
-                    Colore = rilevato.Colore.Value
+                    Colore = (ColoreTraccia)(riga % 6)
                 });
             }
 

@@ -36,22 +36,22 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void ColoriMistiNellaStessaRiga()
+        public void ColoriMistiNellaStessaRiga_StessaTraccia()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
                 Carta(3, 2, 1, ColoreTraccia.Rosso, "VMBL1;N;1"),
-                Carta(3, 2, 1, ColoreTraccia.Verde, "VMBL1;N;2")
+                Carta(3, 5, 1, ColoreTraccia.Verde, "VMBL1;N;2")
             });
 
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(2));
-            Assert.That(stato.Note.Select(n => n.Traccia), Is.EquivalentTo(new[] { 0, 3 }));
+            Assert.That(stato.Note.Select(n => n.Traccia), Is.All.EqualTo(3));
             Assert.That(stato.Note.Select(n => n.Riga), Is.All.EqualTo(3));
         }
 
         [Test]
-        public void RigaETracciaSeparate()
+        public void TracciaUgualeRiga_IndipendenteDalColore()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
@@ -61,9 +61,9 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(1));
             Assert.That(stato.Note[0].Riga, Is.EqualTo(1));
-            Assert.That(stato.Note[0].Traccia, Is.EqualTo(3));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(1));
             Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(4));
-            Assert.That(stato.Note[0].Chiave, Is.EqualTo("7:3:1:4"));
+            Assert.That(stato.Note[0].Chiave, Is.EqualTo("7:1:1:4"));
         }
 
         [Test]
@@ -81,7 +81,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void ColoriDiversiSovrapposti_Ammessi()
+        public void ColoriDiversiSovrapposti_StessaRiga_Errore()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
@@ -89,8 +89,10 @@ namespace VisualMusicBlockLooper.Tests
                 Carta(2, 4, 2, ColoreTraccia.Viola, "VMBL1;N;2")
             });
 
-            Assert.That(stato.Errori, Is.Empty);
-            Assert.That(stato.Note, Has.Count.EqualTo(2));
+            // Il colore non distingue gli strumenti: due note sovrapposte nella stessa riga sono in conflitto.
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.Sovrapposto));
         }
 
         [Test]
@@ -218,7 +220,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void ColoreMancante()
+        public void SenzaColore_NotaValidaConTracciaUgualeRiga()
         {
             RettangoloTavolo area = Cella(3, 2);
 
@@ -227,12 +229,10 @@ namespace VisualMusicBlockLooper.Tests
                 Rilevato("VMBL1;N;12", null, area)
             });
 
-            Assert.That(stato.Note, Is.Empty);
-            Assert.That(stato.Comandi, Is.Empty);
-            Assert.That(stato.Errori, Has.Count.EqualTo(1));
-            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.ColoreMancante));
-            Assert.That(stato.Errori[0].Area.X, Is.EqualTo(area.X));
-            Assert.That(stato.Errori[0].Area.Y, Is.EqualTo(area.Y));
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(3));
+            Assert.That(stato.Note[0].IdClip, Is.EqualTo(12));
         }
 
         [Test]

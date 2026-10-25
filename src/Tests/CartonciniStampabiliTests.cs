@@ -244,7 +244,7 @@ namespace VisualMusicBlockLooper.Tests
         // Guardia del generatore: i cartoncini generati devono essere letti dal rilevatore reale
         // con il payload e la classe di colore attesi.
         [Test]
-        public void Rileva_CartoncinoGenerato_PayloadEColoreCorretti()
+        public void Rileva_CartoncinoGenerato_PayloadELarghezzaCorretti()
         {
             const int larghezza = 1600;
             const int altezza = 1100;
@@ -284,9 +284,10 @@ namespace VisualMusicBlockLooper.Tests
                     Assert.That(per.ContainsKey("VMBL1;N;3"), Is.True);
                     Assert.That(per.ContainsKey("VMBL1;N;1"), Is.True);
                     Assert.That(per.ContainsKey("VMBL1;C;PLAY"), Is.True);
-                    Assert.AreEqual(ColoreTraccia.Rosso, per["VMBL1;N;3"].Colore);
-                    Assert.AreEqual(ColoreTraccia.Giallo, per["VMBL1;N;1"].Colore);
-                    Assert.IsNull(per["VMBL1;C;PLAY"].Colore, "Il corpo dei comandi deve essere neutro");
+
+                    // Il colore non conta: la larghezza del corpo (giallo = 3 passi, rosso = 2 passi) da' la durata.
+                    double rapporto = per["VMBL1;N;1"].Area.Larghezza / per["VMBL1;N;3"].Area.Larghezza;
+                    Assert.AreEqual(1.5, rapporto, 0.15, "Rapporto larghezze giallo/rosso");
                 }
             }
         }

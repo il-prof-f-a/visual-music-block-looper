@@ -252,7 +252,7 @@ namespace VisualMusicBlockLooper.Tests
             // La riga 1 entra in gioco nella seconda misura: step 16 = tick 96.
             Assert.That(uscita.Registro.Where(r => r.StartsWith("NotaOn")), Is.Empty);
             compositore.Motore.TickInterno();
-            Assert.That(uscita.Registro.Count(r => r.StartsWith("NotaOn:1:41")), Is.EqualTo(1));
+            Assert.That(uscita.Registro.Count(r => r.StartsWith("NotaOn:0:41")), Is.EqualTo(1));
             Assert.That(compositore.Motore.Struttura, Is.EqualTo(StrutturaTavolo.Default));
         }
 

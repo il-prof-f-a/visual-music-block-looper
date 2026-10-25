@@ -135,8 +135,9 @@ namespace VisualMusicBlockLooper.Core
 
                 durataStep = Math.Min(durataStep, struttura.StepPerMisura - stepIniziale);
 
-                // Il colore del cartoncino non porta informazioni: lo strumento (canale MIDI) e' la riga.
-                int traccia = riga;
+                // Il colore del cartoncino non porta informazioni: lo strumento (canale MIDI) e' il gruppo di righe
+                // collegate. Righe collegate suonano lo stesso strumento; i gruppi sono strumenti simultanei.
+                int traccia = riga / struttura.RigheCollegate;
                 if (SovrapponeGiaOccupato(occupate, (riga, traccia), stepIniziale, durataStep))
                 {
                     AggiungiErrore(errori, TipoErrore.Sovrapposto, rilevato);

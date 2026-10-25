@@ -9,6 +9,8 @@ namespace VisualMusicBlockLooper.App
     {
         private readonly Action passo;
         private readonly int periodoMs;
+        private readonly Stopwatch orologio = Stopwatch.StartNew();
+        private readonly MisuraFps misura;
         private Thread thread;
         private volatile bool fermare;
 
@@ -16,7 +18,11 @@ namespace VisualMusicBlockLooper.App
         {
             this.passo = passo ?? throw new ArgumentNullException(nameof(passo));
             this.periodoMs = Math.Max(1, periodoMs);
+            misura = new MisuraFps(() => orologio.ElapsedMilliseconds);
         }
+
+        /// <summary>Passi completati al secondo nell'ultimo secondo (0 finché non ce ne sono almeno due); thread-safe.</summary>
+        public double PassiAlSecondo => misura.Fps;
 
         /// <summary>Avvia il ciclo; non fa nulla se è già avviato.</summary>
         public void Avvia()
@@ -62,6 +68,9 @@ namespace VisualMusicBlockLooper.App
                 {
                     // Il ciclo di visione non deve mai terminare per un errore di un singolo frame.
                 }
+
+                // Il passo conta come completato anche se ha lanciato: misura il ritmo del ciclo, non gli errori.
+                misura.Registra();
 
                 int resto = periodoMs - (int)cronometro.ElapsedMilliseconds;
                 if (resto > 0)

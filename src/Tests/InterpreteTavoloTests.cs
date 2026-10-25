@@ -26,17 +26,17 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Note, Has.Count.EqualTo(1));
 
             CartoncinoNota nota = stato.Note[0];
-            Assert.That(nota.Traccia, Is.EqualTo(3));
+            Assert.That(nota.Traccia, Is.EqualTo(0), "Con il default (6 righe collegate) c'e' un solo strumento");
             Assert.That(nota.StepIniziale, Is.EqualTo(2));
             Assert.That(nota.DurataStep, Is.EqualTo(1));
             Assert.That(nota.IdClip, Is.EqualTo(12));
             Assert.That(nota.Colore, Is.EqualTo(ColoreTraccia.Verde));
             Assert.That(nota.Riga, Is.EqualTo(3));
-            Assert.That(nota.Chiave, Is.EqualTo("12:3:3:2"));
+            Assert.That(nota.Chiave, Is.EqualTo("12:0:3:2"));
         }
 
         [Test]
-        public void ColoriMistiNellaStessaRiga_StessaTraccia()
+        public void ColoriMistiNellaStessaRiga_StessoStrumento()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
@@ -46,12 +46,12 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(2));
-            Assert.That(stato.Note.Select(n => n.Traccia), Is.All.EqualTo(3));
+            Assert.That(stato.Note.Select(n => n.Traccia), Is.All.EqualTo(0));
             Assert.That(stato.Note.Select(n => n.Riga), Is.All.EqualTo(3));
         }
 
         [Test]
-        public void TracciaUgualeRiga_IndipendenteDalColore()
+        public void TracciaIndipendenteDalColore()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
@@ -61,9 +61,30 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(1));
             Assert.That(stato.Note[0].Riga, Is.EqualTo(1));
-            Assert.That(stato.Note[0].Traccia, Is.EqualTo(1));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(0));
             Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(4));
-            Assert.That(stato.Note[0].Chiave, Is.EqualTo("7:1:1:4"));
+            Assert.That(stato.Note[0].Chiave, Is.EqualTo("7:0:1:4"));
+        }
+
+        [TestCase(1, new[] { 0, 1, 2, 3, 4, 5 })]
+        [TestCase(2, new[] { 0, 0, 1, 1, 2, 2 })]
+        [TestCase(3, new[] { 0, 0, 0, 1, 1, 1 })]
+        [TestCase(6, new[] { 0, 0, 0, 0, 0, 0 })]
+        public void StrumentoPerGruppoDiRigheCollegate(int righeCollegate, int[] tracceAttese)
+        {
+            var cartoncini = new System.Collections.Generic.List<CartoncinoRilevato>
+            {
+                NellaZona(ZonaSpeciale.Collegamento, "VMBL1;S;LINK;" + righeCollegate)
+            };
+            for (int riga = 0; riga < 6; riga++)
+            {
+                cartoncini.Add(Carta(riga, 0, 1, ColoreTraccia.Rosso, "VMBL1;N;" + riga));
+            }
+
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(cartoncini);
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note.OrderBy(n => n.Riga).Select(n => n.Traccia), Is.EqualTo(tracceAttese));
         }
 
         [Test]
@@ -220,7 +241,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void SenzaColore_NotaValidaConTracciaUgualeRiga()
+        public void SenzaColore_NotaValida()
         {
             RettangoloTavolo area = Cella(3, 2);
 
@@ -231,7 +252,7 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(1));
-            Assert.That(stato.Note[0].Traccia, Is.EqualTo(3));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(0));
             Assert.That(stato.Note[0].IdClip, Is.EqualTo(12));
         }
 
@@ -384,7 +405,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void StessiStepSuTracceDiverse_Accettati()
+        public void StessiStepSuRigheDiverse_Accettati()
         {
             StatoTavolo stato = CreaInterprete().Interpreta(new[]
             {
@@ -394,9 +415,9 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(2));
-            Assert.That(stato.Note[0].Traccia, Is.EqualTo(1));
+            Assert.That(stato.Note[0].Traccia, Is.EqualTo(0));
             Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(4));
-            Assert.That(stato.Note[1].Traccia, Is.EqualTo(4));
+            Assert.That(stato.Note[1].Traccia, Is.EqualTo(0));
             Assert.That(stato.Note[1].StepIniziale, Is.EqualTo(4));
         }
 

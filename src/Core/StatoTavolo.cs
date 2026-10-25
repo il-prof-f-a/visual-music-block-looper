@@ -9,7 +9,7 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Riga della griglia (indice 0-based): la riga-misura in cui sta la nota.</summary>
         public int Riga { get; set; }
 
-        /// <summary>Traccia della griglia, uguale alla riga (indice 0-based): determina il canale MIDI.</summary>
+        /// <summary>Traccia = indice (0-based) del gruppo di righe collegate: determina lo strumento (canale MIDI).</summary>
         public int Traccia { get; set; }
 
         /// <summary>Step iniziale della nota.</summary>

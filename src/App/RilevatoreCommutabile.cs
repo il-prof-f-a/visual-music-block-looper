@@ -8,7 +8,7 @@ namespace VisualMusicBlockLooper.App
     /// Rilevatore sostituibile a caldo: finché non ne viene impostato uno restituisce un tavolo vuoto.
     /// Permette di completare la calibrazione senza ricreare il compositore.
     /// </summary>
-    public sealed class RilevatoreCommutabile : IRilevatoreCartoncini
+    public sealed class RilevatoreCommutabile : IRilevatoreDiagnostico
     {
         private static readonly IReadOnlyList<CartoncinoRilevato> Vuoto = new List<CartoncinoRilevato>();
 
@@ -24,6 +24,19 @@ namespace VisualMusicBlockLooper.App
         public void Imposta(IRilevatoreCartoncini rilevatore)
         {
             corrente = rilevatore;
+        }
+
+        public IReadOnlyList<CartoncinoRilevato> Rileva(TracciaCartoncini traccia)
+        {
+            IRilevatoreCartoncini rilevatore = corrente;
+            if (rilevatore == null)
+            {
+                if (traccia != null) { traccia.CalibrazionePresente = false; traccia.EsitoVisione = "CalibrazioneAssente"; }
+                return Vuoto;
+            }
+            if (rilevatore is IRilevatoreDiagnostico diagnostico) return diagnostico.Rileva(traccia);
+            if (traccia != null) traccia.EsitoVisione = "RilevatoreNonDiagnostico";
+            return rilevatore.Rileva();
         }
 
         public IReadOnlyList<CartoncinoRilevato> Rileva()

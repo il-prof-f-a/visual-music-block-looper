@@ -23,7 +23,7 @@ namespace VisualMusicBlockLooper.Vision
     /// La lettura del QR usa OpenCV; per i cartoncini il cui corpo e' visibile ma il QR non e' stato letto
     /// (piccolo, sfocato, sovraesposto) si ritenta sul ritaglio ingrandito e livellato con ZXing e OpenCV.
     /// </summary>
-    public sealed class RilevatoreCartoncini : IRilevatoreCartoncini
+    public sealed class RilevatoreCartoncini : IRilevatoreDiagnostico
     {
         private const double FattoreZonaQuieta = 0.2; // zona quieta ~4 moduli su 21 (frazione del lato del QR)
         private const int TolleranzaContatto = 3;
@@ -54,20 +54,30 @@ namespace VisualMusicBlockLooper.Vision
         /// <summary>Calibrazione con cui il rilevatore converte la camera nelle coordinate del tavolo.</summary>
         public Calibrazione Calibrazione => calibrazione;
 
-        public IReadOnlyList<CartoncinoRilevato> Rileva()
+        public IReadOnlyList<CartoncinoRilevato> Rileva() => Rileva(null);
+
+        public IReadOnlyList<CartoncinoRilevato> Rileva(TracciaCartoncini traccia)
         {
+            if (traccia != null)
+            {
+                traccia.CalibrazionePresente = true;
+                traccia.EsitoVisione = "Elaborazione";
+            }
             var risultato = new List<CartoncinoRilevato>();
             if (fonte == null)
             {
+                if (traccia != null) traccia.EsitoVisione = "FonteAssente";
                 return risultato;
             }
 
-            using (Mat frame = fonte.Frame())
+            using (Mat frame = AcquisisciFrame(traccia))
             {
                 if (frame == null || frame.Empty())
                 {
+                    if (traccia != null) traccia.EsitoVisione = "FrameAssente";
                     return risultato;
                 }
+                if (traccia != null) { traccia.LarghezzaFrame = frame.Cols; traccia.AltezzaFrame = frame.Rows; }
 
                 Mat convertito = null;
                 Mat maschera = null;
@@ -87,17 +97,22 @@ namespace VisualMusicBlockLooper.Vision
                         }
                         else
                         {
+                            if (traccia != null) traccia.EsitoVisione = "CanaliNonSupportati";
                             return risultato;
                         }
 
                         bgr = convertito;
                     }
 
-                    List<QrTrovato> qr = DecodificaQr(bgr);
+                    List<QrTrovato> qr = DecodificaQr(bgr, traccia);
                     maschera = MascheraCorpo(bgr, calibrazione, out Rect[] corpi);
-                    qr.AddRange(RecuperaQrMancanti(bgr, qr, corpi));
+                    if (traccia != null)
+                        foreach (Rect corpo in corpi)
+                            RegistraVisione(traccia, "CorpoCandidato", "Regione del corpo rilevata; identità non ancora nota.", null, corpo);
+                    qr.AddRange(RecuperaQrMancanti(bgr, qr, corpi, traccia));
                     if (qr.Count == 0)
                     {
+                        if (traccia != null) traccia.EsitoVisione = "NessunQrDecodificato";
                         return risultato;
                     }
 
@@ -106,29 +121,42 @@ namespace VisualMusicBlockLooper.Vision
                     {
                         try
                         {
+                            if (traccia != null) RegistraQr(traccia, q, "QrDecodificato");
                             Candidato c = Analizza(corpi, q);
                             if (c != null)
                             {
                                 candidati.Add(c);
                             }
+                            else if (traccia != null) RegistraQr(traccia, q, "GeometriaQrNonValida");
                         }
-                        catch (OpenCVException)
+                        catch (OpenCVException e)
                         {
+                            if (traccia != null) RegistraQr(traccia, q, "ErroreAnalisiQr", e.Message);
                             // QR non elaborabile: ignorato.
                         }
                     }
 
                     foreach (Candidato c in candidati)
                     {
-                        CartoncinoRilevato r = Converti(c, candidati, maschera);
+                        CartoncinoRilevato r = Converti(c, candidati, maschera, out Rect areaEffettiva);
                         if (r != null)
                         {
                             risultato.Add(r);
+                            if (traccia != null) RegistraVisione(traccia, "CartoncinoRilevato",
+                                "QR convertito nelle coordinate del tavolo.", c.Testo, areaEffettiva, areaTavolo: r.Area);
                         }
+                        else if (traccia != null) RegistraVisione(traccia, "ConversioneNonRiuscita",
+                            "QR letto, ma area del cartoncino non convertibile sul tavolo.", c.Testo, c.Riquadro);
                     }
+                    if (traccia != null) traccia.EsitoVisione = risultato.Count > 0 ? "CartonciniRilevati" : "NessunCartoncinoConvertibile";
                 }
-                catch (OpenCVException)
+                catch (OpenCVException e)
                 {
+                    if (traccia != null)
+                    {
+                        traccia.EsitoVisione = "ErroreVisione";
+                        traccia.Errore = e.GetType().Name + ": " + e.Message;
+                    }
                     // Frame non elaborabile: nessun cartoncino.
                     risultato.Clear();
                 }
@@ -142,10 +170,64 @@ namespace VisualMusicBlockLooper.Vision
             return risultato;
         }
 
+        private Mat AcquisisciFrame(TracciaCartoncini traccia)
+        {
+            try { return fonte.Frame(); }
+            catch (Exception e)
+            {
+                if (traccia != null)
+                {
+                    traccia.EsitoVisione = "ErroreAcquisizione";
+                    traccia.Errore = e.GetType().Name + ": " + e.Message;
+                }
+                throw;
+            }
+        }
+
+        private void RegistraVisione(TracciaCartoncini traccia, string codice, string dettaglio, string payload,
+            Rect area, string origine = null, RettangoloTavolo? areaTavolo = null)
+        {
+            if (traccia == null) return;
+            if (!areaTavolo.HasValue)
+            {
+                try
+                {
+                    PuntoTavolo[] punti = new[]
+                    {
+                        new PuntoImmagine(area.Left, area.Top), new PuntoImmagine(area.Right, area.Top),
+                        new PuntoImmagine(area.Right, area.Bottom), new PuntoImmagine(area.Left, area.Bottom)
+                    }.Select(p => calibrazione.DaCameraATavolo(p)).ToArray();
+                    double x = punti.Min(p => p.X), y = punti.Min(p => p.Y);
+                    areaTavolo = new RettangoloTavolo(x, y, punti.Max(p => p.X) - x, punti.Max(p => p.Y) - y);
+                }
+                catch (Exception) { /* Area pixel disponibile anche se l'omografia non è applicabile. */ }
+            }
+            traccia.Visione.Add(new EventoDiagnosticoCartoncino("Visione", codice, codice, dettaglio,
+                payload, new RettangoloTavolo(area.X, area.Y, area.Width, area.Height), areaTavolo,
+                areaTavolo.HasValue && traccia.Layout != null ? traccia.Layout.ZonaDelCentro(areaTavolo.Value).ToString() : null, origine));
+        }
+
+        private void RegistraQr(TracciaCartoncini traccia, QrTrovato qr, string codice, string dettaglio = null)
+        {
+            if (traccia == null) return;
+            try
+            {
+                if (qr.Angoli.Any(p => float.IsNaN(p.X) || float.IsNaN(p.Y) || float.IsInfinity(p.X) || float.IsInfinity(p.Y)))
+                    throw new ArgumentException("Coordinate QR non finite.");
+                RegistraVisione(traccia, codice, dettaglio ?? "Payload QR decodificato.", qr.Testo, BoundingBox(qr.Angoli), qr.Origine);
+            }
+            catch (Exception e)
+            {
+                traccia.Visione.Add(new EventoDiagnosticoCartoncino("Visione", "GeometriaQrNonValida",
+                    "GeometriaQrNonValida", e.Message, qr.Testo, origine: qr.Origine));
+            }
+        }
+
         private sealed class QrTrovato
         {
             public string Testo;
             public Point2f[] Angoli;
+            public string Origine = "OpenCV";
         }
 
         private sealed class Candidato
@@ -156,30 +238,34 @@ namespace VisualMusicBlockLooper.Vision
             public Rect? Corpo;     // bounding rect del corpo (eventualmente fuso con i vicini)
         }
 
-        private static List<QrTrovato> DecodificaQr(Mat bgr)
+        private List<QrTrovato> DecodificaQr(Mat bgr, TracciaCartoncini traccia)
         {
             var trovati = new List<QrTrovato>();
             using (var rilevatore = new QRCodeDetector())
             {
                 try
                 {
-                    // OpenCvSharp 4.9 non espone DetectAndDecodeMulti: si usano DetectMulti + DecodeMulti.
-                    if (rilevatore.DetectMulti(bgr, out Point2f[] punti)
-                        && punti != null
-                        && rilevatore.DecodeMulti(bgr, punti, out string[] testi)
-                        && testi != null)
+                    if (rilevatore.DetectMulti(bgr, out Point2f[] punti) && punti != null)
                     {
-                        for (int i = 0; i < testi.Length && (i + 1) * 4 <= punti.Length; i++)
+                        bool riuscita = rilevatore.DecodeMulti(bgr, punti, out string[] testi);
+                        if (riuscita && testi != null)
                         {
-                            if (!string.IsNullOrEmpty(testi[i]))
-                            {
-                                trovati.Add(new QrTrovato { Testo = testi[i], Angoli = punti.Skip(i * 4).Take(4).ToArray() });
-                            }
+                            for (int i = 0; i < testi.Length && (i + 1) * 4 <= punti.Length; i++)
+                                if (!string.IsNullOrEmpty(testi[i]))
+                                    trovati.Add(new QrTrovato { Testo = testi[i], Angoli = punti.Skip(i * 4).Take(4).ToArray() });
+                        }
+                        if (traccia != null)
+                        {
+                            for (int i = 0; (i + 1) * 4 <= punti.Length; i++)
+                                if (!riuscita || testi == null || i >= testi.Length || string.IsNullOrEmpty(testi[i]))
+                                    RegistraQr(traccia, new QrTrovato { Angoli = punti.Skip(i * 4).Take(4).ToArray() },
+                                        "QrLocalizzatoNonDecodificato", "OpenCV ha localizzato un QR ma non ne ha decodificato il testo.");
                         }
                     }
                 }
-                catch (OpenCVException)
+                catch (OpenCVException e)
                 {
+                    traccia?.Visione.Add(new EventoDiagnosticoCartoncino("Visione", "ErroreDecoder", "ErroreDecoder", e.Message, origine: "OpenCV"));
                 }
 
                 if (trovati.Count == 0)
@@ -188,21 +274,22 @@ namespace VisualMusicBlockLooper.Vision
                     {
                         string testo = rilevatore.DetectAndDecode(bgr, out Point2f[] angoli);
                         if (!string.IsNullOrEmpty(testo) && angoli != null && angoli.Length >= 4)
-                        {
                             trovati.Add(new QrTrovato { Testo = testo, Angoli = angoli.Take(4).ToArray() });
-                        }
+                        else if (traccia != null && angoli != null && angoli.Length >= 4)
+                            RegistraQr(traccia, new QrTrovato { Angoli = angoli.Take(4).ToArray() },
+                                "QrLocalizzatoNonDecodificato", "QR localizzato ma testo non decodificato.");
                     }
-                    catch (OpenCVException)
+                    catch (OpenCVException e)
                     {
+                        traccia?.Visione.Add(new EventoDiagnosticoCartoncino("Visione", "ErroreDecoder", "ErroreDecoder", e.Message, origine: "OpenCV"));
                     }
                 }
             }
-
             return trovati;
         }
 
         // Per ogni corpo senza un QR letto vicino, ritenta la lettura sul ritaglio ingrandito e livellato.
-        private List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, Rect[] corpi)
+        private List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, Rect[] corpi, TracciaCartoncini traccia)
         {
             var nuovi = new List<QrTrovato>();
             var attuali = new List<KeyValuePair<Rect, QrTrovato>>();
@@ -221,6 +308,8 @@ namespace VisualMusicBlockLooper.Vision
 
                 if (gia.Concat(nuovi).Any(q => CentroDentro(q, regione)))
                 {
+                    if (traccia != null) RegistraVisione(traccia, "QrNellaRegione",
+                        "La regione del corpo contiene già il centro di un QR letto.", null, corpo);
                     continue;
                 }
 
@@ -230,8 +319,12 @@ namespace VisualMusicBlockLooper.Vision
                     .Select(r => (KeyValuePair<Rect, QrTrovato>?)r)
                     .FirstOrDefault();
                 List<QrTrovato> letti = memoria.HasValue
-                    ? new List<QrTrovato> { memoria.Value.Value }
+                    ? new List<QrTrovato> { new QrTrovato { Testo = memoria.Value.Value.Testo,
+                        Angoli = memoria.Value.Value.Angoli, Origine = "Memoria" } }
                     : LeggiRitaglio(bgr, regione);
+
+                if (traccia != null && letti.Count == 0) RegistraVisione(traccia, "CorpoSenzaQrDecodificato",
+                    "Corpo rilevato, ma nessun QR decodificato nel ritaglio; identità sconosciuta.", null, corpo);
 
                 foreach (QrTrovato q in letti)
                 {
@@ -290,7 +383,7 @@ namespace VisualMusicBlockLooper.Vision
                             Point2f[] angoli = q.Angoli
                                 .Select(p => new Point2f((float)(p.X / scala + regione.X), (float)(p.Y / scala + regione.Y)))
                                 .ToArray();
-                            trovati.Add(new QrTrovato { Testo = q.Testo, Angoli = angoli });
+                            trovati.Add(new QrTrovato { Testo = q.Testo, Angoli = angoli, Origine = q.Origine });
                         }
                     }
 
@@ -337,7 +430,7 @@ namespace VisualMusicBlockLooper.Vision
                     string testo = rilevatore.DetectAndDecode(grigio, out Point2f[] angoli);
                     if (!string.IsNullOrEmpty(testo) && angoli != null && angoli.Length >= 4)
                     {
-                        trovati.Add(new QrTrovato { Testo = testo, Angoli = angoli.Take(4).ToArray() });
+                        trovati.Add(new QrTrovato { Testo = testo, Angoli = angoli.Take(4).ToArray(), Origine = "OpenCVRitaglio" });
                     }
                 }
                 catch (OpenCVException)
@@ -371,7 +464,7 @@ namespace VisualMusicBlockLooper.Vision
                         Point2f[] angoli = AngoliDaPunti(r.ResultPoints);
                         if (!string.IsNullOrEmpty(r.Text) && angoli != null)
                         {
-                            trovati.Add(new QrTrovato { Testo = r.Text, Angoli = angoli });
+                            trovati.Add(new QrTrovato { Testo = r.Text, Angoli = angoli, Origine = "ZXingRitaglio" });
                         }
                     }
                 }
@@ -531,9 +624,10 @@ namespace VisualMusicBlockLooper.Vision
             return c;
         }
 
-        private CartoncinoRilevato Converti(Candidato c, List<Candidato> tutti, Mat maschera)
+        private CartoncinoRilevato Converti(Candidato c, List<Candidato> tutti, Mat maschera, out Rect areaCamera)
         {
             Rect rettangolo = c.Corpo.HasValue ? Ritaglia(c, tutti, maschera) : c.Riquadro;
+            areaCamera = rettangolo;
 
             try
             {

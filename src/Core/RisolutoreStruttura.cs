@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -29,6 +30,10 @@ namespace VisualMusicBlockLooper.Core
         private static readonly int[] RigheCollegateAmmesse = { 1, 2, 3, 6 };
 
         public static RisoluzioneStruttura Risolvi(IEnumerable<(PayloadCartoncino Payload, RettangoloTavolo Area, ZonaSpeciale Zona)> impostazioni)
+            => Risolvi(impostazioni, null);
+
+        public static RisoluzioneStruttura Risolvi(IEnumerable<(PayloadCartoncino Payload, RettangoloTavolo Area, ZonaSpeciale Zona)> impostazioni,
+            TracciaCartoncini traccia)
         {
             var errori = new List<ErroreTavolo>();
             if (impostazioni == null)
@@ -53,13 +58,13 @@ namespace VisualMusicBlockLooper.Core
                 lista.Add((payload, area));
             }
 
-            var misura = Candidato(perZona, ZonaSpeciale.Misura, errori);
-            var collegamento = Candidato(perZona, ZonaSpeciale.Collegamento, errori);
-            var ab = Candidato(perZona, ZonaSpeciale.Ab, errori);
+            var misura = Candidato(perZona, ZonaSpeciale.Misura, errori, traccia);
+            var collegamento = Candidato(perZona, ZonaSpeciale.Collegamento, errori, traccia);
+            var ab = Candidato(perZona, ZonaSpeciale.Ab, errori, traccia);
 
             // Prima si risolvono misura e collegamento: l'A-B va validato contro le righe effettive.
-            int battiti = ValoreMisura(misura, errori);
-            int righe = ValoreCollegamento(collegamento, errori);
+            int battiti = ValoreMisura(misura, errori, traccia);
+            int righe = ValoreCollegamento(collegamento, errori, traccia);
             int aInizio = 1;
             int aFine = righe * battiti;
 
@@ -72,10 +77,15 @@ namespace VisualMusicBlockLooper.Core
                 {
                     aInizio = payload.Valore;
                     aFine = payload.ValoreB;
+                    traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Ab, true, "AbAccettato",
+                        $"A-B {aInizio}-{aFine}; MISURA {battiti}/4, LINK {righe}, limite {righe * battiti} battute.");
                 }
                 else
                 {
                     errori.Add(new ErroreTavolo { Tipo = TipoErrore.ImpostazioneNonValida, Area = area });
+                    traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Ab, false,
+                        IsImpostazione(payload, TipoImpostazione.IntervalloAb) ? "IntervalloAbNonValido" : "ImpostazioneInZonaErrata",
+                        $"Richiesti A-B {payload?.Valore}-{payload?.ValoreB}; MISURA {battiti}/4, LINK {righe}: deve valere 1 <= A < B <= {righe * battiti}. Nella zona Ab serve un payload AB.");
                 }
             }
 
@@ -87,7 +97,7 @@ namespace VisualMusicBlockLooper.Core
         private static (PayloadCartoncino Payload, RettangoloTavolo Area)? Candidato(
             Dictionary<ZonaSpeciale, List<(PayloadCartoncino Payload, RettangoloTavolo Area)>> perZona,
             ZonaSpeciale zona,
-            List<ErroreTavolo> errori)
+            List<ErroreTavolo> errori, TracciaCartoncini traccia)
         {
             if (!perZona.TryGetValue(zona, out var lista) || lista.Count == 0)
             {
@@ -98,12 +108,14 @@ namespace VisualMusicBlockLooper.Core
             for (int i = 1; i < ordinati.Count; i++)
             {
                 errori.Add(new ErroreTavolo { Tipo = TipoErrore.Sovrapposto, Area = ordinati[i].Area });
+                traccia?.RegistraImpostazione(ordinati[i].Payload, ordinati[i].Area, zona, false,
+                    "Sovrapposto", "Più impostazioni nella stessa zona: prevale quella più in alto, poi più a sinistra.");
             }
 
             return ordinati[0];
         }
 
-        private static int ValoreMisura((PayloadCartoncino Payload, RettangoloTavolo Area)? candidato, List<ErroreTavolo> errori)
+        private static int ValoreMisura((PayloadCartoncino Payload, RettangoloTavolo Area)? candidato, List<ErroreTavolo> errori, TracciaCartoncini traccia)
         {
             if (!candidato.HasValue)
             {
@@ -113,14 +125,19 @@ namespace VisualMusicBlockLooper.Core
             var (payload, area) = candidato.Value;
             if (IsImpostazione(payload, TipoImpostazione.Misura) && BattitiAmmessi.Contains(payload.Valore))
             {
+                traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Misura, true, "MisuraAccettata",
+                    $"MISURA {payload.Valore}/4 accettata.");
                 return payload.Valore;
             }
 
             errori.Add(new ErroreTavolo { Tipo = TipoErrore.ImpostazioneNonValida, Area = area });
+            traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Misura, false,
+                IsImpostazione(payload, TipoImpostazione.Misura) ? "MisuraNonValida" : "ImpostazioneInZonaErrata",
+                "La zona Misura richiede MISURA 2, 3 o 4.");
             return StrutturaTavolo.Default.BattitiPerMisura;
         }
 
-        private static int ValoreCollegamento((PayloadCartoncino Payload, RettangoloTavolo Area)? candidato, List<ErroreTavolo> errori)
+        private static int ValoreCollegamento((PayloadCartoncino Payload, RettangoloTavolo Area)? candidato, List<ErroreTavolo> errori, TracciaCartoncini traccia)
         {
             if (!candidato.HasValue)
             {
@@ -130,10 +147,15 @@ namespace VisualMusicBlockLooper.Core
             var (payload, area) = candidato.Value;
             if (IsImpostazione(payload, TipoImpostazione.Collegamento) && RigheCollegateAmmesse.Contains(payload.Valore))
             {
+                traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Collegamento, true, "CollegamentoAccettato",
+                    $"LINK {payload.Valore} accettato.");
                 return payload.Valore;
             }
 
             errori.Add(new ErroreTavolo { Tipo = TipoErrore.ImpostazioneNonValida, Area = area });
+            traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Collegamento, false,
+                IsImpostazione(payload, TipoImpostazione.Collegamento) ? "CollegamentoNonValido" : "ImpostazioneInZonaErrata",
+                "La zona Collegamento richiede LINK 1, 2, 3 o 6.");
             return StrutturaTavolo.Default.RigheCollegate;
         }
 

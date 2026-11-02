@@ -21,10 +21,10 @@ namespace VisualMusicBlockLooper.Vision
     }
 
     /// <summary>
-    /// Omografia che mappa i punti dell'immagine della camera sul sistema di coordinate del tavolo.
-    /// La matrice 3x3 e' memorizzata in ordine row-major come double[9].
+    /// Mappa camera/tavolo: omografia, con eventuale deformazione curva sui dodici riferimenti.
+    /// La matrice di base 3x3 è memorizzata in ordine row-major come double[9].
     /// </summary>
-    public sealed class Calibrazione
+    public sealed partial class Calibrazione
     {
         private const string Intestazione = "VMBL-CAL2";
         private const string IntestazioneVecchia = "VMBL-CAL1";
@@ -37,10 +37,12 @@ namespace VisualMusicBlockLooper.Vision
         private const double SogliaRansacTavolo = 0.02;
 
         private readonly double[] matrice;
+        private readonly double[] inversa;
 
         private Calibrazione(double[] matrice, int larghezza, int altezza)
         {
             this.matrice = matrice;
+            inversa = InvertiMatrice(matrice);
             Larghezza = larghezza;
             Altezza = altezza;
         }
@@ -74,8 +76,10 @@ namespace VisualMusicBlockLooper.Vision
 
         /// <param name="larghezza">Larghezza in pixel dell'immagine dei punti camera (0 se ignota).</param>
         /// <param name="altezza">Altezza in pixel dell'immagine dei punti camera (0 se ignota).</param>
+        /// <param name="scartaAnomalie">RANSAC per la sola omografia; false per stimare una base sui punti di una curva.</param>
         public static Calibrazione Calcola(
-            PuntoImmagine[] puntiCamera, PuntoTavolo[] puntiTavolo, int larghezza = 0, int altezza = 0)
+            PuntoImmagine[] puntiCamera, PuntoTavolo[] puntiTavolo, int larghezza = 0, int altezza = 0,
+            bool scartaAnomalie = true)
         {
             if (larghezza < 0 || altezza < 0 || (larghezza == 0) != (altezza == 0))
             {
@@ -117,7 +121,7 @@ namespace VisualMusicBlockLooper.Vision
             // Con esattamente 4 punti l'omografia e' determinata: nessun RANSAC necessario.
             // Con piu' punti RANSAC scarta gli outlier; la soglia e' espressa in unita' del tavolo.
             double[] valori;
-            if (sorgente.Length == NumeroPuntiMinimi)
+            if (sorgente.Length == NumeroPuntiMinimi || !scartaAnomalie)
             {
                 valori = LeggiMatrice(Cv2.FindHomography(sorgente, destinazione, HomographyMethods.None));
             }
@@ -137,16 +141,8 @@ namespace VisualMusicBlockLooper.Vision
 
         public PuntoTavolo DaCameraATavolo(PuntoImmagine p)
         {
-            double x = matrice[0] * p.X + matrice[1] * p.Y + matrice[2];
-            double y = matrice[3] * p.X + matrice[4] * p.Y + matrice[5];
-            double w = matrice[6] * p.X + matrice[7] * p.Y + matrice[8];
-
-            if (Math.Abs(w) < SogliaW)
-            {
-                throw new InvalidOperationException("Il punto camera non ha un'immagine finita sul tavolo (divisione per zero omogenea).");
-            }
-
-            return new PuntoTavolo(x / w, y / w);
+            PuntoTavolo tavolo = Proietta(matrice, p.X, p.Y);
+            return Curva ? deformazione.Inverti(tavolo) : tavolo;
         }
 
         /// <summary>
@@ -159,6 +155,7 @@ namespace VisualMusicBlockLooper.Vision
         /// <returns>Una nuova <see cref="Mat"/>: il chiamante la rilascia.</returns>
         public Mat MascheraTavolo(int larghezzaCamera, int altezzaCamera, int restringi = 0)
         {
+            if (Curva) return MascheraDellaCurva(larghezzaCamera, altezzaCamera, restringi);
             const int Lato = 100;
             double[] riga0 = { matrice[0] * Lato, matrice[1] * Lato, matrice[2] * Lato };
             double[] riga1 = { matrice[3] * Lato, matrice[4] * Lato, matrice[5] * Lato };
@@ -227,6 +224,8 @@ namespace VisualMusicBlockLooper.Vision
                 throw new ArgumentOutOfRangeException(nameof(altezza), "L'altezza deve essere positiva.");
             }
 
+            if (Curva) return RaddrizzaCurva(sorgente, larghezza, altezza);
+
             // M = S * H: H porta la camera nelle coordinate del tavolo (0..1), S le scala in pixel di uscita.
             double[] riga0 = { matrice[0] * larghezza, matrice[1] * larghezza, matrice[2] * larghezza };
             double[] riga1 = { matrice[3] * altezza, matrice[4] * altezza, matrice[5] * altezza };
@@ -264,6 +263,8 @@ namespace VisualMusicBlockLooper.Vision
                 throw new ArgumentNullException(nameof(percorso));
             }
 
+            if (Curva) { SalvaCurva(percorso); return; }
+
             // "G17" garantisce il round-trip esatto di un double su net472.
             string valori = string.Join(";", matrice.Select(v => v.ToString("G17", CultureInfo.InvariantCulture)));
             string risoluzione = Larghezza.ToString(CultureInfo.InvariantCulture) + ";" + Altezza.ToString(CultureInfo.InvariantCulture);
@@ -289,9 +290,10 @@ namespace VisualMusicBlockLooper.Vision
                 .Where(r => r.Trim().Length > 0)
                 .ToArray();
 
-            bool nuovoFormato = righe.Length > 0 && righe[0].Trim() == Intestazione;
+            bool formatoCurvo = righe.Length > 0 && righe[0].Trim() == "VMBL-CAL3";
+            bool nuovoFormato = formatoCurvo || (righe.Length > 0 && righe[0].Trim() == Intestazione);
             bool vecchioFormato = righe.Length > 0 && righe[0].Trim() == IntestazioneVecchia;
-            if ((!nuovoFormato && !vecchioFormato) || righe.Length != (nuovoFormato ? 3 : 2))
+            if ((!nuovoFormato && !vecchioFormato) || righe.Length != (formatoCurvo ? 15 : nuovoFormato ? 3 : 2))
             {
                 throw new InvalidDataException("Formato del file di calibrazione non valido: intestazione o righe inattese.");
             }
@@ -333,7 +335,9 @@ namespace VisualMusicBlockLooper.Vision
                 throw new InvalidDataException("Matrice di calibrazione degenere nel file.");
             }
 
-            return new Calibrazione(valori, larghezza, altezza);
+            var caricata = new Calibrazione(valori, larghezza, altezza);
+            if (formatoCurvo) caricata.LeggiCurva(righe);
+            return caricata;
         }
 
         private static double[] LeggiMatrice(Mat h)

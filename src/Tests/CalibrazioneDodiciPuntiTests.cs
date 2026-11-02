@@ -114,7 +114,7 @@ namespace VisualMusicBlockLooper.Tests
             SchemaCalibrazione.Calcola(new PuntoImmagine[numero], 1280, 720, out _), Throws.TypeOf<ArgumentException>());
 
         [Test]
-        public void FileNuovo_RestaCal2Compatibile()
+        public void FileNuovo_ConservaIDodiciRiferimentiInCal3()
         {
             string file = Path.Combine(Path.GetTempPath(), "vmbl-cal12-" + Guid.NewGuid().ToString("N") + ".txt");
             try
@@ -122,7 +122,7 @@ namespace VisualMusicBlockLooper.Tests
                 var originale = SchemaCalibrazione.Calcola(SchemaCalibrazione.Punti.Select(Camera).ToArray(),
                     1280, 720, out _);
                 originale.Salva(file);
-                Assert.That(File.ReadAllText(file), Does.StartWith("VMBL-CAL2"));
+                Assert.That(File.ReadAllText(file), Does.StartWith("VMBL-CAL3"));
                 Calibrazione caricata = Calibrazione.Carica(file);
                 PuntoTavolo centro = caricata.DaCameraATavolo(Camera(new PuntoTavolo(0.5, 0.5)));
                 Assert.That(centro.X, Is.EqualTo(0.5).Within(0.001));

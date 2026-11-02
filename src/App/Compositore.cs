@@ -60,6 +60,8 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Motore musicale pilotato dal compositore.</summary>
         public MotoreMusicale Motore { get; }
 
+        public RegistroCatture RegistroDiagnostica { get; } = new RegistroCatture();
+
         /// <summary>Ultimo stato stabilizzato del tavolo (thread-safe); mai null.</summary>
         public StatoTavolo UltimoStato
         {
@@ -78,24 +80,60 @@ namespace VisualMusicBlockLooper.App
         /// </summary>
         public void Passo()
         {
-            IReadOnlyList<CartoncinoRilevato> rilevati;
+            CatturaInCorso cattura = RegistroDiagnostica.IniziaCattura();
+            TracciaCartoncini traccia = cattura?.Traccia;
             try
             {
-                rilevati = rilevatore.Rileva();
-            }
-            catch (Exception)
-            {
-                // Webcam o visione momentaneamente non disponibili: si riprova al passo successivo.
-                return;
-            }
+                IReadOnlyList<CartoncinoRilevato> rilevati;
+                try
+                {
+                    if (traccia != null) { traccia.EsitoVisione = "RilevatoreNonDiagnostico"; traccia.Layout = Layout; }
+                    rilevati = traccia != null && rilevatore is IRilevatoreDiagnostico diagnostico
+                        ? diagnostico.Rileva(traccia) : rilevatore.Rileva();
+                }
+                catch (Exception e)
+                {
+                    if (traccia != null)
+                    {
+                        if (traccia.EsitoVisione != "ErroreAcquisizione") traccia.EsitoVisione = "ErroreRilevamento";
+                        traccia.Errore = e.GetType().Name + ": " + e.Message;
+                        stabilizzatore.DescriviStatoInvariato(traccia);
+                    }
+                    // Comportamento invariato: una cattura fallita non aggiorna lo stato musicale.
+                    return;
+                }
 
-            StatoTavolo stabile = stabilizzatore.Aggiorna(interprete.Interpreta(rilevati));
-            lock (bloccoStato)
-            {
-                ultimoStato = stabile;
+                StatoTavolo grezzo = interprete.Interpreta(rilevati, traccia);
+                StatoTavolo stabile = stabilizzatore.Aggiorna(grezzo, traccia);
+                lock (bloccoStato) { ultimoStato = stabile; }
+                Motore.AggiornaTavolo(stabile);
             }
+            catch (Exception e)
+            {
+                if (traccia != null) traccia.Errore = e.GetType().Name + ": " + e.Message;
+                throw;
+            }
+            finally { RegistroDiagnostica.CompletaCattura(cattura); }
+        }
 
-            Motore.AggiornaTavolo(stabile);
+        /// <summary>Annota il ramo di sola anteprima senza far avanzare la pipeline musicale.</summary>
+        public void RegistraSenzaCalibrazione(bool webcamDisponibile, int larghezza, int altezza, string errore = null)
+            => RegistraSenzaCalibrazione(RegistroDiagnostica.IniziaCattura(), webcamDisponibile,
+                webcamDisponibile, larghezza, altezza, errore);
+
+        /// <summary>Completa un contesto aperto PRIMA dell'acquisizione, preservandone timestamp e generazione.</summary>
+        public void RegistraSenzaCalibrazione(CatturaInCorso cattura, bool webcamDisponibile, bool frameDisponibile,
+            int larghezza, int altezza, string errore = null)
+        {
+            if (cattura == null) return;
+            cattura.Traccia.CalibrazionePresente = false;
+            cattura.Traccia.Layout = Layout;
+            cattura.Traccia.EsitoVisione = errore != null ? "ErroreAcquisizione" : !webcamDisponibile ? "WebcamAssente"
+                : frameDisponibile ? "CalibrazioneAssente" : "FrameAssente";
+            cattura.Traccia.LarghezzaFrame = larghezza; cattura.Traccia.AltezzaFrame = altezza;
+            cattura.Traccia.Errore = errore;
+            stabilizzatore.DescriviStatoInvariato(cattura.Traccia);
+            RegistroDiagnostica.CompletaCattura(cattura);
         }
     }
 }

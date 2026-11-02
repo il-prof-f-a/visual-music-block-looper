@@ -62,7 +62,9 @@ namespace VisualMusicBlockLooper.Core
         /// La struttura stabile cambia solo dopo <c>framePresenza</c> frame consecutivi con lo stesso valore diverso.
         /// Uno stato null viene trattato come vuoto: tutti i candidati risultano assenti (struttura compresa: Default).
         /// </summary>
-        public StatoTavolo Aggiorna(StatoTavolo grezzo)
+        public StatoTavolo Aggiorna(StatoTavolo grezzo) => Aggiorna(grezzo, null);
+
+        public StatoTavolo Aggiorna(StatoTavolo grezzo, TracciaCartoncini traccia)
         {
             IReadOnlyList<CartoncinoNota> noteGrezze = grezzo?.Note ?? new List<CartoncinoNota>();
             IReadOnlyList<ComandoRilevato> comandiGrezzi = grezzo?.Comandi ?? new List<ComandoRilevato>();
@@ -70,13 +72,41 @@ namespace VisualMusicBlockLooper.Core
 
             AggiornaNote(noteGrezze);
             List<ComandoRilevato> comandiEsposti = AggiornaComandi(comandiGrezzi);
-            AggiornaStruttura(grezzo?.Struttura ?? StrutturaTavolo.Default);
+            StrutturaTavolo precedente = strutturaStabile;
+            StrutturaTavolo richiesta = grezzo?.Struttura ?? StrutturaTavolo.Default;
+            AggiornaStruttura(richiesta);
+            if (traccia != null)
+            {
+                bool applicata = richiesta.Equals(strutturaStabile);
+                traccia.StrutturaGrezza = richiesta;
+                traccia.StrutturaStabile = strutturaStabile;
+                traccia.StrutturaInConferma = candidata;
+                traccia.ConfermeRichieste = framePresenza;
+                traccia.ConfermeStruttura = applicata ? framePresenza : contatoreCandidata;
+                traccia.EsitoStabilizzazione = !applicata ? "InAttesa"
+                    : precedente.Equals(strutturaStabile) ? "GiaStabile" : "Applicata";
+                traccia.NoteStabili = noteStabili.Count;
+                traccia.ComandiEmessi = comandiEsposti.Count;
+            }
 
             return new StatoTavolo(
                 OutputNote(),
                 comandiEsposti,
                 errori,
                 strutturaStabile);
+        }
+
+        /// <summary>Osserva lo stato dopo una cattura fallita/senza calibrazione, senza avanzare i contatori.</summary>
+        public void DescriviStatoInvariato(TracciaCartoncini traccia)
+        {
+            if (traccia == null) return;
+            traccia.StrutturaStabile = strutturaStabile;
+            traccia.StrutturaInConferma = candidata;
+            traccia.ConfermeRichieste = framePresenza;
+            traccia.ConfermeStruttura = contatoreCandidata;
+            traccia.NoteStabili = noteStabili.Count;
+            traccia.ComandiEmessi = 0;
+            traccia.EsitoStabilizzazione = "NonAggiornata";
         }
 
         // La struttura cambia solo dopo framePresenza frame consecutivi con lo stesso valore diverso dallo stabile.

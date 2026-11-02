@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using VisualMusicBlockLooper.Core;
 using VisualMusicBlockLooper.Vision;
@@ -64,6 +65,13 @@ namespace VisualMusicBlockLooper.App
         private ComboBox comboWebcam;
         private Button pulsanteAggiornaWebcam;
         private Button pulsanteSalvaFrame;
+        private CheckBox casellaDebugCartoncini;
+        private Button pulsanteSalvaDebug;
+        private Label etichettaDebugCartoncini;
+        private readonly ToolTip suggerimentiDebug = new ToolTip();
+        private bool salvataggioDebug;
+        private string messaggioDebug;
+        private bool erroreDebug;
         private bool aggiornamentoComboWebcam;
         private Label etichettaRisoluzione;
         private Label etichettaFuoco;
@@ -159,6 +167,7 @@ namespace VisualMusicBlockLooper.App
                 timerRisoluzione.Dispose();
                 timerApplicaImpostazioni.Dispose();
                 timerSalvaConfigurazione.Dispose();
+                suggerimentiDebug.Dispose();
             }
 
             base.Dispose(disposing);
@@ -218,15 +227,15 @@ namespace VisualMusicBlockLooper.App
         private void CostruisciInterfaccia()
         {
             Text = "Visual Music Block Looper - Controllo";
-            // Layout (coordinate in pixel del client, 760 x 668):
+            // Layout (coordinate in pixel del client, 760 x 716):
             //  - fascia alta x 10..750: stato (y 10), porte (y 38);
             //  - anteprima x 10..530, y 64..454; sotto di lei, larghe come lei (520) e a capo, la descrizione
             //    dell'anteprima (y 458..510) e gli avvisi (y 514..664), così non toccano la colonna destra;
             //  - colonna destra x 545..745 (larghezza 200): pulsanti fino a «Salva frame» (y 394..422), poi
             //    Risoluzione (etichetta y 428, regolo y 446..476), Messa a fuoco (etichetta y 484,
             //    «Auto» + regolo y 504..534), Esposizione (etichetta y 542, «Auto» + regolo y 562..592)
-            //    e l'etichetta dei fps (y 598..662, va a capo).
-            ClientSize = new Size(760, 668);
+            //    e l'etichetta dei fps (y 598..662, va a capo). Diagnostica nella fascia y 674..708.
+            ClientSize = new Size(760, 716);
             StartPosition = FormStartPosition.CenterScreen;
 
             etichettaStato = new Label
@@ -300,13 +309,41 @@ namespace VisualMusicBlockLooper.App
 
             etichettaFps = new Label { Left = 545, Top = 598, Width = 200, Height = 64 };
 
+            casellaDebugCartoncini = new CheckBox
+            {
+                Name = "casellaDebugCartoncini", Text = "Debug cartoncini", AccessibleName = "Debug cartoncini",
+                Left = 10, Top = 676, Width = 180, Height = 24, TabIndex = 30
+            };
+            casellaDebugCartoncini.CheckedChanged += (m, a) =>
+            {
+                compositore.RegistroDiagnostica.Attivo = casellaDebugCartoncini.Checked;
+                messaggioDebug = null; erroreDebug = false;
+                etichettaDebugCartoncini.AccessibleDescription = null;
+                suggerimentiDebug.SetToolTip(etichettaDebugCartoncini, null);
+                AggiornaDebugCartoncini();
+            };
+            pulsanteSalvaDebug = new Button
+            {
+                Name = "pulsanteSalvaDebug", Text = "Salva debug", Left = 200, Top = 674,
+                Width = 135, Height = 28, TabIndex = 31, Enabled = false
+            };
+            pulsanteSalvaDebug.Click += async (m, a) => await SalvaDebugCartoncini();
+            etichettaDebugCartoncini = new Label
+            {
+                Name = "etichettaDebugCartoncini", Left = 350, Top = 674, Width = 395, Height = 34,
+                AutoEllipsis = true
+            };
+            suggerimentiDebug.SetToolTip(casellaDebugCartoncini,
+                "Conserva le ultime 50 catture. Disattiva per congelare; Salva debug esporta il rapporto JSON.");
+
             Controls.AddRange(new Control[]
             {
                 etichettaStato, etichettaPorte, anteprima, pulsanteCalibra, pulsanteAvviaFerma,
                 pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor,
                 etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, pulsanteSalvaFrame, etichettaAnteprima, etichettaAvviso,
                 etichettaRisoluzione, regoloRisoluzione, etichettaFuoco, casellaFuocoAuto, regoloFuoco,
-                etichettaEsposizione, casellaEsposizioneAuto, regoloEsposizione, etichettaFps
+                etichettaEsposizione, casellaEsposizioneAuto, regoloEsposizione, etichettaFps,
+                casellaDebugCartoncini, pulsanteSalvaDebug, etichettaDebugCartoncini
             });
 
             AggiornaInterfaccia();
@@ -370,8 +407,26 @@ namespace VisualMusicBlockLooper.App
             else
             {
                 // Senza calibrazione il rilevatore non gira, ma l'anteprima deve restare viva.
-                using (webcam?.Frame())
+                CatturaInCorso cattura = compositore.RegistroDiagnostica.IniziaCattura();
+                string errore = null;
+                bool frameDisponibile = false;
+                int larghezza = webcam.Larghezza, altezza = webcam.Altezza;
+                try
                 {
+                    using (var frame = webcam?.Frame())
+                    {
+                        frameDisponibile = frame != null && !frame.Empty();
+                        if (frameDisponibile) { larghezza = frame.Cols; altezza = frame.Rows; }
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (cattura != null) errore = e.GetType().Name + ": " + e.Message;
+                    throw;
+                }
+                finally
+                {
+                    compositore.RegistraSenzaCalibrazione(cattura, webcam.Disponibile, frameDisponibile, larghezza, altezza, errore);
                 }
             }
 
@@ -421,7 +476,46 @@ namespace VisualMusicBlockLooper.App
             etichettaAvviso.Text = string.Join(Environment.NewLine, righe);
             etichettaFps.Text = PresentatoreRegoliWebcam.TestoFps(
                 webcam.FpsCatturati, fpsDichiarati, cicloCattura.PassiAlSecondo, webcam.Larghezza, webcam.Altezza);
+            AggiornaDebugCartoncini();
             AggiornaAnteprima();
+        }
+
+        private void AggiornaDebugCartoncini()
+        {
+            RegistroCatture registro = compositore.RegistroDiagnostica;
+            pulsanteSalvaDebug.Enabled = !salvataggioDebug && registro.NumeroCatture > 0;
+            etichettaDebugCartoncini.ForeColor = erroreDebug ? Color.DarkRed : Color.DarkBlue;
+            etichettaDebugCartoncini.Text = $"Debug {(registro.Attivo ? "attivo" : "fermo")}: {registro.NumeroCatture}/50"
+                + (string.IsNullOrEmpty(messaggioDebug) ? string.Empty : Environment.NewLine + messaggioDebug);
+        }
+
+        private async Task SalvaDebugCartoncini()
+        {
+            if (salvataggioDebug) return;
+            RapportoDiagnosticaCartoncini rapporto = compositore.RegistroDiagnostica.Istantanea();
+            if (rapporto.Catture.Count == 0) return;
+            salvataggioDebug = true; messaggioDebug = "Salvataggio in corso…"; erroreDebug = false;
+            AggiornaDebugCartoncini();
+            try
+            {
+                string percorso = await Task.Run(() => EsportatoreDiagnosticaCartoncini.Salva(
+                    rapporto, AppDomain.CurrentDomain.BaseDirectory));
+                if (IsDisposed || Disposing || chiusuraEseguita) return;
+                messaggioDebug = "Salvato: " + Path.GetFileName(percorso);
+                etichettaDebugCartoncini.AccessibleDescription = percorso;
+                suggerimentiDebug.SetToolTip(etichettaDebugCartoncini, percorso);
+            }
+            catch (Exception e)
+            {
+                if (IsDisposed || Disposing || chiusuraEseguita) return;
+                erroreDebug = true; messaggioDebug = "Salvataggio non riuscito: " + e.Message;
+                suggerimentiDebug.SetToolTip(etichettaDebugCartoncini, messaggioDebug);
+            }
+            finally
+            {
+                salvataggioDebug = false;
+                if (!IsDisposed && !Disposing && !chiusuraEseguita) AggiornaDebugCartoncini();
+            }
         }
 
         private void AggiornaAnteprima()

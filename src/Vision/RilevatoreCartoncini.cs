@@ -192,11 +192,7 @@ namespace VisualMusicBlockLooper.Vision
             {
                 try
                 {
-                    PuntoTavolo[] punti = new[]
-                    {
-                        new PuntoImmagine(area.Left, area.Top), new PuntoImmagine(area.Right, area.Top),
-                        new PuntoImmagine(area.Right, area.Bottom), new PuntoImmagine(area.Left, area.Bottom)
-                    }.Select(p => calibrazione.DaCameraATavolo(p)).ToArray();
+                    PuntoTavolo[] punti = calibrazione.BordiDaCameraATavolo(area);
                     double x = punti.Min(p => p.X), y = punti.Min(p => p.Y);
                     areaTavolo = new RettangoloTavolo(x, y, punti.Max(p => p.X) - x, punti.Max(p => p.Y) - y);
                 }
@@ -631,13 +627,7 @@ namespace VisualMusicBlockLooper.Vision
 
             try
             {
-                PuntoTavolo[] punti = new[]
-                {
-                    new PuntoImmagine(rettangolo.Left, rettangolo.Top),
-                    new PuntoImmagine(rettangolo.Right, rettangolo.Top),
-                    new PuntoImmagine(rettangolo.Right, rettangolo.Bottom),
-                    new PuntoImmagine(rettangolo.Left, rettangolo.Bottom),
-                }.Select(p => calibrazione.DaCameraATavolo(p)).ToArray();
+                PuntoTavolo[] punti = calibrazione.BordiDaCameraATavolo(rettangolo);
 
                 double minX = punti.Min(p => p.X), maxX = punti.Max(p => p.X);
                 double minY = punti.Min(p => p.Y), maxY = punti.Max(p => p.Y);

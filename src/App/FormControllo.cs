@@ -639,7 +639,8 @@ namespace VisualMusicBlockLooper.App
             anteprima.Image = nuova;
             vecchia?.Dispose();
             immagineRaddrizzata = raddrizza;
-            etichettaAnteprima.Text = raddrizza ? AnteprimaTavolo.TestoRaddrizzata : AnteprimaTavolo.TestoGrezza;
+            etichettaAnteprima.Text = !raddrizza ? AnteprimaTavolo.TestoGrezza
+                : calibrazioneAttiva.Curva ? AnteprimaTavolo.TestoCurva : AnteprimaTavolo.TestoRaddrizzata;
             return true;
         }
 
@@ -772,9 +773,9 @@ namespace VisualMusicBlockLooper.App
             string messaggio;
             try
             {
-                // L'omografia è in pixel: si memorizza la risoluzione del frame su cui sono stati cliccati i punti.
+                // Si conservano risoluzione e dodici riferimenti del frame realmente cliccato.
                 Calibrazione calibrazione = SchemaCalibrazione.Calcola(
-                    puntiCalibrazione.ToArray(), dimensioniFrame.Width, dimensioniFrame.Height, out double scartoMedio);
+                    puntiCalibrazione.ToArray(), dimensioniFrame.Width, dimensioniFrame.Height, out _);
                 // Ricontrollare il frame grezzo prima di applicare: le dimensioni dichiarate dal driver
                 // possono restare quelle dell'apertura anche se il frame consegnato è cambiato.
                 using (Bitmap corrente = webcam.Anteprima())
@@ -801,7 +802,7 @@ namespace VisualMusicBlockLooper.App
                 }
 
                 SalvaWebcamInConfigurazione();
-                messaggio = $"Calibrazione: completata con 12 punti. Scarto medio {scartoMedio * 100:0.00}% del tavolo.";
+                messaggio = "Calibrazione: completata con 12 punti e correzione curva. Verifica anche le linee interne della griglia.";
             }
             catch (PuntiCalibrazioneIncoerentiException eccezione)
             {

@@ -20,6 +20,10 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Testo mostrato sotto l'anteprima dell'immagine originale.</summary>
         public const string TestoGrezza = "Anteprima: immagine originale della webcam (non calibrata).";
 
+        public const string TestoCurva =
+            "Anteprima RADDRIZZATA con correzione curva a 12 punti. "
+            + "Controlla che bordi e linee interne della griglia siano allineati.";
+
         /// <summary>True se l'anteprima deve mostrare l'area raddrizzata: serve una calibrazione attiva e non si deve stare calibrando.</summary>
         public static bool Raddrizzata(bool calibrazioneAttiva, bool inCalibrazione)
         {

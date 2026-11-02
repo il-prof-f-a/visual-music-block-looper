@@ -129,7 +129,7 @@ namespace VisualMusicBlockLooper.Tests
                 scena.Click(11);
                 Assert.That(File.Exists(scena.FileCalibrazione), Is.True);
                 Assert.That(scena.Rilevatore.Attivo, Is.True);
-                Assert.That(scena.Testo, Does.Contain("12 punti").And.Contain("Scarto medio"));
+                Assert.That(scena.Testo, Does.Contain("12 punti").And.Contain("correzione curva").And.Not.Contain("Scarto medio"));
                 PuntoTavolo p = Calibrazione.Carica(scena.FileCalibrazione)
                     .DaCameraATavolo(CalibrazioneDodiciPuntiTests.Camera(new PuntoTavolo(0.5,0.5)));
                 Assert.That(p.X, Is.EqualTo(0.5).Within(0.004));

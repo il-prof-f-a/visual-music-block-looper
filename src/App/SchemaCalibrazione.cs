@@ -40,26 +40,39 @@ namespace VisualMusicBlockLooper.App
             "basso-sinistra", "lato sinistro, dal basso, primo terzo", "lato sinistro, dal basso, secondo terzo"
         });
 
-        /// <summary>Calcola l'omografia e rifiuta click incoerenti anche quando RANSAC li ha scartati.</summary>
+        /// <summary>Controlla errori isolati rispetto alla prospettiva, poi interpola la curva sui dodici riferimenti.</summary>
         public static Calibrazione Calcola(PuntoImmagine[] punti, int larghezza, int altezza, out double scartoMedio)
         {
             scartoMedio = 0;
             if (punti == null) throw new ArgumentNullException(nameof(punti));
             if (punti.Length != Punti.Count) throw new ArgumentException("Servono esattamente 12 punti.", nameof(punti));
             Calibrazione calibrazione = Calibrazione.Calcola(punti, Punti.ToArray(), larghezza, altezza);
+            Calibrazione media = Calibrazione.Calcola(punti, Punti.ToArray(), larghezza, altezza, scartaAnomalie: false);
             var incoerenti = new List<int>();
+            var scarti = new double[punti.Length];
+            var scartiDistribuiti = new double[punti.Length];
             for (int i = 0; i < punti.Length; i++)
             {
                 PuntoTavolo letto = calibrazione.DaCameraATavolo(punti[i]);
                 double dx = letto.X - Punti[i].X, dy = letto.Y - Punti[i].Y;
                 double scarto = Math.Sqrt(dx * dx + dy * dy);
-                if (double.IsNaN(scarto) || double.IsInfinity(scarto) || scarto > ScartoMassimo)
-                    incoerenti.Add(i + 1);
-                scartoMedio += scarto / punti.Length;
+                scarti[i] = scarto;
+                PuntoTavolo globale = media.DaCameraATavolo(punti[i]);
+                double gx = globale.X - Punti[i].X, gy = globale.Y - Punti[i].Y;
+                scartiDistribuiti[i] = Math.Sqrt(gx * gx + gy * gy);
+                scartoMedio += scartiDistribuiti[i] / punti.Length;
             }
+            // La curvatura distribuita non è un errore di click. Si conservano il controllo degli
+            // errori isolati e la ripetizione del riferimento, senza pretendere una sola omografia.
+            var ordinati = scartiDistribuiti.OrderBy(s => s).ToArray();
+            double mediana = (ordinati[5] + ordinati[6]) / 2;
+            double soglia = Math.Max(ScartoMassimo, 4 * mediana);
+            for (int i = 0; i < scarti.Length; i++)
+                if (double.IsNaN(scarti[i]) || double.IsInfinity(scarti[i]) || scarti[i] > soglia)
+                    incoerenti.Add(i + 1);
             if (incoerenti.Count > 0)
                 throw new PuntiCalibrazioneIncoerentiException(incoerenti.ToArray());
-            return calibrazione;
+            return Calibrazione.CalcolaCurva(punti, Punti.ToArray(), larghezza, altezza);
         }
     }
 }

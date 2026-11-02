@@ -11,5 +11,11 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Area occupata dal cartoncino sul tavolo.</summary>
         public RettangoloTavolo Area { get; set; }
+
+        /// <summary>Quadrilatero QR riportato al tavolo, senza zona bianca o ingombro del corpo.</summary>
+        public RettangoloTavolo? AreaQr { get; set; }
+
+        /// <summary>Fine dell'estensione contigua verso destra nel tavolo; null per fonti precedenti.</summary>
+        public double? FineEstensioneX { get; set; }
     }
 }

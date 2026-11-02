@@ -28,11 +28,13 @@ Ogni cattura include timestamp UTC, durata, dimensioni del frame, layout effetti
 | `NessunQrDecodificato` | Nessun testo QR ottenuto dalla cattura. Non identifica quale cartoncino fosse presente. |
 | `CorpoCandidato` / `CorpoSenzaQrDecodificato` | Regione del corpo individuata; nel secondo caso la lettura di riserva non ha ottenuto un QR. L'identità resta sconosciuta. |
 | `QrLocalizzatoNonDecodificato` | Il decoder ha fornito una posizione QR senza riuscire a leggerne il testo. |
-| `QrDecodificato` | Il testo compare in `Payload`; `Origine` distingue OpenCV, lettura sul ritaglio e `Memoria`. Quest'ultima riusa una lettura precedente, senza nuova conferma ottica. |
+| `QrDecodificato` | Il testo compare in `Payload`; `Origine` distingue OpenCV, `ZXingGlobale`, lettura sul ritaglio e `Memoria`. Quest'ultima riusa una lettura precedente, senza nuova conferma ottica. |
+| `AggancioQr` | `AreaTavolo` descrive il QR usato per l'attacco; il dettaglio riporta X del QR e fine dell'estensione colorata. L'ingombro fisico resta separato. |
+| `NotaAccettata` | Il dettaglio riporta riga, gruppo, step iniziale zero-based e durata. Indica anche l'eventuale troncamento imposto dal QR successivo. |
 | `PayloadNonValido` | Il testo è stato letto, ma non rispetta il protocollo `VMBL1`. |
 | `ZonaIncompatibile` / `ImpostazioneInZonaErrata` | Payload riconosciuto, ma cartoncino nella zona sbagliata. `Zona`, aree e `Layout` mostrano la classificazione effettiva. |
 | `IntervalloAbNonValido` | Il rapporto mostra A/B richiesti e MISURA/LINK effettivi, con il limite valido. |
-| `Sovrapposto` | Più impostazioni nella stessa zona, oppure note sovrapposte. Il dettaglio spiega la decisione. |
+| `Sovrapposto` | Più impostazioni nella stessa zona, oppure QR di nota distinti con attacco nella stessa cella dello stesso rigo. Corpi sovrapposti con attacchi diversi non causano lo scarto della nuova nota. |
 | `AbAccettato` | Il vincolo A-B è valido nello stato grezzo; può dover ancora superare la stabilizzazione. |
 | `InAttesa` | La struttura ha meno delle conferme consecutive richieste; confrontare `ConfermeStruttura` e `ConfermeRichieste`. |
 | `Applicata` / `GiaStabile` | Nuova struttura applicata in quella cattura, oppure struttura già attiva. |
@@ -40,6 +42,8 @@ Ogni cattura include timestamp UTC, durata, dimensioni del frame, layout effetti
 
 `AreaCamera` usa pixel; `AreaTavolo` usa coordinate normalizzate. Per l'evento `CartoncinoRilevato` le due aree descrivono lo stesso corpo ritagliato; l'evento QR descrive invece il suo riquadro.
 Gli errori di acquisizione/elaborazione riportano tipo e messaggio, senza trasformarsi in falsi rifiuti dei vincoli.
+
+QR con lo stesso payload in posizioni diverse rappresentano attacchi distinti. Per confrontare la scena, contare le letture spaziali e gli eventi `AggancioQr`, non soltanto i payload unici. Il recupero può leggere più codici nello stesso corpo; la memoria viene rivalutata al cambiamento della regione e periodicamente, e non costituisce una nuova lettura ottica.
 
 Nel modello corrente A-B è contato in battute applicative di quattro step. **A-B 1-2 è valido con tutte le MISURA/LINK previste**, quando il QR è letto correttamente e il cartoncino è nella zona A-B. L'applicazione richiede normalmente tre catture consecutive.
 La presenza del solo `CorpoCandidato`, o l'assenza di un payload A-B, non prova quale cartoncino fosse ripreso: l'analisi deve usare posizione e letture effettivamente disponibili.

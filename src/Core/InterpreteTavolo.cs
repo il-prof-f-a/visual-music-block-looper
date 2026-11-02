@@ -38,8 +38,8 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>
         /// Interpreta i cartoncini in due passaggi. Il primo classifica ogni cartoncino per zona e ne legge il payload;
-        /// il secondo risolve la struttura dalle impostazioni e interpreta le note, in ordine di Area.X (poi Area.Y)
-        /// così che, in caso di sovrapposizione sulla stessa riga e sullo stesso colore, il primo resti.
+        /// il secondo risolve la struttura e aggancia le note al QR (Area per le fonti precedenti).
+        /// Attacchi in celle diverse troncano la precedente; nella stessa cella resta il primo da sinistra.
         /// Una lista null è trattata come vuota; gli elementi null vengono ignorati.
         /// </summary>
         public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati) => Interpreta(rilevati, null);
@@ -56,8 +56,8 @@ namespace VisualMusicBlockLooper.Core
                 ?? Enumerable.Empty<CartoncinoRilevato>();
 
             IEnumerable<CartoncinoRilevato> ordinati = validi
-                .OrderBy(r => r.Area.X)
-                .ThenBy(r => r.Area.Y);
+                .OrderBy(r => (r.AreaQr ?? r.Area).X)
+                .ThenBy(r => (r.AreaQr ?? r.Area).Y);
 
             // Primo passaggio: classificazione per zona e lettura del payload.
             foreach (CartoncinoRilevato rilevato in ordinati)
@@ -67,6 +67,12 @@ namespace VisualMusicBlockLooper.Core
                 {
                     AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona);
                     continue;
+                }
+
+                if (payload.Tipo == TipoCartoncino.Nota && rilevato.AreaQr.HasValue)
+                {
+                    RettangoloTavolo qr = rilevato.AreaQr.Value;
+                    zona = layout.ZonaDelCentro(new RettangoloTavolo(qr.X, qr.Y + qr.Altezza / 2, 0, 0));
                 }
 
                 switch (zona)
@@ -121,13 +127,13 @@ namespace VisualMusicBlockLooper.Core
 
             var notaStato = new List<CartoncinoNota>();
 
-            // Occupazione per (riga, colore): intervalli [inizio, fine) degli step già assegnati.
-            var occupate = new Dictionary<(int Riga, int Traccia), List<(int Inizio, int Fine)>>();
+            var occupate = new HashSet<(int Riga, int Step)>();
+            var accettate = new List<NotaDaRisolvere>();
 
             foreach (var (rilevato, payload) in note)
             {
                 ZonaSpeciale zona = ZonaSpeciale.Nessuna;
-                if (!griglia.TryCella(rilevato.Area, out int riga, out int stepIniziale, out int durataStep))
+                if (!griglia.TryCella(rilevato, out int riga, out int stepIniziale, out int durataStep))
                 {
                     AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato, diagnostica, zona);
                     continue;
@@ -144,24 +150,43 @@ namespace VisualMusicBlockLooper.Core
                 // Il colore del cartoncino non porta informazioni: lo strumento (canale MIDI) e' il gruppo di righe
                 // collegate. Righe collegate suonano lo stesso strumento; i gruppi sono strumenti simultanei.
                 int traccia = riga / struttura.RigheCollegate;
-                if (SovrapponeGiaOccupato(occupate, (riga, traccia), stepIniziale, durataStep))
+                if (!occupate.Add((riga, stepIniziale)))
                 {
                     AggiungiErrore(errori, TipoErrore.Sovrapposto, rilevato, diagnostica, zona);
                     continue;
                 }
 
-                OccupaStep(occupate, (riga, traccia), stepIniziale, durataStep);
+                accettate.Add(new NotaDaRisolvere { Rilevato = rilevato, Payload = payload,
+                    Riga = riga, Step = stepIniziale, Durata = durataStep, Traccia = traccia });
+            }
+
+            foreach (var gruppo in accettate.GroupBy(n => n.Riga))
+            {
+                var riga = gruppo.OrderBy(n => n.Step).ToArray();
+                for (int i = 0; i + 1 < riga.Length; i++)
+                {
+                    int prima = riga[i].Durata;
+                    riga[i].Durata = Math.Min(prima, riga[i + 1].Step - riga[i].Step);
+                    if (riga[i].Durata < prima)
+                        riga[i].Troncamento = $" Troncata da {prima} a {riga[i].Durata} step dal QR alla cella {riga[i + 1].Step + 1}.";
+                }
+            }
+
+            foreach (NotaDaRisolvere n in accettate)
+            {
                 notaStato.Add(new CartoncinoNota
                 {
-                    Riga = riga,
-                    Traccia = traccia,
-                    StepIniziale = stepIniziale,
-                    DurataStep = durataStep,
-                    IdClip = payload.IdClip,
-                    Colore = (ColoreTraccia)(riga % 6)
+                    Riga = n.Riga,
+                    Traccia = n.Traccia,
+                    StepIniziale = n.Step,
+                    DurataStep = n.Durata,
+                    IdClip = n.Payload.IdClip,
+                    Colore = (ColoreTraccia)(n.Riga % 6)
                 });
-                diagnostica?.RegistraInterpretazione(rilevato, zona, true, "NotaAccettata",
-                    $"Nota {payload.IdClip}, riga {riga + 1}, gruppo {(riga / struttura.RigheCollegate + 1)}, step {stepIniziale}, durata {durataStep}.");
+                string aggancio = n.Rilevato.AreaQr.HasValue
+                    ? $" Aggancio QR x={n.Rilevato.AreaQr.Value.X:0.00000}, fine colore={n.Rilevato.FineEstensioneX:0.00000}." : "";
+                diagnostica?.RegistraInterpretazione(n.Rilevato, ZonaSpeciale.Nessuna, true, "NotaAccettata",
+                    $"Nota {n.Payload.IdClip}, riga {n.Riga + 1}, gruppo {n.Traccia + 1}, step {n.Step}, durata {n.Durata}." + aggancio + n.Troncamento);
             }
 
             if (diagnostica != null)
@@ -184,34 +209,12 @@ namespace VisualMusicBlockLooper.Core
                     : $"Cartoncino scartato: {tipo}; zona {zona}.");
         }
 
-        private static bool SovrapponeGiaOccupato(
-            Dictionary<(int Riga, int Traccia), List<(int Inizio, int Fine)>> occupate,
-            (int Riga, int Traccia) chiave,
-            int stepIniziale,
-            int durataStep)
+        private sealed class NotaDaRisolvere
         {
-            if (!occupate.TryGetValue(chiave, out List<(int Inizio, int Fine)> intervalli))
-            {
-                return false;
-            }
-
-            int fine = stepIniziale + durataStep;
-            return intervalli.Any(i => stepIniziale < i.Fine && i.Inizio < fine);
-        }
-
-        private static void OccupaStep(
-            Dictionary<(int Riga, int Traccia), List<(int Inizio, int Fine)>> occupate,
-            (int Riga, int Traccia) chiave,
-            int stepIniziale,
-            int durataStep)
-        {
-            if (!occupate.TryGetValue(chiave, out List<(int Inizio, int Fine)> intervalli))
-            {
-                intervalli = new List<(int Inizio, int Fine)>();
-                occupate[chiave] = intervalli;
-            }
-
-            intervalli.Add((stepIniziale, stepIniziale + durataStep));
+            public CartoncinoRilevato Rilevato;
+            public PayloadCartoncino Payload;
+            public int Riga, Step, Durata, Traccia;
+            public string Troncamento = "";
         }
     }
 }

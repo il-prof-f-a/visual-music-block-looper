@@ -792,7 +792,7 @@ namespace VisualMusicBlockLooper.App
                     }
                 }
                 string avvisoSalvataggio = ApplicazioneCalibrazione.Applica(
-                    rilevatore, webcam, calibrazione, c => c.Salva(percorsoCalibrazione));
+                    rilevatore, webcam, calibrazione, c => c.Salva(percorsoCalibrazione), compositore.ConfigurazioneGriglia);
                 calibrazionePresente = true;
                 avvisi.RemoveAll(a => a == ApplicazioneCalibrazione.AvvisoRisoluzioneDiversa
                     || a == ApplicazioneCalibrazione.AvvisoRisoluzioneSconosciuta);
@@ -958,7 +958,7 @@ namespace VisualMusicBlockLooper.App
                 || a == ApplicazioneCalibrazione.AvvisoRisoluzioneSconosciuta);
             calibrazionePresente = inUso != null
                 && configurazione.Webcam.Corrisponde(inUso)
-                && ApplicazioneCalibrazione.TentaCaricamento(percorsoCalibrazione, webcam, rilevatore, avvisi);
+                && ApplicazioneCalibrazione.TentaCaricamento(percorsoCalibrazione, webcam, rilevatore, avvisi, compositore.ConfigurazioneGriglia);
         }
 
         /// <summary>

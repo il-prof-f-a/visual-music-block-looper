@@ -40,15 +40,29 @@ namespace VisualMusicBlockLooper.Vision
 
         private readonly IFonteImmagini fonte;
         private readonly Calibrazione calibrazione;
+        private readonly ConfigGriglia griglia;
 
         // QR recuperati con la lettura di riserva nel frame precedente, per corpo: la lettura di riserva e'
         // costosa, quindi un cartoncino fermo non viene riletto a ogni frame.
-        private List<KeyValuePair<Rect, QrTrovato>> recuperati = new List<KeyValuePair<Rect, QrTrovato>>();
+        private List<RecuperoMemorizzato> recuperati = new List<RecuperoMemorizzato>();
+        private long sequenzaFrame;
+
+        private sealed class RecuperoMemorizzato
+        {
+            public Rect Corpo, Regione;
+            public byte[] Aspetto;
+            public List<QrTrovato> Qr;
+            public long UltimaScansione;
+        }
 
         public RilevatoreCartoncini(IFonteImmagini fonte, Calibrazione calibrazione)
+            : this(fonte, calibrazione, new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault }) { }
+
+        public RilevatoreCartoncini(IFonteImmagini fonte, Calibrazione calibrazione, ConfigGriglia griglia)
         {
             this.fonte = fonte;
             this.calibrazione = calibrazione ?? throw new ArgumentNullException(nameof(calibrazione));
+            this.griglia = griglia ?? new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
         }
 
         /// <summary>Calibrazione con cui il rilevatore converte la camera nelle coordinate del tavolo.</summary>
@@ -104,12 +118,13 @@ namespace VisualMusicBlockLooper.Vision
                         bgr = convertito;
                     }
 
-                    List<QrTrovato> qr = DecodificaQr(bgr, traccia);
+                    sequenzaFrame++;
+                    List<QrTrovato> qr = DecodificaQr(bgr, traccia, out List<QrTrovato> localizzati);
                     maschera = MascheraCorpo(bgr, calibrazione, out Rect[] corpi);
                     if (traccia != null)
                         foreach (Rect corpo in corpi)
                             RegistraVisione(traccia, "CorpoCandidato", "Regione del corpo rilevata; identità non ancora nota.", null, corpo);
-                    qr.AddRange(RecuperaQrMancanti(bgr, qr, corpi, traccia));
+                    qr.AddRange(RecuperaQrMancanti(bgr, qr, localizzati, corpi, traccia));
                     if (qr.Count == 0)
                     {
                         if (traccia != null) traccia.EsitoVisione = "NessunQrDecodificato";
@@ -142,6 +157,10 @@ namespace VisualMusicBlockLooper.Vision
                         if (r != null)
                         {
                             risultato.Add(r);
+                            if (traccia != null && r.AreaQr.HasValue)
+                                traccia.Visione.Add(new EventoDiagnosticoCartoncino("Visione", "AggancioQr", "AggancioQr",
+                                    $"Attacco QR x={r.AreaQr.Value.X:0.00000}; fine colore={r.FineEstensioneX:0.00000}.",
+                                    c.Testo, areaTavolo: r.AreaQr));
                             if (traccia != null) RegistraVisione(traccia, "CartoncinoRilevato",
                                 "QR convertito nelle coordinate del tavolo.", c.Testo, areaEffettiva, areaTavolo: r.Area);
                         }
@@ -229,14 +248,24 @@ namespace VisualMusicBlockLooper.Vision
         private sealed class Candidato
         {
             public string Testo;
+            public Point2f[] AngoliQr;
             public Rect Riquadro;   // bounding box del quadrilatero QR
             public Rect Zona;       // riquadro QR + zona quieta
             public Rect? Corpo;     // bounding rect del corpo (eventualmente fuso con i vicini)
         }
 
-        private List<QrTrovato> DecodificaQr(Mat bgr, TracciaCartoncini traccia)
+        private List<QrTrovato> DecodificaQr(Mat bgr, TracciaCartoncini traccia, out List<QrTrovato> localizzati)
         {
             var trovati = new List<QrTrovato>();
+            localizzati = new List<QrTrovato>();
+            using (var grigio = new Mat())
+            {
+                Cv2.CvtColor(bgr, grigio, ColorConversionCodes.BGR2GRAY);
+                // MultiDetector propone anche combinazioni spurie di finder appartenenti a codici diversi.
+                // Il catalogo globale ZXing contiene solo risultati decodificati; gli altri si cercano nei corpi.
+                foreach (var q in DecodificaConZxing(grigio, null, "ZXingGlobale"))
+                    if (!trovati.Any(e => Vicini(e, q))) trovati.Add(q);
+            }
             using (var rilevatore = new QRCodeDetector())
             {
                 try
@@ -248,8 +277,13 @@ namespace VisualMusicBlockLooper.Vision
                         {
                             for (int i = 0; i < testi.Length && (i + 1) * 4 <= punti.Length; i++)
                                 if (!string.IsNullOrEmpty(testi[i]))
-                                    trovati.Add(new QrTrovato { Testo = testi[i], Angoli = punti.Skip(i * 4).Take(4).ToArray() });
+                                {
+                                    var q = new QrTrovato { Testo = testi[i], Angoli = punti.Skip(i * 4).Take(4).ToArray() };
+                                    if (!trovati.Any(e => Vicini(e, q))) trovati.Add(q);
+                                }
                         }
+                        for (int i = 0; (i + 1) * 4 <= punti.Length; i++)
+                            localizzati.Add(new QrTrovato { Angoli = punti.Skip(i * 4).Take(4).ToArray() });
                         if (traccia != null)
                         {
                             for (int i = 0; (i + 1) * 4 <= punti.Length; i++)
@@ -285,10 +319,23 @@ namespace VisualMusicBlockLooper.Vision
         }
 
         // Per ogni corpo senza un QR letto vicino, ritenta la lettura sul ritaglio ingrandito e livellato.
-        private List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, Rect[] corpi, TracciaCartoncini traccia)
+        private List<QrTrovato> RecuperaQrMancanti(Mat bgr, List<QrTrovato> gia, List<QrTrovato> localizzati,
+            Rect[] corpi, TracciaCartoncini traccia)
         {
             var nuovi = new List<QrTrovato>();
-            var attuali = new List<KeyValuePair<Rect, QrTrovato>>();
+            var attuali = new List<RecuperoMemorizzato>();
+            var scansioni = new Dictionary<Rect, List<QrTrovato>>();
+            // Tentativi per QR localizzato, anche quando nella stessa regione ne è già stato letto un altro.
+            foreach (var candidato in localizzati)
+            {
+                if (gia.Concat(nuovi).Any(q => Vicini(q, candidato))) continue;
+                Rect r = BoundingBox(candidato.Angoli);
+                Rect regione = Gonfia(r, (int)Math.Round(Math.Max(r.Width, r.Height) * .5))
+                    & new Rect(0, 0, bgr.Cols, bgr.Rows);
+                if (regione.Width < 8 || regione.Height < 8) continue;
+                foreach (var q in LeggiRitaglio(bgr, regione, gia.Concat(nuovi).ToArray(), true))
+                    if (!gia.Concat(nuovi).Any(e => Vicini(e, q))) nuovi.Add(q);
+            }
             foreach (Rect corpo in corpi)
             {
                 // Il QR sta a un'estremita' del cartoncino (a sinistra, o a destra con camera capovolta):
@@ -302,38 +349,84 @@ namespace VisualMusicBlockLooper.Vision
                     continue;
                 }
 
-                if (gia.Concat(nuovi).Any(q => CentroDentro(q, regione)))
+                // Un componente interamente interno a un QR noto non è un altro corpo da recuperare.
+                if (gia.Concat(nuovi).Any(q => Dentro(corpo, BoundingBox(q.Angoli))))
                 {
-                    if (traccia != null) RegistraVisione(traccia, "QrNellaRegione",
-                        "La regione del corpo contiene già il centro di un QR letto.", null, corpo);
                     continue;
                 }
 
-                // Stesso corpo (quasi fermo) del frame precedente: si riusa il QR gia' recuperato.
-                KeyValuePair<Rect, QrTrovato>? memoria = recuperati
-                    .Where(r => Sovrapposizione(r.Key, corpo) >= 0.7)
-                    .Select(r => (KeyValuePair<Rect, QrTrovato>?)r)
-                    .FirstOrDefault();
-                List<QrTrovato> letti = memoria.HasValue
-                    ? new List<QrTrovato> { new QrTrovato { Testo = memoria.Value.Value.Testo,
-                        Angoli = memoria.Value.Value.Angoli, Origine = "Memoria" } }
-                    : LeggiRitaglio(bgr, regione);
+                byte[] aspetto = Impronta(bgr, regione);
+                var memoria = recuperati.FirstOrDefault(r => Sovrapposizione(r.Corpo, corpo) >= .9
+                    && AspettoSimile(r.Aspetto, aspetto) && sequenzaFrame - r.UltimaScansione < 8);
+                List<QrTrovato> letti;
+                long scansione;
+                if (memoria != null)
+                {
+                    letti = memoria.Qr.Select(q => new QrTrovato { Testo = q.Testo, Origine = "Memoria",
+                        Angoli = q.Angoli.Select(p => new Point2f(
+                            regione.X + (p.X-memoria.Regione.X)*regione.Width/memoria.Regione.Width,
+                            regione.Y + (p.Y-memoria.Regione.Y)*regione.Height/memoria.Regione.Height)).ToArray() }).ToList();
+                    scansione = memoria.UltimaScansione;
+                }
+                else
+                {
+                    if (!scansioni.TryGetValue(regione, out letti))
+                    {
+                        letti = LeggiRitaglio(bgr, regione, gia.Concat(nuovi).ToArray());
+                        scansioni[regione] = letti;
+                    }
+                    scansione = sequenzaFrame;
+                }
 
-                if (traccia != null && letti.Count == 0) RegistraVisione(traccia, "CorpoSenzaQrDecodificato",
+                if (traccia != null && letti.Count == 0 && !gia.Concat(nuovi).Any(q => CentroDentro(q, regione))) RegistraVisione(traccia, "CorpoSenzaQrDecodificato",
                     "Corpo rilevato, ma nessun QR decodificato nel ritaglio; identità sconosciuta.", null, corpo);
 
                 foreach (QrTrovato q in letti)
                 {
-                    if (!gia.Concat(nuovi).Any(e => e.Testo == q.Testo && Vicini(e, q)))
+                    if (!gia.Concat(nuovi).Any(e => Vicini(e, q)))
                     {
                         nuovi.Add(q);
-                        attuali.Add(new KeyValuePair<Rect, QrTrovato>(corpo, q));
                     }
                 }
+                var tutte = new List<QrTrovato>();
+                foreach (var q in gia.Concat(nuovi).Where(q => CentroDentro(q, regione)).Concat(letti))
+                    if (!tutte.Any(e => Vicini(e, q))) tutte.Add(q);
+                // Anche i risultati vuoti hanno una cache; sempre limitata ai corpi del frame corrente.
+                attuali.Add(new RecuperoMemorizzato { Corpo = corpo, Regione = regione, Aspetto = aspetto,
+                    Qr = tutte, UltimaScansione = scansione });
             }
 
             recuperati = attuali;
             return nuovi;
+        }
+
+        private static bool Dentro(Rect a, Rect b) => a.Left >= b.Left && a.Right <= b.Right
+            && a.Top >= b.Top && a.Bottom <= b.Bottom;
+
+        private static byte[] Impronta(Mat bgr, Rect regione)
+        {
+            using (var ritaglio = new Mat(bgr, regione))
+            using (var grigio = new Mat())
+            using (var piccolo = new Mat())
+            {
+                Cv2.CvtColor(ritaglio, grigio, ColorConversionCodes.BGR2GRAY);
+                Cv2.Resize(grigio, piccolo, new Size(64, 32), 0, 0, InterpolationFlags.Area);
+                var valori = new byte[64*32];
+                System.Runtime.InteropServices.Marshal.Copy(piccolo.Data, valori, 0, valori.Length);
+                return valori;
+            }
+        }
+
+        private static bool AspettoSimile(byte[] a, byte[] b)
+        {
+            if (a == null || a.Length != b.Length) return false;
+            int somma = 0, cambiati = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                int delta = Math.Abs(a[i]-b[i]); somma += delta;
+                if (delta > 12) cambiati++;
+            }
+            return somma <= a.Length*2.5 && cambiati <= 10;
         }
 
         // Intersezione su unione dei due rettangoli (0..1).
@@ -355,11 +448,12 @@ namespace VisualMusicBlockLooper.Vision
         {
             float dx = a.Angoli.Average(p => p.X) - b.Angoli.Average(p => p.X);
             float dy = a.Angoli.Average(p => p.Y) - b.Angoli.Average(p => p.Y);
-            double lato = Math.Max(BoundingBox(a.Angoli).Width, 1);
-            return Math.Sqrt(dx * dx + dy * dy) < lato;
+            double lato = Math.Max(1, Math.Min(BoundingBox(a.Angoli).Width, BoundingBox(b.Angoli).Width));
+            return Math.Sqrt(dx * dx + dy * dy) < .35 * lato;
         }
 
-        private static List<QrTrovato> LeggiRitaglio(Mat bgr, Rect regione)
+        private static List<QrTrovato> LeggiRitaglio(Mat bgr, Rect regione, IReadOnlyList<QrTrovato> noti = null,
+            bool qrLocalizzato = false)
         {
             var trovati = new List<QrTrovato>();
             double scala = Math.Max(2.0, Math.Min(6.0, AltezzaTargetQr / Math.Max(1.0, regione.Height / 1.6)));
@@ -369,28 +463,54 @@ namespace VisualMusicBlockLooper.Vision
             {
                 Cv2.CvtColor(ritaglio, grigio, ColorConversionCodes.BGR2GRAY);
                 Cv2.Resize(grigio, ingrandito, new Size(), scala, scala, InterpolationFlags.Cubic);
+                OscuraQrLetti(ingrandito, noti ?? new QrTrovato[0], regione, scala);
 
                 foreach (Mat variante in Varianti(ingrandito))
                 {
                     using (variante)
                     {
-                        foreach (QrTrovato q in DecodificaConZxing(variante).Concat(DecodificaConOpenCv(variante)))
+                        var candidati = new List<QrTrovato>();
+                        var zxing = DecodificaConZxing(variante, candidati, "ZXingRitaglio").ToArray();
+                        foreach (QrTrovato q in zxing)
                         {
                             Point2f[] angoli = q.Angoli
                                 .Select(p => new Point2f((float)(p.X / scala + regione.X), (float)(p.Y / scala + regione.Y)))
                                 .ToArray();
-                            trovati.Add(new QrTrovato { Testo = q.Testo, Angoli = angoli, Origine = q.Origine });
+                            var letto = new QrTrovato { Testo = q.Testo, Angoli = angoli, Origine = q.Origine };
+                            if (!trovati.Any(e => Vicini(e, letto))) trovati.Add(letto);
+                        }
+                        // Il decoder singolo vede solo i simboli ancora da recuperare. Eliminare i QR
+                        // già letti evita di ripetere scansioni costose e di fermarsi sempre sul primo.
+                        using (var mancanti = variante.Clone())
+                        {
+                            OscuraQrLetti(mancanti, (noti ?? new QrTrovato[0]).Concat(trovati), regione, scala);
+                            var nativi = qrLocalizzato || candidati.Any(c => !zxing.Any(q => Vicini(c, q)))
+                                ? DecodificaConOpenCv(mancanti) : Enumerable.Empty<QrTrovato>();
+                            foreach (QrTrovato q in nativi)
+                            {
+                                var letto = new QrTrovato { Testo = q.Testo, Origine = q.Origine,
+                                    Angoli = q.Angoli.Select(p => new Point2f((float)(p.X/scala+regione.X), (float)(p.Y/scala+regione.Y))).ToArray() };
+                                if (!trovati.Any(e => Vicini(e, letto))) trovati.Add(letto);
+                            }
                         }
                     }
 
-                    if (trovati.Count > 0)
-                    {
-                        break;
-                    }
+                    // Una variante può leggere soltanto parte dei QR presenti nella stessa regione.
+                    OscuraQrLetti(ingrandito, trovati, regione, scala);
                 }
             }
 
             return trovati;
+        }
+
+        private static void OscuraQrLetti(Mat immagine, IEnumerable<QrTrovato> qr, Rect regione, double scala)
+        {
+            foreach (var q in qr)
+            {
+                var poligono = q.Angoli.Select(p => new Point((int)Math.Round((p.X-regione.X)*scala),
+                    (int)Math.Round((p.Y-regione.Y)*scala))).ToArray();
+                Cv2.FillConvexPoly(immagine, poligono, Scalar.All(255));
+            }
         }
 
         // Grigio, livellato (divide per lo sfondo sfocato: toglie bagliori e gradienti) e contrasto adattivo.
@@ -437,7 +557,9 @@ namespace VisualMusicBlockLooper.Vision
             return trovati;
         }
 
-        private static IEnumerable<QrTrovato> DecodificaConZxing(Mat grigio)
+        private static IEnumerable<QrTrovato> DecodificaConZxing(Mat grigio) => DecodificaConZxing(grigio, null, "ZXingRitaglio");
+
+        private static IEnumerable<QrTrovato> DecodificaConZxing(Mat grigio, List<QrTrovato> localizzati, string origine)
         {
             var trovati = new List<QrTrovato>();
             try
@@ -452,6 +574,21 @@ namespace VisualMusicBlockLooper.Vision
                     { DecodeHintType.POSSIBLE_FORMATS, new List<BarcodeFormat> { BarcodeFormat.QR_CODE } },
                 };
 
+                if (localizzati != null)
+                {
+                    try
+                    {
+                        var detector = new ZXing.Multi.QrCode.Internal.MultiDetector(bitmap.BlackMatrix);
+                        var candidati = detector.detectMulti(suggerimenti);
+                        if (candidati != null)
+                            foreach (var candidato in candidati)
+                            {
+                                var angoli = AngoliDaPunti(candidato.Points);
+                                if (angoli != null) localizzati.Add(new QrTrovato { Angoli = angoli, Origine = origine });
+                            }
+                    }
+                    catch (Exception) { /* Un errore del localizzatore non impedisce il tentativo del decoder. */ }
+                }
                 Result[] risultati = new QRCodeMultiReader().decodeMultiple(bitmap, suggerimenti);
                 if (risultati != null)
                 {
@@ -460,7 +597,7 @@ namespace VisualMusicBlockLooper.Vision
                         Point2f[] angoli = AngoliDaPunti(r.ResultPoints);
                         if (!string.IsNullOrEmpty(r.Text) && angoli != null)
                         {
-                            trovati.Add(new QrTrovato { Testo = r.Text, Angoli = angoli, Origine = "ZXingRitaglio" });
+                            trovati.Add(new QrTrovato { Testo = r.Text, Angoli = angoli, Origine = origine });
                         }
                     }
                 }
@@ -598,7 +735,7 @@ namespace VisualMusicBlockLooper.Vision
             Rect zona = Gonfia(riquadro, margine);
             Rect zonaContatto = Gonfia(zona, TolleranzaContatto);
 
-            var c = new Candidato { Testo = qr.Testo, Riquadro = riquadro, Zona = zona };
+            var c = new Candidato { Testo = qr.Testo, AngoliQr = qr.Angoli, Riquadro = riquadro, Zona = zona };
             Rect migliore = default(Rect);
             int areaMigliore = 0;
             foreach (Rect r in corpi)
@@ -631,10 +768,15 @@ namespace VisualMusicBlockLooper.Vision
 
                 double minX = punti.Min(p => p.X), maxX = punti.Max(p => p.X);
                 double minY = punti.Min(p => p.Y), maxY = punti.Max(p => p.Y);
+                PuntoTavolo[] puntiQr = c.AngoliQr.Select(p => calibrazione.DaCameraATavolo(new PuntoImmagine(p.X, p.Y))).ToArray();
+                double qx = puntiQr.Min(p => p.X), qy = puntiQr.Min(p => p.Y);
+                var areaQr = new RettangoloTavolo(qx, qy, puntiQr.Max(p => p.X) - qx, puntiQr.Max(p => p.Y) - qy);
                 return new CartoncinoRilevato
                 {
                     Payload = c.Testo,
                     Area = new RettangoloTavolo(minX, minY, maxX - minX, maxY - minY),
+                    AreaQr = areaQr,
+                    FineEstensioneX = MisuratoreEstensioneNota.Misura(maschera, calibrazione, areaQr, griglia),
                 };
             }
             catch (Exception)

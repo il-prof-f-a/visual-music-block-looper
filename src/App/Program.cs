@@ -45,7 +45,7 @@ namespace VisualMusicBlockLooper.App
             RilevatoreCommutabile rilevatore = new RilevatoreCommutabile();
             string percorsoCalibrazione = Path.Combine(cartella, NomeCalibrazione);
             bool calibrata = ApplicazioneCalibrazione.TentaCaricamento(
-                percorsoCalibrazione, webcam, rilevatore, avvisi);
+                percorsoCalibrazione, webcam, rilevatore, avvisi, config);
 
             Compositore compositore = new Compositore(
                 rilevatore, uscita, ingresso, mappatura, config, LayoutTavolo.Default, orologioMs);

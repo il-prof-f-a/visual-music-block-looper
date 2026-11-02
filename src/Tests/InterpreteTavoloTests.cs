@@ -88,7 +88,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void StessoColoreSovrappostoNellaRiga()
+        public void StessoColoreConNuovoAttacco_TroncaLaPrecedente()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
@@ -96,9 +96,10 @@ namespace VisualMusicBlockLooper.Tests
                 Carta(2, 5, 1, ColoreTraccia.Blu, "VMBL1;N;2")
             });
 
-            Assert.That(stato.Note, Has.Count.EqualTo(1));
-            Assert.That(stato.Errori, Has.Count.EqualTo(1));
-            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.Sovrapposto));
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note.Select(n => n.StepIniziale), Is.EqualTo(new[] { 4, 5 }));
+            Assert.That(stato.Note.Select(n => n.DurataStep), Is.EqualTo(new[] { 1, 1 }));
         }
 
         [Test]
@@ -314,9 +315,9 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void SovrappostoStessaCella()
+        public void NuovoAttaccoNellaCellaSuccessiva_ConservaEntrambeLeNote()
         {
-            // La prima per Area.X (step 4-5) resta; la seconda (step 5) si sovrappone e va in errore.
+            // La prima termina prima del nuovo attacco nello step 5.
             RettangoloTavolo primaArea = Cella(2, 4, 2);
             RettangoloTavolo secondaArea = Cella(2, 5, 1);
 
@@ -327,13 +328,14 @@ namespace VisualMusicBlockLooper.Tests
             });
 
             Assert.That(stato.Comandi, Is.Empty);
-            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
             Assert.That(stato.Note[0].IdClip, Is.EqualTo(1));
             Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(4));
-            Assert.That(stato.Note[0].DurataStep, Is.EqualTo(2));
-            Assert.That(stato.Errori, Has.Count.EqualTo(1));
-            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.Sovrapposto));
-            Assert.That(stato.Errori[0].Area.X, Is.EqualTo(secondaArea.X));
+            Assert.That(stato.Note[0].DurataStep, Is.EqualTo(1));
+            Assert.That(stato.Note[1].IdClip, Is.EqualTo(2));
+            Assert.That(stato.Note[1].StepIniziale, Is.EqualTo(5));
+            Assert.That(stato.Note[1].DurataStep, Is.EqualTo(1));
+            Assert.That(stato.Errori, Is.Empty);
         }
 
         [Test]
@@ -385,7 +387,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void SovrapposizioneParziale()
+        public void SovrapposizioneParziale_TroncaSenzaScartareLaSuccessiva()
         {
             // Nota [2,5) e nota [4,7) sulla stessa traccia: la seconda si sovrappone solo in parte.
             RettangoloTavolo primaArea = Cella(2, 2, 3);
@@ -397,11 +399,12 @@ namespace VisualMusicBlockLooper.Tests
                 Rilevato("VMBL1;N;2", ColoreTraccia.Giallo, secondaArea)
             });
 
-            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
             Assert.That(stato.Note[0].IdClip, Is.EqualTo(1));
-            Assert.That(stato.Errori, Has.Count.EqualTo(1));
-            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.Sovrapposto));
-            Assert.That(stato.Errori[0].Area.X, Is.EqualTo(secondaArea.X));
+            Assert.That(stato.Note[0].DurataStep, Is.EqualTo(2));
+            Assert.That(stato.Note[1].IdClip, Is.EqualTo(2));
+            Assert.That(stato.Note[1].DurataStep, Is.EqualTo(3));
+            Assert.That(stato.Errori, Is.Empty);
         }
 
         [Test]

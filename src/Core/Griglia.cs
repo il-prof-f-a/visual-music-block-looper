@@ -37,6 +37,28 @@ namespace VisualMusicBlockLooper.Core
             return true;
         }
 
+        /// <summary>Il QR decide l'attacco; il colore decide il confine finale più vicino.</summary>
+        public bool TryCella(CartoncinoRilevato nota, out int traccia, out int stepIniziale, out int durataStep)
+        {
+            traccia = stepIniziale = durataStep = 0;
+            if (nota == null) return false;
+            RettangoloTavolo attacco = nota.AreaQr ?? nota.Area;
+            if (nota.AreaQr.HasValue && (attacco.Larghezza <= 0 || attacco.Altezza <= 0)) return false;
+            double fine = nota.FineEstensioneX ?? (nota.Area.X + nota.Area.Larghezza);
+            if (!Finito(attacco.X) || !Finito(attacco.Y) || !Finito(attacco.Larghezza) || !Finito(attacco.Altezza)
+                || !Finito(fine) || config.Step <= 0 || config.Tracce <= 0
+                || config.Area.Larghezza <= 0 || config.Area.Altezza <= 0) return false;
+            if (!nota.AreaQr.HasValue && !nota.FineEstensioneX.HasValue)
+                return TryCella(nota.Area, out traccia, out stepIniziale, out durataStep);
+            if (!TrovaPosizione(attacco, out traccia, out stepIniziale)) return false;
+            double confine = Math.Round((fine - config.Area.X) / LarghezzaStep() + Epsilon, MidpointRounding.AwayFromZero);
+            int finale = (int)Math.Min(config.Step, Math.Max(stepIniziale + 1, confine));
+            durataStep = finale - stepIniziale;
+            return true;
+        }
+
+        private static bool Finito(double v) => !double.IsNaN(v) && !double.IsInfinity(v);
+
         /// <summary>True quando la posizione dell'area non ricade nella griglia.</summary>
         public bool EsternoAllaGriglia(RettangoloTavolo area)
         {

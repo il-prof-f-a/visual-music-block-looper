@@ -5,6 +5,17 @@ using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
 {
+    /// <summary>Punti da ripetere senza perdere le altre osservazioni della raccolta.</summary>
+    public sealed class PuntiCalibrazioneIncoerentiException : ArgumentException
+    {
+        public IReadOnlyList<int> Numeri { get; }
+        public PuntiCalibrazioneIncoerentiException(int[] numeri)
+            : base("Punti incoerenti: " + string.Join(", ", numeri) + ". Ripetere i bersagli segnalati.", "punti")
+        {
+            Numeri = Array.AsReadOnly((int[])numeri.Clone());
+        }
+    }
+
     /// <summary>Riferimenti proiettati e controllo della calibrazione manuale a dodici punti.</summary>
     public static class SchemaCalibrazione
     {
@@ -47,8 +58,7 @@ namespace VisualMusicBlockLooper.App
                 scartoMedio += scarto / punti.Length;
             }
             if (incoerenti.Count > 0)
-                throw new ArgumentException("Punti incoerenti: " + string.Join(", ", incoerenti)
-                    + ". Ripetere la calibrazione cliccando i bersagli numerati.", nameof(punti));
+                throw new PuntiCalibrazioneIncoerentiException(incoerenti.ToArray());
             return calibrazione;
         }
     }

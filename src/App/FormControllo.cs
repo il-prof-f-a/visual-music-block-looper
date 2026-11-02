@@ -29,6 +29,8 @@ namespace VisualMusicBlockLooper.App
         private readonly string testoPorte;
         private readonly List<string> avvisi;
         private readonly List<PuntoImmagine> puntiCalibrazione = new List<PuntoImmagine>();
+        private int? puntoDaCorreggere;
+        private int PuntoCalibrazioneCorrente => puntoDaCorreggere ?? puntiCalibrazione.Count;
         private Dictionary<Control, Rectangle> limitiIniziali;
         private Dictionary<Control, Font> fontIniziali;
         private Dictionary<Font, Font> fontRidimensionati = new Dictionary<Font, Font>();
@@ -189,8 +191,9 @@ namespace VisualMusicBlockLooper.App
             }
             if (inCalibrazione && keyData == Keys.Back)
             {
-                if (puntiCalibrazione.Count > 0) puntiCalibrazione.RemoveAt(puntiCalibrazione.Count - 1);
-                proiettore.MostraCalibrazione(puntiCalibrazione.Count);
+                if (puntoDaCorreggere.HasValue) puntoDaCorreggere = Math.Max(0, puntoDaCorreggere.Value - 1);
+                else if (puntiCalibrazione.Count > 0) puntiCalibrazione.RemoveAt(puntiCalibrazione.Count - 1);
+                proiettore.MostraCalibrazione(PuntoCalibrazioneCorrente);
                 anteprima.Invalidate();
                 AggiornaInterfaccia();
                 return true;
@@ -553,10 +556,10 @@ namespace VisualMusicBlockLooper.App
 
             if (inCalibrazione)
             {
-                righe.Add($"Calibrazione: punto {puntiCalibrazione.Count + 1}/12 — "
-                    + SchemaCalibrazione.Descrizioni[puntiCalibrazione.Count] + ".\n"
-                    + "Clicca nell'anteprima il centro del bersaglio blu proiettato. "
-                    + "Backspace: ultimo punto; Esc: annulla; Calibra: ricomincia.");
+                righe.Add($"Calibrazione: punto {PuntoCalibrazioneCorrente + 1}/12 — "
+                    + SchemaCalibrazione.Descrizioni[PuntoCalibrazioneCorrente] + ".\n"
+                    + "Clicca il centro nero del bersaglio cerchiato in blu. "
+                    + "Backspace: punto precedente; Esc: annulla; Calibra: ricomincia.");
             }
 
             etichettaAvviso.Text = string.Join(Environment.NewLine, righe);
@@ -673,6 +676,7 @@ namespace VisualMusicBlockLooper.App
             dimensioniFrame = Size.Empty;
             inCalibrazione = true;
             puntiCalibrazione.Clear();
+            puntoDaCorreggere = null;
             bool immagineDisponibile = AggiornaAnteprima();
             if (!immagineDisponibile || anteprima.Image == null || immagineRaddrizzata)
             {
@@ -699,6 +703,7 @@ namespace VisualMusicBlockLooper.App
         {
             inCalibrazione = false;
             puntiCalibrazione.Clear();
+            puntoDaCorreggere = null;
             dimensioniFrame = Size.Empty;
             proiettore.MostraCalibrazione(null);
             ImpostaControlliCalibrazione(false);
@@ -748,14 +753,16 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            puntiCalibrazione.Add(punto.Value);
+            if (puntoDaCorreggere.HasValue) puntiCalibrazione[puntoDaCorreggere.Value] = punto.Value;
+            else puntiCalibrazione.Add(punto.Value);
+            puntoDaCorreggere = null;
             anteprima.Invalidate();
 
             if (puntiCalibrazione.Count == SchemaCalibrazione.Punti.Count)
             {
                 CompletaCalibrazione();
             }
-            else proiettore.MostraCalibrazione(puntiCalibrazione.Count);
+            else proiettore.MostraCalibrazione(PuntoCalibrazioneCorrente);
 
             AggiornaInterfaccia();
         }
@@ -795,6 +802,16 @@ namespace VisualMusicBlockLooper.App
 
                 SalvaWebcamInConfigurazione();
                 messaggio = $"Calibrazione: completata con 12 punti. Scarto medio {scartoMedio * 100:0.00}% del tavolo.";
+            }
+            catch (PuntiCalibrazioneIncoerentiException eccezione)
+            {
+                puntoDaCorreggere = eccezione.Numeri[0] - 1;
+                avvisi.RemoveAll(a => a.StartsWith("Calibrazione: "));
+                avvisi.Add("Calibrazione: punti incoerenti: " + string.Join(", ", eccezione.Numeri)
+                    + ". Ripeti il riferimento evidenziato; gli altri punti sono conservati.");
+                proiettore.MostraCalibrazione(PuntoCalibrazioneCorrente);
+                anteprima.Invalidate();
+                return;
             }
             catch (Exception eccezione)
             {
@@ -1170,10 +1187,12 @@ namespace VisualMusicBlockLooper.App
             double offsetX = (anteprima.ClientSize.Width - anteprima.Image.Width * scala) / 2;
             double offsetY = (anteprima.ClientSize.Height - anteprima.Image.Height * scala) / 2;
             float raggio = 5 * scalaFontApplicata;
-            foreach (PuntoImmagine p in puntiCalibrazione)
+            for (int i = 0; i < puntiCalibrazione.Count; i++)
             {
+                PuntoImmagine p = puntiCalibrazione[i];
                 float x = (float)(offsetX + p.X * scala), y = (float)(offsetY + p.Y * scala);
-                argomenti.Graphics.DrawEllipse(Pens.Lime, x - raggio, y - raggio, 2 * raggio, 2 * raggio);
+                argomenti.Graphics.DrawEllipse(puntoDaCorreggere == i ? Pens.Red : Pens.Lime,
+                    x - raggio, y - raggio, 2 * raggio, 2 * raggio);
             }
         }
     }

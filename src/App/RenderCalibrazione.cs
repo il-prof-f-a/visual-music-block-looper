@@ -27,9 +27,12 @@ namespace VisualMusicBlockLooper.App
                 {
                     var p = SchemaCalibrazione.Punti[i];
                     float x = (float)Math.Round(p.X * dimensioni.Width), y = (float)Math.Round(p.Y * dimensioni.Height);
-                    Color colore = i == puntoCorrente ? Color.RoyalBlue : Color.Black;
-                    using (var penna = new Pen(colore, i == puntoCorrente ? 3 : 2))
-                    using (var pennello = new SolidBrush(colore))
+                    if (i == puntoCorrente)
+                        using (var evidenza = new Pen(Color.RoyalBlue, 3))
+                            g.DrawEllipse(evidenza, x - raggio * 1.6f, y - raggio * 1.6f, 3.2f * raggio, 3.2f * raggio);
+                    // Il centro resta nero anche nel riferimento attivo: il blu può svanire nella webcam.
+                    using (var penna = new Pen(Color.Black, 2))
+                    using (var pennello = new SolidBrush(Color.Black))
                     {
                         g.DrawEllipse(penna, x - raggio, y - raggio, 2 * raggio, 2 * raggio);
                         g.DrawLine(penna, x - raggio, y, x + raggio, y);
@@ -43,8 +46,8 @@ namespace VisualMusicBlockLooper.App
                     }
                 }
                 g.DrawString($"Calibrazione — punto {puntoCorrente + 1}/12\n"
-                    + "Nell'anteprima clicca il centro del bersaglio blu.\n"
-                    + "Backspace: ultimo punto · Esc: annulla", font, Brushes.RoyalBlue,
+                    + "Clicca il centro nero del bersaglio cerchiato in blu.\n"
+                    + "Backspace: punto precedente · Esc: annulla", font, Brushes.Black,
                     new RectangleF(dimensioni.Width * 0.15f, dimensioni.Height * 0.3f,
                         dimensioni.Width * 0.7f, dimensioni.Height * 0.4f), formato);
             }

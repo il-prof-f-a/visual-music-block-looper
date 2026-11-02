@@ -186,6 +186,49 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(scena.Rilevatore.CalibrazioneAttiva, Is.SameAs(precedente));
                 Assert.That(File.ReadAllBytes(scena.FileCalibrazione), Is.EqualTo(file));
                 Assert.That(scena.Testo, Does.Contain("incoerenti").And.Contain("6"));
+                Assert.That(scena.Testo, Does.Contain("6/12"));
+                Assert.That(scena.Campo<ComboBox>("comboWebcam").Enabled, Is.False);
+                scena.Click(5);
+                Assert.That(scena.Rilevatore.CalibrazioneAttiva, Is.Not.SameAs(precedente));
+                Assert.That(scena.Campo<ComboBox>("comboWebcam").Enabled, Is.True);
+                Assert.That(scena.Testo, Does.Contain("completata"));
+            }
+        }
+
+        [Test]
+        public void DuePuntiIncoerenti_RichiedonoSoloLaRipetizioneDeiDueRiferimenti()
+        {
+            using (var scena = new Scena(true))
+            {
+                byte[] file = File.ReadAllBytes(scena.FileCalibrazione);
+                scena.Avvia();
+                for (int i = 0; i < 12; i++) scena.Click(i, i == 9 || i == 11);
+                Assert.That(scena.Testo, Does.Contain("10/12"));
+                Assert.That(File.ReadAllBytes(scena.FileCalibrazione), Is.EqualTo(file));
+                scena.Click(9);
+                Assert.That(scena.Testo, Does.Contain("12/12"));
+                Assert.That(File.ReadAllBytes(scena.FileCalibrazione), Is.EqualTo(file));
+                scena.Click(11);
+                Assert.That(scena.Testo, Does.Contain("completata"));
+                Assert.That(File.ReadAllBytes(scena.FileCalibrazione), Is.Not.EqualTo(file));
+            }
+        }
+
+        [Test]
+        public void Correzione_UndoEdEscConservanoLaCalibrazionePrecedente()
+        {
+            using (var scena = new Scena(true))
+            {
+                byte[] file = File.ReadAllBytes(scena.FileCalibrazione);
+                scena.Avvia();
+                for (int i = 0; i < 12; i++) scena.Click(i, i == 5);
+                Assert.That(scena.Testo, Does.Contain("6/12"));
+                scena.Tasto(Keys.Back);
+                Assert.That(scena.Testo, Does.Contain("5/12"));
+                scena.Click(4);
+                Assert.That(scena.Testo, Does.Contain("6/12"));
+                scena.Tasto(Keys.Escape);
+                Assert.That(File.ReadAllBytes(scena.FileCalibrazione), Is.EqualTo(file));
                 Assert.That(scena.Campo<ComboBox>("comboWebcam").Enabled, Is.True);
             }
         }

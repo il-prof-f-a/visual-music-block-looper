@@ -39,7 +39,12 @@ namespace VisualMusicBlockLooper.App
         private readonly string testoPorte;
         private readonly List<string> avvisi;
         private readonly List<PuntoImmagine> puntiCalibrazione = new List<PuntoImmagine>();
-        private readonly List<Point> puntiSchermo = new List<Point>();
+        private Dictionary<Control, Rectangle> limitiIniziali;
+        private Dictionary<Control, Font> fontIniziali;
+        private Dictionary<Font, Font> fontRidimensionati = new Dictionary<Font, Font>();
+        private Size dimensioniLayout;
+        private float scalaFontApplicata = 1;
+        private bool ridimensionamentoInCorso;
         private readonly TickMaster tickMaster;
         private readonly CicloCattura cicloCattura;
         private readonly Timer timerInterfaccia = new Timer { Interval = 150 };
@@ -171,6 +176,69 @@ namespace VisualMusicBlockLooper.App
             }
 
             base.Dispose(disposing);
+            if (disposing)
+            {
+                foreach (Font font in fontRidimensionati.Values) font.Dispose();
+                fontRidimensionati.Clear();
+            }
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            RidimensionaInterfaccia();
+        }
+
+        private void RidimensionaInterfaccia()
+        {
+            if (limitiIniziali == null || ridimensionamentoInCorso || Disposing || WindowState == FormWindowState.Minimized
+                || ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
+
+            double scalaX = (double)ClientSize.Width / dimensioniLayout.Width;
+            double scalaY = (double)ClientSize.Height / dimensioniLayout.Height;
+            float scalaFont = (float)Math.Min(scalaX, scalaY);
+            ridimensionamentoInCorso = true;
+            SuspendLayout();
+            try
+            {
+                if (Math.Abs(scalaFont - scalaFontApplicata) > 0.001f)
+                {
+                    var nuoviFont = new Dictionary<Font, Font>();
+                    foreach (var coppia in fontIniziali)
+                    {
+                        Font originale = coppia.Value;
+                        if (Math.Abs(scalaFont - 1) < 0.001f) coppia.Key.Font = originale;
+                        else
+                        {
+                            if (!nuoviFont.TryGetValue(originale, out Font font))
+                            {
+                                font = new Font(originale.FontFamily, originale.SizeInPoints * scalaFont,
+                                    originale.Style, GraphicsUnit.Point);
+                                nuoviFont.Add(originale, font);
+                            }
+                            coppia.Key.Font = font;
+                        }
+                    }
+                    foreach (Font precedente in fontRidimensionati.Values) precedente.Dispose();
+                    fontRidimensionati = nuoviFont;
+                    scalaFontApplicata = scalaFont;
+                }
+
+                // Ripartire sempre dai limiti iniziali evita errori di arrotondamento cumulativi.
+                foreach (var coppia in limitiIniziali)
+                {
+                    Rectangle area = coppia.Value;
+                    coppia.Key.Bounds = Rectangle.FromLTRB(
+                        (int)Math.Round(area.Left * scalaX), (int)Math.Round(area.Top * scalaY),
+                        (int)Math.Round(area.Right * scalaX), (int)Math.Round(area.Bottom * scalaY));
+                }
+                anteprima.Invalidate();
+            }
+            finally
+            {
+                ResumeLayout(false);
+                ridimensionamentoInCorso = false;
+            }
         }
 
         /// <summary>Ferma i thread e rilascia tutte le risorse una sola volta.</summary>
@@ -227,7 +295,7 @@ namespace VisualMusicBlockLooper.App
         private void CostruisciInterfaccia()
         {
             Text = "Visual Music Block Looper - Controllo";
-            // Layout (coordinate in pixel del client, 760 x 716):
+            // Layout iniziale (760 x 716), usato come riferimento per il ridimensionamento:
             //  - fascia alta x 10..750: stato (y 10), porte (y 38);
             //  - anteprima x 10..530, y 64..454; sotto di lei, larghe come lei (520) e a capo, la descrizione
             //    dell'anteprima (y 458..510) e gli avvisi (y 514..664), così non toccano la colonna destra;
@@ -346,6 +414,10 @@ namespace VisualMusicBlockLooper.App
                 casellaDebugCartoncini, pulsanteSalvaDebug, etichettaDebugCartoncini
             });
 
+            dimensioniLayout = ClientSize;
+            limitiIniziali = Controls.Cast<Control>().ToDictionary(c => c, c => c.Bounds);
+            fontIniziali = Controls.Cast<Control>().ToDictionary(c => c, c => c.Font);
+            MinimumSize = Size;
             AggiornaInterfaccia();
         }
 
@@ -571,7 +643,6 @@ namespace VisualMusicBlockLooper.App
 
             inCalibrazione = true;
             puntiCalibrazione.Clear();
-            puntiSchermo.Clear();
             anteprima.Invalidate();
             AggiornaInterfaccia();
         }
@@ -593,7 +664,6 @@ namespace VisualMusicBlockLooper.App
 
             dimensioniFrame = anteprima.Image.Size;
             puntiCalibrazione.Add(punto.Value);
-            puntiSchermo.Add(argomenti.Location);
             anteprima.Invalidate();
 
             if (puntiCalibrazione.Count == AngoliTavolo.Length)
@@ -630,7 +700,6 @@ namespace VisualMusicBlockLooper.App
             }
 
             puntiCalibrazione.Clear();
-            puntiSchermo.Clear();
             anteprima.Invalidate();
         }
 
@@ -993,9 +1062,16 @@ namespace VisualMusicBlockLooper.App
 
         private void OnPaintAnteprima(object mittente, PaintEventArgs argomenti)
         {
-            foreach (Point p in puntiSchermo)
+            if (anteprima.Image == null || puntiCalibrazione.Count == 0) return;
+            double scala = Math.Min((double)anteprima.ClientSize.Width / anteprima.Image.Width,
+                (double)anteprima.ClientSize.Height / anteprima.Image.Height);
+            double offsetX = (anteprima.ClientSize.Width - anteprima.Image.Width * scala) / 2;
+            double offsetY = (anteprima.ClientSize.Height - anteprima.Image.Height * scala) / 2;
+            float raggio = 5 * scalaFontApplicata;
+            foreach (PuntoImmagine p in puntiCalibrazione)
             {
-                argomenti.Graphics.DrawEllipse(Pens.Lime, p.X - 5, p.Y - 5, 10, 10);
+                float x = (float)(offsetX + p.X * scala), y = (float)(offsetY + p.Y * scala);
+                argomenti.Graphics.DrawEllipse(Pens.Lime, x - raggio, y - raggio, 2 * raggio, 2 * raggio);
             }
         }
     }

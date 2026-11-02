@@ -95,6 +95,23 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
+        [Test]
+        public void Diagnostica_DistingueRecuperoNuovoDaMemoriaSenzaAlterareIlQr()
+        {
+            using (Mat mat = Frame(0.15, 0.7, 0.7, true))
+            {
+                var rilevatore = new RilevatoreCartoncini(new FonteMat(mat), CalibrazioneSuFrame());
+                var primo = new TracciaCartoncini();
+                var secondo = new TracciaCartoncini();
+                var prima = rilevatore.Rileva(primo);
+                var dopo = rilevatore.Rileva(secondo);
+                Assert.That(prima.Select(c => c.Payload), Is.EqualTo(new[] { "VMBL1;N;3" }));
+                Assert.That(dopo.Select(c => c.Payload), Is.EqualTo(prima.Select(c => c.Payload)));
+                Assert.That(primo.Visione.Any(e => e.Codice == "QrDecodificato" && e.Origine != "Memoria"), Is.True);
+                Assert.That(secondo.Visione.Any(e => e.Codice == "QrDecodificato" && e.Origine == "Memoria"), Is.True);
+            }
+        }
+
         [TestCase(0.22, 0.7, 0.7, true)]
         [TestCase(0.22, 1.2, 0.7, true)]
         [TestCase(0.18, 0.7, 0.7, true)]

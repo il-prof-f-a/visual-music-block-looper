@@ -42,7 +42,9 @@ namespace VisualMusicBlockLooper.Core
         /// così che, in caso di sovrapposizione sulla stessa riga e sullo stesso colore, il primo resti.
         /// Una lista null è trattata come vuota; gli elementi null vengono ignorati.
         /// </summary>
-        public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati)
+        public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati) => Interpreta(rilevati, null);
+
+        public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati, TracciaCartoncini diagnostica)
         {
             var note = new List<(CartoncinoRilevato Rilevato, PayloadCartoncino Payload)>();
             var comandi = new List<ComandoRilevato>();
@@ -60,13 +62,13 @@ namespace VisualMusicBlockLooper.Core
             // Primo passaggio: classificazione per zona e lettura del payload.
             foreach (CartoncinoRilevato rilevato in ordinati)
             {
+                ZonaSpeciale zona = layout.ZonaDelCentro(rilevato.Area);
                 if (!ParserPayload.TryParse(rilevato.Payload, out PayloadCartoncino payload))
                 {
-                    AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato);
+                    AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona);
                     continue;
                 }
 
-                ZonaSpeciale zona = layout.ZonaDelCentro(rilevato.Area);
                 switch (zona)
                 {
                     case ZonaSpeciale.Misura:
@@ -74,15 +76,16 @@ namespace VisualMusicBlockLooper.Core
                     case ZonaSpeciale.Ab:
                         if (payload.Tipo == TipoCartoncino.Nota)
                         {
-                            AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato);
+                            AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato, diagnostica, zona);
                         }
                         else if (payload.Tipo == TipoCartoncino.Impostazione)
                         {
                             impostazioni.Add((payload, rilevato.Area, zona));
+                            diagnostica?.Associa(payload, rilevato);
                         }
                         else
                         {
-                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato);
+                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona, "ZonaIncompatibile");
                         }
 
                         break;
@@ -90,17 +93,19 @@ namespace VisualMusicBlockLooper.Core
                     case ZonaSpeciale.Comandi:
                         if (payload.Tipo != TipoCartoncino.Comando)
                         {
-                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato);
+                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona, "ZonaIncompatibile");
                             break;
                         }
 
                         comandi.Add(new ComandoRilevato { Tipo = payload.Comando, Parametro = payload.Parametro });
+                        diagnostica?.RegistraInterpretazione(rilevato, zona, true, "ComandoAccettato",
+                            $"Comando {payload.Comando}, parametro {payload.Parametro}.");
                         break;
 
                     default:
                         if (payload.Tipo != TipoCartoncino.Nota)
                         {
-                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato);
+                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona, "ZonaIncompatibile");
                             break;
                         }
 
@@ -110,7 +115,7 @@ namespace VisualMusicBlockLooper.Core
             }
 
             // Secondo passaggio: struttura dalle impostazioni, poi note sulla griglia.
-            RisoluzioneStruttura risoluzione = RisolutoreStruttura.Risolvi(impostazioni);
+            RisoluzioneStruttura risoluzione = RisolutoreStruttura.Risolvi(impostazioni, diagnostica);
             errori.AddRange(risoluzione.Errori);
             StrutturaTavolo struttura = risoluzione.Struttura;
 
@@ -121,15 +126,16 @@ namespace VisualMusicBlockLooper.Core
 
             foreach (var (rilevato, payload) in note)
             {
+                ZonaSpeciale zona = ZonaSpeciale.Nessuna;
                 if (!griglia.TryCella(rilevato.Area, out int riga, out int stepIniziale, out int durataStep))
                 {
-                    AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato);
+                    AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato, diagnostica, zona);
                     continue;
                 }
 
                 if (stepIniziale >= struttura.StepPerMisura)
                 {
-                    AggiungiErrore(errori, TipoErrore.FuoriMisura, rilevato);
+                    AggiungiErrore(errori, TipoErrore.FuoriMisura, rilevato, diagnostica, zona);
                     continue;
                 }
 
@@ -140,7 +146,7 @@ namespace VisualMusicBlockLooper.Core
                 int traccia = riga / struttura.RigheCollegate;
                 if (SovrapponeGiaOccupato(occupate, (riga, traccia), stepIniziale, durataStep))
                 {
-                    AggiungiErrore(errori, TipoErrore.Sovrapposto, rilevato);
+                    AggiungiErrore(errori, TipoErrore.Sovrapposto, rilevato, diagnostica, zona);
                     continue;
                 }
 
@@ -154,14 +160,28 @@ namespace VisualMusicBlockLooper.Core
                     IdClip = payload.IdClip,
                     Colore = (ColoreTraccia)(riga % 6)
                 });
+                diagnostica?.RegistraInterpretazione(rilevato, zona, true, "NotaAccettata",
+                    $"Nota {payload.IdClip}, riga {riga + 1}, gruppo {(riga / struttura.RigheCollegate + 1)}, step {stepIniziale}, durata {durataStep}.");
             }
 
+            if (diagnostica != null)
+            {
+                diagnostica.Layout = layout;
+                diagnostica.StrutturaGrezza = struttura;
+                diagnostica.NoteGrezze = notaStato.Count;
+                diagnostica.ComandiGrezzi = comandi.Count;
+            }
             return new StatoTavolo(notaStato, comandi, errori, struttura);
         }
 
-        private static void AggiungiErrore(List<ErroreTavolo> errori, TipoErrore tipo, CartoncinoRilevato rilevato)
+        private static void AggiungiErrore(List<ErroreTavolo> errori, TipoErrore tipo, CartoncinoRilevato rilevato,
+            TracciaCartoncini diagnostica, ZonaSpeciale zona, string codice = null)
         {
             errori.Add(new ErroreTavolo { Tipo = tipo, Area = rilevato.Area });
+            diagnostica?.RegistraInterpretazione(rilevato, zona, false, codice ?? tipo.ToString(),
+                codice == "ZonaIncompatibile"
+                    ? $"QR decodificato e payload valido, ma tipo non applicabile nella zona {zona}."
+                    : $"Cartoncino scartato: {tipo}; zona {zona}.");
         }
 
         private static bool SovrapponeGiaOccupato(

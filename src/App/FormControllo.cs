@@ -12,21 +12,11 @@ namespace VisualMusicBlockLooper.App
 {
     /// <summary>
     /// Finestra di controllo dell'operatore: stato del motore, anteprima webcam, calibrazione manuale
-    /// a 4 click, comandi di trasporto e scelta del monitor del proiettore. Contiene solo UI:
+    /// a 12 click, comandi di trasporto e scelta del monitor del proiettore. Contiene solo UI:
     /// la logica resta nel <see cref="Compositore"/> e nel motore.
     /// </summary>
     public class FormControllo : Form
     {
-        private static readonly string[] NomiAngoli =
-        {
-            "alto-sinistra", "alto-destra", "basso-destra", "basso-sinistra"
-        };
-
-        private static readonly PuntoTavolo[] AngoliTavolo =
-        {
-            new PuntoTavolo(0, 0), new PuntoTavolo(1, 0), new PuntoTavolo(1, 1), new PuntoTavolo(0, 1)
-        };
-
         private readonly Compositore compositore;
         private readonly FormProiettore proiettore;
         private readonly GestoreWebcam webcam;
@@ -187,6 +177,25 @@ namespace VisualMusicBlockLooper.App
         {
             base.OnResize(e);
             RidimensionaInterfaccia();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (inCalibrazione && keyData == Keys.Escape)
+            {
+                TerminaCalibrazione("Calibrazione: annullata; calibrazione precedente conservata.");
+                AggiornaInterfaccia();
+                return true;
+            }
+            if (inCalibrazione && keyData == Keys.Back)
+            {
+                if (puntiCalibrazione.Count > 0) puntiCalibrazione.RemoveAt(puntiCalibrazione.Count - 1);
+                proiettore.MostraCalibrazione(puntiCalibrazione.Count);
+                anteprima.Invalidate();
+                AggiornaInterfaccia();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void RidimensionaInterfaccia()
@@ -462,6 +471,7 @@ namespace VisualMusicBlockLooper.App
 
         private void OnMonitorSelezionato(object mittente, EventArgs argomenti)
         {
+            if (inCalibrazione) return;
             int indice = comboMonitor.SelectedIndex;
             if (indice >= 0 && indice < schermi.Length)
             {
@@ -523,6 +533,7 @@ namespace VisualMusicBlockLooper.App
 
         private void AggiornaInterfaccia()
         {
+            AggiornaAnteprima();
             MotoreMusicale motore = compositore.Motore;
             string modo = motore.Modo == ModoSincronia.Master ? "Master" : "Slave";
             string stato = motore.InEsecuzione ? "in esecuzione" : "fermo";
@@ -542,14 +553,16 @@ namespace VisualMusicBlockLooper.App
 
             if (inCalibrazione)
             {
-                righe.Add($"Calibrazione: clicca l'angolo {puntiCalibrazione.Count + 1}/4 ({NomiAngoli[puntiCalibrazione.Count]}) dell'area bianca proiettata.");
+                righe.Add($"Calibrazione: punto {puntiCalibrazione.Count + 1}/12 — "
+                    + SchemaCalibrazione.Descrizioni[puntiCalibrazione.Count] + ".\n"
+                    + "Clicca nell'anteprima il centro del bersaglio blu proiettato. "
+                    + "Backspace: ultimo punto; Esc: annulla; Calibra: ricomincia.");
             }
 
             etichettaAvviso.Text = string.Join(Environment.NewLine, righe);
             etichettaFps.Text = PresentatoreRegoliWebcam.TestoFps(
                 webcam.FpsCatturati, fpsDichiarati, cicloCattura.PassiAlSecondo, webcam.Larghezza, webcam.Altezza);
             AggiornaDebugCartoncini();
-            AggiornaAnteprima();
         }
 
         private void AggiornaDebugCartoncini()
@@ -590,10 +603,10 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
-        private void AggiornaAnteprima()
+        private bool AggiornaAnteprima()
         {
             // Con una calibrazione attiva l'anteprima mostra l'area del tavolo raddrizzata (stirata);
-            // durante la calibrazione serve invece l'immagine originale per cliccare i quattro angoli.
+            // durante la calibrazione serve invece l'immagine originale per cliccare i dodici bersagli.
             Calibrazione calibrazioneAttiva = rilevatore.CalibrazioneAttiva;
             bool raddrizza = AnteprimaTavolo.Raddrizzata(calibrazioneAttiva != null, inCalibrazione);
 
@@ -611,7 +624,12 @@ namespace VisualMusicBlockLooper.App
 
             if (nuova == null)
             {
-                return;
+                return false;
+            }
+
+            if (inCalibrazione && !dimensioniFrame.IsEmpty && nuova.Size != dimensioniFrame)
+            {
+                AnnullaCalibrazionePerRisoluzione();
             }
 
             Image vecchia = anteprima.Image;
@@ -619,6 +637,7 @@ namespace VisualMusicBlockLooper.App
             vecchia?.Dispose();
             immagineRaddrizzata = raddrizza;
             etichettaAnteprima.Text = raddrizza ? AnteprimaTavolo.TestoRaddrizzata : AnteprimaTavolo.TestoGrezza;
+            return true;
         }
 
         /// <summary>Rapporto larghezza/altezza del tavolo: quello dello schermo del proiettore, se scelto.</summary>
@@ -641,10 +660,58 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
+            timerRisoluzione.Stop();
+            aggiornamentoRegoli = true;
+            try
+            {
+                regoloRisoluzione.Value = EntroLimiti(regoloRisoluzione,
+                    PresetRisoluzione.IndiceVicino(webcam.Larghezza, webcam.Altezza));
+            }
+            finally { aggiornamentoRegoli = false; }
+            AggiornaTestiRegoli();
+            avvisi.RemoveAll(a => a.StartsWith("Calibrazione: "));
+            dimensioniFrame = Size.Empty;
             inCalibrazione = true;
             puntiCalibrazione.Clear();
+            bool immagineDisponibile = AggiornaAnteprima();
+            if (!immagineDisponibile || anteprima.Image == null || immagineRaddrizzata)
+            {
+                TerminaCalibrazione("Calibrazione: immagine originale non disponibile. Attendi un frame e riprova.");
+                AggiornaInterfaccia();
+                return;
+            }
+            dimensioniFrame = anteprima.Image.Size;
+            ImpostaControlliCalibrazione(true);
+            proiettore.MostraCalibrazione(0);
             anteprima.Invalidate();
             AggiornaInterfaccia();
+        }
+
+        private void ImpostaControlliCalibrazione(bool raccolta)
+        {
+            comboWebcam.Enabled = !raccolta;
+            comboMonitor.Enabled = !raccolta;
+            pulsanteAggiornaWebcam.Enabled = !raccolta;
+            regoloRisoluzione.Enabled = !raccolta && webcam.Disponibile;
+        }
+
+        private void TerminaCalibrazione(string messaggio)
+        {
+            inCalibrazione = false;
+            puntiCalibrazione.Clear();
+            dimensioniFrame = Size.Empty;
+            proiettore.MostraCalibrazione(null);
+            ImpostaControlliCalibrazione(false);
+            avvisi.RemoveAll(a => a.StartsWith("Calibrazione: "));
+            if (!string.IsNullOrEmpty(messaggio)) avvisi.Add(messaggio);
+            anteprima.Invalidate();
+        }
+
+        private void AnnullaCalibrazionePerRisoluzione()
+        {
+            rilevatore.Imposta(null);
+            calibrazionePresente = false;
+            TerminaCalibrazione("Calibrazione: risoluzione del frame cambiata, raccolta annullata. Premi Calibra per ripetere.");
         }
 
         private void OnClickAnteprima(object mittente, MouseEventArgs argomenti)
@@ -655,6 +722,25 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
+            // Il frame può essere cambiato dall'ultimo tick UI: non usare una bitmap di vecchia geometria.
+            if (!AggiornaAnteprima())
+            {
+                TerminaCalibrazione("Calibrazione: immagine originale non disponibile, raccolta annullata. Riprova.");
+                AggiornaInterfaccia();
+                return;
+            }
+            if (!inCalibrazione)
+            {
+                AggiornaInterfaccia();
+                return;
+            }
+            if (anteprima.Image.Size != dimensioniFrame)
+            {
+                AnnullaCalibrazionePerRisoluzione();
+                AggiornaInterfaccia();
+                return;
+            }
+
             PuntoImmagine? punto = ConversioneAnteprima.DaPictureBoxAImmagine(
                 argomenti.Location, anteprima.ClientSize, anteprima.Image.Size);
             if (punto == null)
@@ -662,26 +748,41 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            dimensioniFrame = anteprima.Image.Size;
             puntiCalibrazione.Add(punto.Value);
             anteprima.Invalidate();
 
-            if (puntiCalibrazione.Count == AngoliTavolo.Length)
+            if (puntiCalibrazione.Count == SchemaCalibrazione.Punti.Count)
             {
                 CompletaCalibrazione();
             }
+            else proiettore.MostraCalibrazione(puntiCalibrazione.Count);
 
             AggiornaInterfaccia();
         }
 
         private void CompletaCalibrazione()
         {
-            inCalibrazione = false;
+            string messaggio;
             try
             {
                 // L'omografia è in pixel: si memorizza la risoluzione del frame su cui sono stati cliccati i punti.
-                Calibrazione calibrazione = Calibrazione.Calcola(
-                    puntiCalibrazione.ToArray(), AngoliTavolo, dimensioniFrame.Width, dimensioniFrame.Height);
+                Calibrazione calibrazione = SchemaCalibrazione.Calcola(
+                    puntiCalibrazione.ToArray(), dimensioniFrame.Width, dimensioniFrame.Height, out double scartoMedio);
+                // Ricontrollare il frame grezzo prima di applicare: le dimensioni dichiarate dal driver
+                // possono restare quelle dell'apertura anche se il frame consegnato è cambiato.
+                using (Bitmap corrente = webcam.Anteprima())
+                {
+                    if (corrente == null)
+                    {
+                        TerminaCalibrazione("Calibrazione: immagine originale non disponibile, raccolta annullata. Riprova.");
+                        return;
+                    }
+                    if (corrente.Size != dimensioniFrame)
+                    {
+                        AnnullaCalibrazionePerRisoluzione();
+                        return;
+                    }
+                }
                 string avvisoSalvataggio = ApplicazioneCalibrazione.Applica(
                     rilevatore, webcam, calibrazione, c => c.Salva(percorsoCalibrazione));
                 calibrazionePresente = true;
@@ -693,14 +794,14 @@ namespace VisualMusicBlockLooper.App
                 }
 
                 SalvaWebcamInConfigurazione();
+                messaggio = $"Calibrazione: completata con 12 punti. Scarto medio {scartoMedio * 100:0.00}% del tavolo.";
             }
             catch (Exception eccezione)
             {
-                MessageBox.Show(this, "Calibrazione non riuscita: " + eccezione.Message, Text);
+                messaggio = "Calibrazione: non riuscita. " + eccezione.Message;
             }
 
-            puntiCalibrazione.Clear();
-            anteprima.Invalidate();
+            TerminaCalibrazione(messaggio);
         }
 
         /// <summary>Dopo una calibrazione riuscita salva nel file di configurazione la webcam in uso.</summary>
@@ -777,6 +878,7 @@ namespace VisualMusicBlockLooper.App
 
         private void AggiornaElencoWebcam()
         {
+            if (inCalibrazione) return;
             PopolaElencoWebcam(ElencoWebcam.RilevaReali(webcam.IndiceCorrente));
         }
 
@@ -795,7 +897,7 @@ namespace VisualMusicBlockLooper.App
 
         private void OnWebcamSelezionata(object mittente, EventArgs argomenti)
         {
-            if (aggiornamentoComboWebcam || !(comboWebcam.SelectedItem is InfoWebcam scelta))
+            if (inCalibrazione || aggiornamentoComboWebcam || !(comboWebcam.SelectedItem is InfoWebcam scelta))
             {
                 return;
             }
@@ -884,7 +986,7 @@ namespace VisualMusicBlockLooper.App
                 aggiornamentoRegoli = false;
             }
 
-            regoloRisoluzione.Enabled = conWebcam;
+            regoloRisoluzione.Enabled = conWebcam && !inCalibrazione;
             AggiornaTestiRegoli();
         }
 
@@ -915,7 +1017,7 @@ namespace VisualMusicBlockLooper.App
 
         private void OnScrollRisoluzione(object mittente, EventArgs argomenti)
         {
-            if (aggiornamentoRegoli)
+            if (aggiornamentoRegoli || inCalibrazione)
             {
                 return;
             }
@@ -931,7 +1033,7 @@ namespace VisualMusicBlockLooper.App
         private void ApplicaRisoluzione()
         {
             timerRisoluzione.Stop();
-            if (!webcam.Disponibile)
+            if (inCalibrazione || !webcam.Disponibile)
             {
                 return;
             }

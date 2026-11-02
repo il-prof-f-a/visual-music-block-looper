@@ -50,12 +50,15 @@ namespace VisualMusicBlockLooper.App
             }
 
             Layout = layout ?? LayoutTavolo.ConSoloComandi(ZonaComandiDefault);
+            ConfigurazioneGriglia = config;
             interprete = new InterpreteTavolo(new Griglia(config), Layout);
             Motore = new MotoreMusicale(new Sequencer(config), uscita, ingresso, mappatura, 120, orologioMs);
         }
 
         /// <summary>Zone speciali del tavolo usate per interpretare i cartoncini.</summary>
         public LayoutTavolo Layout { get; }
+
+        public ConfigGriglia ConfigurazioneGriglia { get; }
 
         /// <summary>Motore musicale pilotato dal compositore.</summary>
         public MotoreMusicale Motore { get; }

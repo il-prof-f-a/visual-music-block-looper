@@ -94,8 +94,8 @@ Passi in Ableton:
 
 Riferimenti per il controllo, tutti sulla guida proiettata:
 
-- La griglia è di **6 righe x 16 colonne**. La riga è determinata dal centro verticale del cartoncino; il colore determina lo strumento (canale MIDI) e non è più legato alla riga. Nella stessa riga si possono mescolare colori diversi (sezione 12).
-- Lo step iniziale è determinato dal bordo sinistro del cartoncino. La durata è la larghezza in passi (30 mm per passo nei cartoncini stampati: la scala con la nuova griglia è in sezione 12).
+- La griglia è di **6 righe x 16 colonne**. La riga è determinata dal centro verticale del QR; lo strumento dipende dal gruppo di righe collegate. Il colore del cartoncino serve a misurare l'estensione della nota.
+- Lo step iniziale è determinato dal bordo sinistro del QR nero, senza aggiungere cornice bianca o ingombro del corpo. La durata dipende dal corpo contiguo verso destra nel tavolo, con fine agganciata al confine di cella più vicino.
 - La nota viene riconosciuta (verde sulla guida) dopo circa 3 frame consecutivi e rimossa dopo circa 5 frame di assenza.
 
 Procedura:
@@ -103,8 +103,16 @@ Procedura:
 1. Posare un cartoncino rosso `nota-rosso-0.png` nel primo step della riga 1. La guida lo mostra verde.
 2. Premere **Avvia** (modo Master). Ad ogni passaggio del playhead la nota viene inviata: in Ableton il clip deve partire e la nota MIDI 36 canale 1 deve apparire nel monitor MIDI.
 3. Rimuovere il cartoncino: la nota si spegne (note-off) alla fine della sua durata.
-4. Ripetere la verifica per ciascuno dei sei colori (un canale per colore). Con il default le sei righe suonano in sequenza: per sentire più righe insieme posare il cartoncino «1 riga» (sezione 12).
+4. Ripetere la verifica nei diversi gruppi di righe: ogni gruppo usa uno strumento. Con il default le sei righe suonano in sequenza; per sentire più righe insieme posare il cartoncino «1 riga» (sezione 12).
 5. Errori: un cartoncino non valido sulla griglia è segnato in rosso sulla guida (vedi sezione 9).
+
+### Aggancio al QR e durata
+
+Posare l'inizio nero del QR nella cella desiderata. Il bordo bianco o colorato può sporgere a sinistra senza invalidare un QR interno. Non viene aggiunto un margine obbligatorio in millimetri al QR.
+
+Un QR senza colore che lo prolunga dura almeno una cella. Un corpo contiguo prolunga la nota verso destra; un vuoto mantiene la pausa. Se nella stessa riga compare un altro QR, la nota precedente termina al più nella cella prima del nuovo attacco. Anche due QR con la stessa altezza avviano due note distinte. Se iniziano realmente nella stessa cella, il conflitto viene segnalato in rosso: separarli in celle diverse.
+
+Il verde descrive le celle effettivamente suonate. Per la prova con cartoncini sovrapposti, contare i QR visibili e confrontarli con `AggancioQr` e `NotaAccettata` nel debugger. La fotografia di riferimento ha cinque note sul rigo 3 e cinque sul rigo 4, alle celle 1, 4, 7, 12 e 14. Un QR fisicamente coperto resta non leggibile.
 
 ## 8. Modo Master e Slave
 
@@ -148,14 +156,14 @@ La guida segnala in rosso (contorno e fondo chiaro) i cartoncini scartati. Il mo
 
 | Errore | Causa tipica | Cosa fare |
 |---|---|---|
-| Payload non valido | QR non leggibile o payload non previsto (nota nella zona comandi, comando nella griglia). | Verificare il cartoncino e la sua posizione. |
-| Colore mancante | Il colore non è abbastanza saturo (saturazione < 35%) o troppo scuro (valore < 25%). Succede con il proiettore sovraesposto. | Ridurre la luce ambiente, abbassare la luminosità del proiettore, usare cartoncini stampati più saturi. |
-| Sovrapposto | Due note dello stesso colore sulla stessa riga si sovrappongono nei passi, oppure due cartoncini speciali nella stessa zona. | Spostare o accorciare una delle due note; lasciare un solo cartoncino per zona. |
-| Fuori griglia | Cartoncino fuori dalla griglia (ad esempio oltre la riga 6 o prima del primo step), oppure una nota posata nella colonna sinistra. | Riposizionare il cartoncino. |
+| Payload non valido | Testo QR fuori protocollo o tipo incompatibile con la zona (nota nella zona comandi, comando nella griglia). | Verificare il cartoncino e la sua posizione. |
+| Colore mancante | Voce storica: il colore non sceglie più lo strumento; un QR senza estensione produce una nota di una cella. | Controllare la lettura del QR e la durata desiderata. |
+| Sovrapposto | Due QR di nota iniziano nella stessa cella dello stesso rigo, oppure più cartoncini speciali occupano la stessa zona. | Separare gli attacchi in celle diverse; lasciare un solo cartoncino per zona. I corpi possono sovrapporsi: il nuovo QR tronca la nota precedente. |
+| Fuori griglia | Il bordo sinistro del QR o il suo centro verticale sono fuori dall'area musicale. | Posare il QR nella cella desiderata; l'ingombro del corpo a sinistra non determina l'attacco. |
 | Impostazione non valida | Cartoncino speciale con un valore non ammesso (ad esempio `MISURA 5`), o A-B non compatibile con il collegamento (ad esempio B oltre le righe collegate). Il parametro torna al default. | Usare un cartoncino della tabella di sezione 12. |
 | Fuori misura | Nota che inizia in una colonna oscurata (in 3/4 dalla colonna 13, in 2/4 dalla colonna 9). | Spostare la nota nelle colonne attive, o usare 4/4. |
 
-Colori di riferimento (corpo, RGB): Rosso 220/40/40, Arancione 255/140/0, Giallo 250/210/0, Verde 40/160/70, Blu 30/90/200, Viola 130/50/170. La classificazione è per tonalità HSV (intervalli in `ClassificatoreColore`): prima della prova completa, verificare il riconoscimento con un cartoncino per colore, sotto la luce reale del proiettore.
+Il corpo deve distinguersi dal fondo per misurare la durata. La sua tonalità non sceglie lo strumento. Se la durata è sbagliata, confrontare il punto di fine colore e la cella finale nel debugger.
 
 ## 10. Latenza
 
@@ -191,7 +199,7 @@ Misura suggerita (con registrazione audio):
 Il tavolo non ha più «sei tracce con un colore fisso per riga». Il modello è questo:
 
 - **Riga = misura.** Ogni riga contiene una misura: 4/4 (16 sedicesimi, default), 3/4 (12) o 2/4 (8). Con 3/4 e 2/4 le colonne oltre la misura sono oscurate e le note che vi iniziano sono scartate (`FuoriMisura`).
-- **Colore = strumento.** Il colore del cartoncino sceglie il canale MIDI (mappatura di sezione 6). Nella stessa riga si possono mescolare colori diversi. Due cartoncini dello stesso colore non possono sovrapporsi nei passi; colori diversi sì.
+- **Strumento = gruppo di righe collegate.** Il colore prolunga la nota ma non sceglie il canale MIDI. Un nuovo QR in una cella successiva avvia una nuova nota e limita la precedente, anche se i corpi si sovrappongono o l'altezza è uguale.
 - **Gruppi.** Il collegamento divide le 6 righe in gruppi consecutivi. Dentro un gruppo le righe suonano in sequenza, misura dopo misura. Gruppi diversi suonano in contemporanea, sempre sincronizzati.
 - **A-B.** Il giro ripete solo le righe da A a B, numerate dentro il gruppo a partire da 1. Si usa con collegamento 2, 3 o 6.
 

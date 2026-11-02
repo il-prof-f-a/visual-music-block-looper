@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using VisualMusicBlockLooper.Vision;
+using VisualMusicBlockLooper.Core;
 
 namespace VisualMusicBlockLooper.App
 {
@@ -44,7 +45,8 @@ namespace VisualMusicBlockLooper.App
         /// <param name="avvisi">Riceve i messaggi da mostrare all'operatore.</param>
         /// <returns>True se il rilevatore è stato attivato.</returns>
         public static bool TentaCaricamento(
-            string percorso, GestoreWebcam webcam, RilevatoreCommutabile rilevatore, ICollection<string> avvisi)
+            string percorso, GestoreWebcam webcam, RilevatoreCommutabile rilevatore, ICollection<string> avvisi,
+            ConfigGriglia griglia = null)
         {
             if (webcam == null || !webcam.Disponibile || !File.Exists(percorso))
             {
@@ -65,7 +67,7 @@ namespace VisualMusicBlockLooper.App
                     return false;
                 }
 
-                rilevatore.Imposta(new RilevatoreCartoncini(webcam, calibrazione));
+                rilevatore.Imposta(new RilevatoreCartoncini(webcam, calibrazione, griglia));
                 return true;
             }
             catch (Exception eccezione)
@@ -82,9 +84,10 @@ namespace VisualMusicBlockLooper.App
         /// <param name="salva">Azione che persiste la calibrazione.</param>
         /// <returns>Messaggio di avviso se il salvataggio è fallito, altrimenti null.</returns>
         public static string Applica(
-            RilevatoreCommutabile rilevatore, IFonteImmagini fonte, Calibrazione calibrazione, Action<Calibrazione> salva)
+            RilevatoreCommutabile rilevatore, IFonteImmagini fonte, Calibrazione calibrazione, Action<Calibrazione> salva,
+            ConfigGriglia griglia = null)
         {
-            rilevatore.Imposta(new RilevatoreCartoncini(fonte, calibrazione));
+            rilevatore.Imposta(new RilevatoreCartoncini(fonte, calibrazione, griglia));
             try
             {
                 salva(calibrazione);

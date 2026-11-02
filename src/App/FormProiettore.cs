@@ -20,6 +20,7 @@ namespace VisualMusicBlockLooper.App
         private StatoTavolo stato;
         private PosizioneGiro posizione;
         private bool inEsecuzione;
+        private int? puntoCalibrazione;
 
         /// <summary>Crea la form per la griglia indicata. Non viene mostrata.</summary>
         public FormProiettore(ConfigGriglia config, LayoutTavolo layout = null)
@@ -49,6 +50,19 @@ namespace VisualMusicBlockLooper.App
             Show();
         }
 
+        /// <summary>Mostra il riferimento atteso; null ripristina la guida musicale.</summary>
+        public void MostraCalibrazione(int? puntoCorrente)
+        {
+            if (puntoCorrente.HasValue && (puntoCorrente.Value < 0 || puntoCorrente.Value >= SchemaCalibrazione.Punti.Count))
+                throw new ArgumentOutOfRangeException(nameof(puntoCorrente));
+            lock (bloccoStato)
+            {
+                if (IsDisposed) return;
+                puntoCalibrazione = puntoCorrente;
+            }
+            RichiediDisegno();
+        }
+
         /// <summary>
         /// Aggiorna lo stato proiettato e richiede un nuovo disegno. Thread-safe.
         /// Lo stato viene copiato: le modifiche successive del chiamante non influiscono sul disegno.
@@ -75,6 +89,11 @@ namespace VisualMusicBlockLooper.App
                 inEsecuzione = nuovaEsecuzione;
             }
 
+            RichiediDisegno();
+        }
+
+        private void RichiediDisegno()
+        {
             if (!IsHandleCreated)
             {
                 return;
@@ -116,15 +135,18 @@ namespace VisualMusicBlockLooper.App
             StatoTavolo statoCorrente;
             PosizioneGiro posizioneDisegnata;
             bool esecuzione;
+            int? riferimento;
 
             lock (bloccoStato)
             {
                 statoCorrente = stato;
                 posizioneDisegnata = posizione;
                 esecuzione = inEsecuzione;
+                riferimento = puntoCalibrazione;
             }
 
-            renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
+            if (riferimento.HasValue) RenderCalibrazione.Disegna(e.Graphics, ClientSize, riferimento.Value);
+            else renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
         }
 
         /// <summary>Stato attualmente proiettato (copia interna), null se non ancora impostato.</summary>

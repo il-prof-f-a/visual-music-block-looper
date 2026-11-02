@@ -61,20 +61,17 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
   Si può modificare a mano: basta il solo `Nome` (con più webcam dello stesso nome vale la prima, salvo che sia indicato anche il `Percorso`).
 - Se la webcam indicata nel file non è presente (scollegata) l'app parte in modalità simulazione con un avviso e **non** apre un'altra webcam al suo posto: si sceglie dalla lista. Se il file è assente si usa la prima webcam.
 
-## 5. Calibrazione (4 click)
+## 5. Calibrazione (12 click)
 
-1. Premere **Calibra**.
-2. Nell'anteprima della webcam cliccare, in quest'ordine, i quattro angoli dell'area bianca proiettata:
-   1. alto-sinistra
-   2. alto-destra
-   3. basso-destra
-   4. basso-sinistra
-
-   Il testo nell'area avvisi in basso nella finestra di controllo indica l'angolo atteso ("clicca l'angolo 2/4 ..."). La riga di stato in alto mostra invece BPM, modo e stato di esecuzione.
-3. Dopo il quarto click la calibrazione viene calcolata e salvata in `calibrazione.txt`, accanto all'exe. Il messaggio "Calibrazione mancante" scompare.
-   Da questo momento l'anteprima non mostra più l'immagine grezza della webcam ma **l'area del tavolo raddrizzata**: è "stirata" secondo i quattro punti cliccati, in modo che il rettangolo calibrato riempia tutta l'anteprima (il rapporto è quello dello schermo del proiettore, o 16:9). Un testo sotto l'anteprima lo ricorda. **Se vedi parti che non sono il tavolo** (bordi, oggetti, zone fuori dall'area proiettata), la calibrazione non è precisa: premi di nuovo **Calibra** (durante i quattro click l'anteprima torna all'immagine originale) e rifai i click più vicino agli angoli.
-4. Se i click sono sbagliati, premere di nuovo **Calibra** e ripetere. La webcam viene aperta a 1280x720 (se il driver non la concede si usa la risoluzione reale) e `calibrazione.txt` memorizza la risoluzione usata: se all'avvio la camera lavora a una risoluzione diversa compare "Calibrazione per una risoluzione diversa: rifai la calibrazione" e il rilevatore resta spento; un vecchio file senza risoluzione viene accettato con l'avviso "Calibrazione senza risoluzione: ripetila per sicurezza".
-5. Controllo: appoggiare un cartoncino nero o colorato su una zona nota e verificare che la guida proiettata lo riconosca nella cella giusta (vedi sezione 7).
+1. Selezionare il monitor del proiettore, poi premere **Calibra**. Il proiettore mostra dodici bersagli numerati su una cornice: i quattro vertici più due punti intermedi per lato. Ogni lato ha quattro riferimenti contando gli angoli condivisi.
+2. Nell'anteprima **originale** della webcam cliccare il centro del bersaglio blu, seguendo i numeri **1–12**. Il percorso parte dall'alto-sinistra del proiettore e procede in senso orario: 1–4 sul lato superiore, 4–7 a destra, 7–10 in basso, 10–1 a sinistra. La camera può essere capovolta: seguire i numeri proiettati, non gli angoli dell'anteprima.
+   I bersagli sono leggermente interni al bianco per essere completamente visibili. La calibrazione usa le loro coordinate effettive: non bisogna cliccare i bordi esterni né stimare i terzi dei lati nell'immagine prospettica.
+3. L'area avvisi indica **punto n/12** e posizione. **Backspace** cancella l'ultimo punto, **Esc** annulla conservando la calibrazione precedente, **Calibra** ricomincia. Si può ingrandire la finestra: i punti restano allineati all'immagine.
+   Webcam, monitor e risoluzione restano bloccati durante la raccolta. Un cambio inatteso della dimensione del frame annulla la raccolta; ripetere con la nuova risoluzione.
+4. Dopo il dodicesimo click il software calcola l'omografia e controlla gli scarti. Se alcuni punti risultano incoerenti, mostra i loro numeri e lascia intatta la calibrazione precedente: ripetere con **Calibra**. Se il controllo passa, la nuova calibrazione è attivata e salvata in `calibrazione.txt`; viene mostrato lo **scarto medio**. Un errore di scrittura è segnalato come calibrazione attiva ma non salvata.
+5. La guida musicale ricompare e l'anteprima mostra **l'area del tavolo raddrizzata**, con il rapporto dello schermo del proiettore (o 16:9). Se compaiono zone esterne al tavolo, ripetere cliccando con precisione i centri dei bersagli. La correzione prospettica non sostituisce una calibrazione della distorsione ottica della lente.
+6. I file esistenti restano compatibili. `calibrazione.txt` conserva la risoluzione usata: se la camera lavora a una risoluzione diversa il rilevatore resta spento e occorre rifare la calibrazione. I vecchi file senza risoluzione sono accettati con un avviso. La risoluzione richiesta è configurabile; quella effettiva dipende dal driver.
+7. Controllo: appoggiare un cartoncino nero o colorato su una zona nota e verificare che la guida proiettata lo riconosca nella cella giusta (vedi sezione 7).
 
 ## 6. Mappatura in Ableton
 
@@ -257,7 +254,7 @@ La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step pro
 |---|---|---|---|
 | Porte `VMBL` aperte, nessun avviso MIDI | | | |
 | Webcam aperta (nessun avviso di simulazione) | | | |
-| Calibrazione con 4 click, file `calibrazione.txt` creato | | | |
+| Calibrazione con 12 click, file `calibrazione.txt` creato, scarti coerenti | | | |
 | Nota on/off per ciascun colore (rosso, arancione, giallo, verde, blu, viola: un canale per colore) | | | |
 | Nota on/off per clip (almeno clip 0, 3 e 7) | | | |
 | Mappatura clip in Ableton (MIDI Map) | | | |

@@ -73,8 +73,9 @@ namespace VisualMusicBlockLooper.Tests
             PuntoImmagine[] punti = SchemaCalibrazione.Punti.Select(Camera).ToArray();
             Assert.That(punti, Has.Length.EqualTo(12));
             punti[5] = new PuntoImmagine(punti[5].X + 120, punti[5].Y + 60);
-            var errore = Assert.Throws<ArgumentException>(() => SchemaCalibrazione.Calcola(punti, 1280, 720, out _));
+            var errore = Assert.Throws<PuntiCalibrazioneIncoerentiException>(() => SchemaCalibrazione.Calcola(punti, 1280, 720, out _));
             Assert.That(errore.Message, Does.Contain("6"));
+            Assert.That(errore.Numeri, Is.EqualTo(new[] { 6 }));
         }
 
         [Test]

@@ -37,7 +37,14 @@ namespace VisualMusicBlockLooper.Tests
                 {
                     Point p = Centro(i, bitmap.Size);
                     Color colore = bitmap.GetPixel(p.X, p.Y);
-                    Assert.That(colore.ToArgb(), Is.EqualTo((i == 5 ? Color.RoyalBlue : Color.Black).ToArgb()), "bersaglio " + (i + 1));
+                    Assert.That(colore.ToArgb(), Is.EqualTo(Color.Black.ToArgb()), "centro ad alto contrasto " + (i + 1));
+                    int raggio = (int)Math.Ceiling(Math.Min(w, h) * 0.022);
+                    bool bordoBlu = false;
+                    for (int x = p.X - raggio; x <= p.X + raggio; x++)
+                        for (int y = p.Y - raggio; y <= p.Y + raggio; y++)
+                            if (x >= 0 && y >= 0 && x < w && y < h)
+                                bordoBlu |= bitmap.GetPixel(x,y).ToArgb() == Color.RoyalBlue.ToArgb();
+                    Assert.That(bordoBlu, Is.EqualTo(i == 5), "evidenza bersaglio " + (i + 1));
                     Assert.That(p.X, Is.InRange(10, w - 10));
                     Assert.That(p.Y, Is.InRange(10, h - 10));
                 }
@@ -55,7 +62,7 @@ namespace VisualMusicBlockLooper.Tests
                 form.Aggiorna(new StatoTavolo(null, null, null), 4, true);
                 form.Dipingi(g, bitmap.Size);
                 Point p = Centro(2, bitmap.Size);
-                Assert.That(bitmap.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.RoyalBlue.ToArgb()));
+                Assert.That(bitmap.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.Black.ToArgb()));
                 form.MostraCalibrazione(null);
                 form.Dipingi(g, bitmap.Size);
                 Assert.That(bitmap.GetPixel(p.X, p.Y).ToArgb(), Is.EqualTo(Color.White.ToArgb()));

@@ -197,6 +197,35 @@ namespace VisualMusicBlockLooper.Vision
             }
         }
 
+        /// <summary>Genera soltanto il ritaglio richiesto; il margine conserva l'erosione ai bordi della ROI.</summary>
+        public Mat MascheraTavolo(Rect regione,int larghezzaCamera,int altezzaCamera,int restringi=0)
+        {
+            regione&=new Rect(0,0,larghezzaCamera,altezzaCamera);
+            if(regione.Width<=0||regione.Height<=0||restringi<0)throw new ArgumentOutOfRangeException(nameof(regione));
+            if(Curva)return MascheraDellaCurva(larghezzaCamera,altezzaCamera,restringi,regione);
+            var estesa=new Rect(regione.X-restringi,regione.Y-restringi,regione.Width+2*restringi,regione.Height+2*restringi)
+                &new Rect(0,0,larghezzaCamera,altezzaCamera);
+            using(var tavolo=new Mat(100,100,MatType.CV_8UC1,Scalar.All(255)))
+            using(var trasformazione=new Mat(3,3,MatType.CV_64FC1))
+            using(var maschera=new Mat())
+            {
+                for(int r=0;r<3;r++)
+                {
+                    double fattore=r<2?100:1;
+                    trasformazione.Set(r,0,matrice[r*3]*fattore);
+                    trasformazione.Set(r,1,matrice[r*3+1]*fattore);
+                    trasformazione.Set(r,2,(matrice[r*3+2]+matrice[r*3]*estesa.X+matrice[r*3+1]*estesa.Y)*fattore);
+                }
+                Cv2.WarpPerspective(tavolo,maschera,trasformazione,estesa.Size,
+                    InterpolationFlags.Linear|InterpolationFlags.WarpInverseMap,BorderTypes.Constant,Scalar.All(0));
+                Cv2.Threshold(maschera,maschera,127,255,ThresholdTypes.Binary);
+                if(restringi>0)
+                    using(var nucleo=Cv2.GetStructuringElement(MorphShapes.Rect,new Size(2*restringi+1,2*restringi+1)))
+                        Cv2.Erode(maschera,maschera,nucleo);
+                using(var taglio=new Mat(maschera,new Rect(regione.X-estesa.X,regione.Y-estesa.Y,regione.Width,regione.Height)))return taglio.Clone();
+            }
+        }
+
         /// <summary>
         /// Raddrizza l'immagine della camera sull'area del tavolo definita dalla calibrazione: il risultato è
         /// una vista dall'alto, "stirata", in cui il rettangolo calibrato riempie tutta l'immagine

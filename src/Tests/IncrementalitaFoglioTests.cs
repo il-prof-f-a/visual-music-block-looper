@@ -11,6 +11,25 @@ namespace VisualMusicBlockLooper.Tests
     public class IncrementalitaFoglioTests
     {
         [Test]
+        public void DueModificheIsolateNonConfermanoUnaNuovaPartitura()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var c=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>c,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora))
+                {
+                    foreach(var frame in new[]{vuoto,vuoto,f,vuoto,f}){ora+=100;r.Pubblica(frame,ora);a.Passo(true);}
+                    Assert.That(a.UltimoStato.Note,Is.Empty,"A,A,B,A,B non sono due conferme consecutive di B.");
+                    Assert.That(p.NumeroCompilazioni,Is.EqualTo(1));
+                    ora+=100;r.Pubblica(f,ora);a.Passo(true);Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                }
+            }
+        }
+        [Test]
         public void FoglioFermoNonVieneRidecodificatoONuovamenteCompilato()
         {
             long ora=0;var u=new EsecutorePartituraTests.Uscita();var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};

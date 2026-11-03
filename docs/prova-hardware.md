@@ -251,8 +251,22 @@ La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step pro
 - **Comando ONESHOT con più QR visibili.** Il cartoncino `comando-oneshot-36.png` ha un payload più lungo (`VMBL1;C;ONESHOT;36`) che richiede il QR di versione 2 con correzione M. Quando più QR sono visibili insieme, la lettura multipla di OpenCV può scartarlo. Al banco: verificare il ONESHOT con gli altri cartoncini nel campo, e se serve posarlo da solo.
 - **Cartoncini speciali: livello di correzione L.** I cartoncini speciali usano la correzione d'errore L: il loro payload più lungo (`VMBL1;S;MISURA;3`, 16 caratteri) entra nella versione QR 1 solo con questo livello (capacità della versione 1 in modo byte: 17 byte a livello L, 14 a livello M). Il livello L corregge meno errori del M: la robustezza di lettura dipende quindi molto da stampa nitida e messa a fuoco.
 - **Colori e leggibilità sotto la luce del proiettore.** Il corpo dei cartoncini speciali è viola-grigio neutro (sotto la soglia di saturazione: non è un colore di traccia). I test automatici verificano i PNG, non la lettura reale. Da verificare al banco: la lettura del QR e la distinzione tra le tre zone, con la luce reale del proiettore e della stanza.
-- **Comportamento noto: cambio della MISURA durante la riproduzione.** Cambiando il cartoncino MISURA mentre suona, il playhead salta: lo step assoluto continua a scorrere, ma la posizione nella nuova misura è diversa e le note in corso vengono interrotte. Per un cambio pulito fermare, cambiare e riavviare.
+- **Aggiornamenti durante la riproduzione.** Il runtime prepara la nuova MISURA/LINK/A–B e le note in background; entrano insieme alla frontiera di un giro. Una lettura tardiva può richiedere un ulteriore giro. Vedi [esecuzione per giro](esecuzione-midi.md).
 - **Comportamento noto: note con stesso colore e stessa clip insieme.** Due note dello stesso colore e della stessa clip che suonano contemporaneamente in righe diverse condividono canale e nota MIDI: il motore le riattacca (note-off e nuovo note-on) e invia il note-off finale solo quando termina l'ultima. Nessun intervento richiesto.
+
+## Collaudo del produttore–consumatore
+
+Con illuminazione sufficiente e la calibrazione esistente, verificare i punti seguenti senza cambiare porte o impostazioni ottiche per ottenere un esito positivo:
+
+1. Foglio fermo: dopo le conferme iniziali, versioni e conteggio delle letture delle zone restano stabili. Il controllo leggero e la camera proseguono.
+2. Spostare una delle dieci note a metà giro: il verde conserva la partitura in uso; la nuova posizione blu entra soltanto alla frontiera ammessa. Le altre zone non richiedono nuova decodifica.
+3. Rimuovere un cartoncino: servono due frame affidabili di zona vuota. Coprire/oscureggiare il QR deve conservare la versione valida e indicare incertezza.
+4. Modificare dopo la scadenza dell'ultima misura: il prossimo giro conserva la versione già preparata; l'aggiornamento successivo entra interamente più tardi.
+5. Premere Ferma durante lettura e preparazione: il trasporto non aspetta il decoder. Ripetere durante lo stato «in preparazione» prima della prima lettura: la richiesta Play deve essere annullata.
+6. Provare separatamente STOP/TAP ottici: il timestamp TAP proviene dal frame, ma il ritardo ottico comprende la conferma. Un cartoncino tenuto non deve riemettere il comando dopo un'occlusione.
+7. Eseguire il [banco temporale](esecuzione-midi.md#banco-temporale-isolato) per dieci minuti a 60/120/180 BPM, base e con carico, sulla porta isolata «VMBL Test». Conservare JSON e TRX; misurare audio DAW separatamente. Riportare tutti gli overrun e i target falliti.
+
+La proiezione verde indica la partitura in uso; le modifiche osservate in attesa sono blu tratteggiate. Lo stato riporta le versioni letto/pronto/in uso. «Salva tempi MIDI» e «Salva debug» producono rapporti locali distinti.
 
 ## Esito della prova
 

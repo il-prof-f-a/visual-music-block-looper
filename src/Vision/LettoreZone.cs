@@ -13,6 +13,7 @@ namespace VisualMusicBlockLooper.Vision
         public bool Completa { get; }
         public int QrDecodificati { get; }
         public Rect RegioneCamera { get; }
+        public Rect RegioneMaschera { get; internal set; }
     }
     public sealed class LettoreZone
     {

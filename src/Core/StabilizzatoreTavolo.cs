@@ -96,6 +96,13 @@ namespace VisualMusicBlockLooper.Core
                 strutturaStabile);
         }
 
+        /// <summary>Interrompe le conferme candidate senza interpretare un frame incerto come rimozione.</summary>
+        public void InterrompiConfermeComandi()
+        {
+            presenzeComandi.Clear();
+            foreach(string chiave in comandiTenuti.Keys.ToArray())comandiTenuti[chiave]=0;
+        }
+
         /// <summary>Osserva lo stato dopo una cattura fallita/senza calibrazione, senza avanzare i contatori.</summary>
         public void DescriviStatoInvariato(TracciaCartoncini traccia)
         {

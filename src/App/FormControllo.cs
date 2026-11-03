@@ -459,7 +459,7 @@ namespace VisualMusicBlockLooper.App
 
         private void AvviaFerma()
         {
-            if (compositore.Motore.InEsecuzione)
+            if (compositore.Motore.InEsecuzione || compositore.Esecutore?.Stato.InPreparazione==true)
             {
                 compositore.Motore.Arresta();
             }
@@ -536,7 +536,7 @@ namespace VisualMusicBlockLooper.App
             string modo = motore.Modo == ModoSincronia.Master ? "Master" : "Slave";
             string stato = motore.InEsecuzione ? "in esecuzione" : compositore.Esecutore?.Stato.InPreparazione == true ? "in preparazione" : "fermo";
             etichettaStato.Text = $"BPM {motore.Bpm:0.#}   |   {modo}   |   {stato}";
-            pulsanteAvviaFerma.Text = motore.InEsecuzione ? "Ferma" : "Avvia";
+            pulsanteAvviaFerma.Text = motore.InEsecuzione || compositore.Esecutore?.Stato.InPreparazione==true ? "Ferma" : "Avvia";
             pulsanteTap.Enabled = !inCalibrazione && motore.Modo == ModoSincronia.Master;
 
             List<string> righe = new List<string>(avvisi);

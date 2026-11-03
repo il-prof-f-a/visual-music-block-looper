@@ -1,6 +1,8 @@
 # visual-music-block-looper
 Software per la composizione visuale di musica webcam-proiettore collegati ad un software di produzione musicale
 
+[Esecuzione MIDI per giro](docs/esecuzione-midi.md): produttore–consumatore con doppio buffer, lettura delle zone cambiate, scambio alla frontiera e diagnostica temporale dalla finestra principale.
+
 [Debug dei cartoncini: ultime 50 catture e rapporto QR/vincoli](docs/debug-cartoncini.md).
 
 [Note agganciate ai QR](docs/prova-hardware.md#aggancio-al-qr-e-durata): il QR determina l'attacco, il colore contiguo prolunga la nota e il QR successivo chiude la precedente. QR distinti della stessa altezza rimangono attacchi separati.

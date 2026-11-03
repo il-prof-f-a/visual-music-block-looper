@@ -35,6 +35,9 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(l.UltimaRegioneCamera.Width, Is.LessThan(f.Width*.5));
                 Assert.That(l.UltimaRegioneCamera.Height, Is.LessThan(f.Height*.7));
                 Assert.That(dopo.QrDecodificati, Is.LessThan(10));
+                Assert.That(dopo.RegioneMaschera.Height,Is.LessThan(f.Height*.8),"Anche la maschera deve elaborare solo il rigo interessato.");
+                Assert.That(AggancioQrTests.Interprete().Interpreta(dopo.Catalogo).Note.Select(n=>n.DurataStep),
+                    Is.EqualTo(AggancioQrTests.Interprete().Interpreta(prima.Catalogo).Note.Select(n=>n.DurataStep)));
             }
         }
         [Test]

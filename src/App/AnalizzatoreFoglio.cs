@@ -90,8 +90,9 @@ namespace VisualMusicBlockLooper.App
                         if(cmd.Width>0&&cmd.Height>0)Cv2.Rectangle(tavolo,cmd,Scalar.White,-1);
                         var variazioni=differenze.Confronta(tavolo);
                         Volatile.Write(ref ultimeRegioni,variazioni.Regioni);
-                        if(!variazioni.Affidabile){Descrivi(traccia,"ImmagineNonAffidabile",f);return true;}
-                        if(variazioni.Regioni.Count==0){Descrivi(traccia,"FoglioInvariato",f);return true;}
+                        if(!variazioni.Affidabile){firmaCandidata=null;conferme=0;Descrivi(traccia,"ImmagineNonAffidabile",f);return true;}
+                        if(variazioni.Regioni.Count==0)
+                        {firmaCandidata=null;conferme=0;Descrivi(traccia,"FoglioInvariato",f);return true;}
                         var lavoro=catalogo;var risolte=new List<RettangoloTavolo>();bool completa=true;
                         foreach(var z in variazioni.Regioni)
                         {

@@ -762,9 +762,10 @@ namespace VisualMusicBlockLooper.Vision
             return c;
         }
 
-        private CartoncinoRilevato Converti(Candidato c, List<Candidato> tutti, Mat maschera, out Rect areaCamera)
+        private CartoncinoRilevato Converti(Candidato c, List<Candidato> tutti, Mat maschera, out Rect areaCamera,
+            Point? origineMaschera=null,Size? dimensioniCamera=null)
         {
-            Rect rettangolo = c.Corpo.HasValue ? Ritaglia(c, tutti, maschera) : c.Riquadro;
+            Rect rettangolo = c.Corpo.HasValue ? Ritaglia(c, tutti, maschera,origineMaschera??new Point()) : c.Riquadro;
             areaCamera = rettangolo;
 
             try
@@ -781,7 +782,7 @@ namespace VisualMusicBlockLooper.Vision
                     Payload = c.Testo,
                     Area = new RettangoloTavolo(minX, minY, maxX - minX, maxY - minY),
                     AreaQr = areaQr,
-                    FineEstensioneX = MisuratoreEstensioneNota.Misura(maschera, calibrazione, areaQr, griglia),
+                    FineEstensioneX = MisuratoreEstensioneNota.Misura(maschera, calibrazione, areaQr, griglia,origineMaschera,dimensioniCamera),
                 };
             }
             catch (Exception)
@@ -792,16 +793,16 @@ namespace VisualMusicBlockLooper.Vision
         }
 
         // Unisce il corpo con la zona del QR e lo ritaglia con i vicini.
-        private static Rect Ritaglia(Candidato c, List<Candidato> tutti, Mat maschera)
+        private static Rect Ritaglia(Candidato c, List<Candidato> tutti, Mat maschera,Point origine)
         {
             // Estensione lungo la fascia del QR: righe del riquadro per sinistra/destra, colonne per alto/basso.
             // La zona del QR (riquadro bianco) conta come piena anche se fuori maschera.
             Rect z = c.Zona;
             int sinistra = z.Left, destra = z.Right, alto = z.Top, basso = z.Bottom;
-            sinistra = Espandi(sinistra, -1, 0, maschera.Cols, x => ColonnaPiena(maschera, x, c.Riquadro.Top, c.Riquadro.Bottom));
-            destra = Espandi(destra - 1, +1, 0, maschera.Cols, x => ColonnaPiena(maschera, x, c.Riquadro.Top, c.Riquadro.Bottom)) + 1;
-            alto = Espandi(alto, -1, 0, maschera.Rows, y => RigaPiena(maschera, y, c.Riquadro.Left, c.Riquadro.Right));
-            basso = Espandi(basso - 1, +1, 0, maschera.Rows, y => RigaPiena(maschera, y, c.Riquadro.Left, c.Riquadro.Right)) + 1;
+            sinistra = Espandi(sinistra, -1, origine.X, origine.X+maschera.Cols, x => ColonnaPiena(maschera, x-origine.X, c.Riquadro.Top-origine.Y, c.Riquadro.Bottom-origine.Y));
+            destra = Espandi(destra - 1, +1, origine.X, origine.X+maschera.Cols, x => ColonnaPiena(maschera, x-origine.X, c.Riquadro.Top-origine.Y, c.Riquadro.Bottom-origine.Y)) + 1;
+            alto = Espandi(alto, -1, origine.Y, origine.Y+maschera.Rows, y => RigaPiena(maschera, y-origine.Y, c.Riquadro.Left-origine.X, c.Riquadro.Right-origine.X));
+            basso = Espandi(basso - 1, +1, origine.Y, origine.Y+maschera.Rows, y => RigaPiena(maschera, y-origine.Y, c.Riquadro.Left-origine.X, c.Riquadro.Right-origine.X)) + 1;
 
             foreach (Candidato n in tutti)
             {

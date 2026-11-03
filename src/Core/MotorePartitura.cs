@@ -139,7 +139,16 @@ namespace VisualMusicBlockLooper.Core
             if (modo != ModoSincronia.Master) return;
             var nuovo = tap.Tap(istante);
             if (!nuovo.HasValue) return;
-            if (inEsecuzione) bpmPendente = nuovo.Value; else Volatile.Write(ref bpm, nuovo.Value);
+            if (inEsecuzione) bpmPendente = nuovo.Value;
+            else {bpmPendente=0;Volatile.Write(ref bpm, nuovo.Value);}
+        }
+        public double BpmRichiesto {get {double p=Volatile.Read(ref bpmPendente);return p>0?p:Bpm;}}
+        public void ImpostaBpm(double nuovo)
+        {
+            if(modo!=ModoSincronia.Master)return;
+            tap.Azzera();nuovo=Tempo.Limita(nuovo);
+            if(inEsecuzione)Volatile.Write(ref bpmPendente,nuovo);
+            else{bpmPendente=0;Volatile.Write(ref bpm,nuovo);}
         }
         public void Arresta()
         {

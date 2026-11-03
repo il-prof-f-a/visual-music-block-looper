@@ -39,6 +39,8 @@ namespace VisualMusicBlockLooper.App
         private bool ridimensionamentoInCorso;
         private readonly TickMaster tickMaster;
         private readonly CicloCattura cicloCattura;
+        private readonly PreparatoreAnteprima preparatoreAnteprima;
+        private AnteprimaPronta anteprimaMostrata;
         private readonly Timer timerInterfaccia = new Timer { Interval = 150 };
 
         // Debounce dei regoli della webcam: risoluzione al rilascio (500 ms), fuoco/esposizione dal vivo (150 ms)
@@ -126,6 +128,7 @@ namespace VisualMusicBlockLooper.App
 
             tickMaster = new TickMaster(compositore.Motore, orologioMs);
             cicloCattura = new CicloCattura(PassoCattura);
+            if(compositore.Video!=null)preparatoreAnteprima=new PreparatoreAnteprima(compositore.Video.Registro,()=>rilevatore.CalibrazioneAttiva);
 
             CostruisciInterfaccia();
             PopolaElencoWebcam(elencoWebcam ?? new List<InfoWebcam>());
@@ -144,6 +147,7 @@ namespace VisualMusicBlockLooper.App
         {
             base.OnShown(e);
             compositore.AvviaAcquisizione();
+            preparatoreAnteprima?.Avvia();
             tickMaster.Avvia();
             cicloCattura.Avvia();
             timerInterfaccia.Start();
@@ -279,6 +283,8 @@ namespace VisualMusicBlockLooper.App
             }
 
             cicloCattura.Ferma();
+            preparatoreAnteprima?.Dispose();
+            if(anteprimaMostrata!=null){anteprima.Image=null;anteprimaMostrata.Dispose();anteprimaMostrata=null;}
             tickMaster.Ferma();
             try { compositore.Dispose(); }
             catch (Exception) { /* Proseguire con il rilascio delle altre risorse. */ }
@@ -604,6 +610,7 @@ namespace VisualMusicBlockLooper.App
 
         private bool AggiornaAnteprima()
         {
+            if(preparatoreAnteprima!=null)return AggiornaAnteprimaPreparata();
             // Con una calibrazione attiva l'anteprima mostra l'area del tavolo raddrizzata (stirata);
             // durante la calibrazione serve invece l'immagine originale per cliccare i dodici bersagli.
             Calibrazione calibrazioneAttiva = rilevatore.CalibrazioneAttiva;
@@ -638,6 +645,26 @@ namespace VisualMusicBlockLooper.App
             etichettaAnteprima.Text = !raddrizza ? AnteprimaTavolo.TestoGrezza
                 : calibrazioneAttiva.Curva ? AnteprimaTavolo.TestoCurva : AnteprimaTavolo.TestoRaddrizzata;
             return true;
+        }
+
+        private bool AggiornaAnteprimaPreparata()
+        {
+            preparatoreAnteprima.Richiedi(AnteprimaTavolo.Dimensioni(AspettoDelTavolo(),anteprima.ClientSize.Width,anteprima.ClientSize.Height));
+            var nuova=preparatoreAnteprima.Preleva();
+            var vecchia=anteprimaMostrata;
+            if(nuova!=null)anteprimaMostrata=nuova;
+            var attuale=anteprimaMostrata;
+            if(attuale==null)return false;
+            var c=rilevatore.CalibrazioneAttiva;
+            bool raddrizza=AnteprimaTavolo.Raddrizzata(c!=null,inCalibrazione);
+            Image immagine=raddrizza&&ReferenceEquals(c,attuale.Calibrazione)?attuale.Raddrizzata:!raddrizza?attuale.Grezza:null;
+            if(inCalibrazione&&!dimensioniFrame.IsEmpty&&attuale.Grezza.Size!=dimensioniFrame)
+            {AnnullaCalibrazionePerRisoluzione();raddrizza=false;immagine=attuale.Grezza;}
+            anteprima.Image=immagine;
+            if(nuova!=null)vecchia?.Dispose();
+            immagineRaddrizzata=raddrizza;
+            etichettaAnteprima.Text=!raddrizza?AnteprimaTavolo.TestoGrezza:c.Curva?AnteprimaTavolo.TestoCurva:AnteprimaTavolo.TestoRaddrizzata;
+            return immagine!=null;
         }
 
         /// <summary>Rapporto larghezza/altezza del tavolo: quello dello schermo del proiettore, se scelto.</summary>
@@ -780,19 +807,16 @@ namespace VisualMusicBlockLooper.App
                     puntiCalibrazione.ToArray(), dimensioniFrame.Width, dimensioniFrame.Height, out _);
                 // Ricontrollare il frame grezzo prima di applicare: le dimensioni dichiarate dal driver
                 // possono restare quelle dell'apertura anche se il frame consegnato è cambiato.
-                using (Bitmap corrente = webcam.Anteprima())
+                Size dimensioniCorrenti;
+                if(compositore.Video!=null)
                 {
-                    if (corrente == null)
-                    {
-                        TerminaCalibrazione("Calibrazione: immagine originale non disponibile, raccolta annullata. Riprova.");
-                        return;
-                    }
-                    if (corrente.Size != dimensioniFrame)
-                    {
-                        AnnullaCalibrazionePerRisoluzione();
-                        return;
-                    }
+                    var d=compositore.Video.Registro.DimensioniCorrenti;
+                    dimensioniCorrenti=new Size(d.Width,d.Height);
                 }
+                else using(Bitmap corrente=webcam.Anteprima())dimensioniCorrenti=corrente?.Size??Size.Empty;
+                if(dimensioniCorrenti.IsEmpty)
+                {TerminaCalibrazione("Calibrazione: immagine originale non disponibile, raccolta annullata. Riprova.");return;}
+                if(dimensioniCorrenti!=dimensioniFrame){AnnullaCalibrazionePerRisoluzione();return;}
                 string avvisoSalvataggio = ApplicazioneCalibrazione.Applica(
                     rilevatore, webcam, calibrazione, c => c.Salva(percorsoCalibrazione), compositore.ConfigurazioneGriglia);
                 calibrazionePresente = true;
@@ -882,7 +906,8 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Salva l'ultimo frame grezzo della webcam accanto all'eseguibile, per analizzare i QR non letti.</summary>
         private void SalvaFrame()
         {
-            using (Bitmap frame = webcam.Anteprima())
+            Bitmap grezza=anteprimaMostrata?.Grezza;
+            using (Bitmap frame = preparatoreAnteprima==null?webcam.Anteprima():grezza==null?null:new Bitmap(grezza))
             {
                 if (frame == null)
                 {

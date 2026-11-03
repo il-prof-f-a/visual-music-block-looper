@@ -12,6 +12,7 @@ namespace VisualMusicBlockLooper.Core
         void AggiornaTavolo(StatoTavolo stato);
         void TickInterno();
         void Tap(long istante);
+        void ImpostaBpm(double bpm);
         void ControllaTimeoutClock(long adesso);
         void Avvia();
         void Arresta();

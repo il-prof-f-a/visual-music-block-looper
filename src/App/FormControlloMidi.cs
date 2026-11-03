@@ -17,10 +17,20 @@ namespace VisualMusicBlockLooper.App
         private StatoTavolo osservatoDisegnato;
         private bool salvataggioTempi;
         private string messaggioTempi;
+        private NumericUpDown campoBpm;
+        private bool aggiornamentoBpm;
 
         private void AggiungiControlliMidi()
         {
             if(!compositore.EsecuzioneDeterministica)return;
+            pulsanteTap.Width=75;
+            var labelBpm=new Label{Text="BPM",Left=630,Top=194,Width=115,Height=18};
+            campoBpm=new NumericUpDown{Name="campoBpm",AccessibleName="BPM",Left=630,Top=214,Width=115,Height=24,
+                Minimum=(decimal)Tempo.MinBpm,Maximum=(decimal)Tempo.MaxBpm,DecimalPlaces=1,Increment=1,Value=(decimal)compositore.Motore.Bpm,TabIndex=4};
+            campoBpm.ValueChanged+=(m,a)=>{if(!aggiornamentoBpm)compositore.Motore.ImpostaBpm((double)campoBpm.Value);};
+            campoBpm.KeyDown+=(m,a)=>{if(a.KeyCode==Keys.Enter){SelectNextControl(campoBpm,true,true,true,true);a.Handled=true;a.SuppressKeyPress=true;}};
+            suggerimentiDebug.SetToolTip(campoBpm,"Tempo Master: scrivi il valore e premi Invio. Durante Play cambia alla pulsazione successiva; in Slave segue il clock esterno.");
+            Controls.AddRange(new Control[]{labelBpm,campoBpm});
             ClientSize=new Size(760,800);
             var rileggi=new Button {Name="pulsanteRileggiFoglio",Text="Rileggi foglio",Left=10,Top=714,Width=180,Height=28,TabIndex=32};
             rileggi.Click+=(m,a)=>compositore.RileggiFoglio();
@@ -45,8 +55,15 @@ namespace VisualMusicBlockLooper.App
         private void AggiornaStatoMidi()
         {
             var e=compositore.Esecutore;if(e==null||etichettaVersioniFoglio==null)return;
+            campoBpm.Enabled=!inCalibrazione&&e.Modo==ModoSincronia.Master;
+            if(!campoBpm.ContainsFocus)
+            {
+                aggiornamentoBpm=true;
+                try{campoBpm.Value=(decimal)Tempo.Limita(e.Modo==ModoSincronia.Master?e.Stato.BpmRichiesto:e.Bpm);}
+                finally{aggiornamentoBpm=false;}
+            }
             long osservata=compositore.Preparatore.Foglio.Ultima?.Versione??0;
-            string errore=tickMaster.UltimoErrore??e.UltimoErrore??compositore.Preparatore.UltimoErrore??cicloCattura.UltimoErrore;
+            string errore=tickMaster.UltimoErrore??e.UltimoErrore??compositore.Preparatore.UltimoErrore??cicloCattura.UltimoErrore??preparatoreAnteprima?.UltimoErrore;
             string testo=$"Foglio letto v{osservata} | pronto v{e.Stato.VersionePronta} | in uso v{e.Stato.VersioneAttiva}"
                 +$" | letture zone: {compositore.Analizzatore?.NumeroLettureZone??0}";
             testo+=Environment.NewLine+(errore??messaggioTempi??compositore.Analizzatore?.UltimoEsito??"Preparazione del foglio");

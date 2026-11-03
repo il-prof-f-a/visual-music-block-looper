@@ -143,8 +143,8 @@ namespace VisualMusicBlockLooper.Tests
         }
         private sealed class OffFallisceUnaVolta : IUscitaMidi
         {
-            public int TentativiOff;
-            public void Clock() { } public void Start() { } public void Stop() { } public void Continue() { }
+            public int TentativiOff, TentativiStop;
+            public void Clock() { } public void Start() { } public void Stop() { TentativiStop++; } public void Continue() { }
             public void NotaOn(int c, int n, int v) { }
             public void NotaOff(int c, int n) { if (++TentativiOff == 1) throw new InvalidOperationException("Driver temporaneamente occupato"); }
         }
@@ -157,6 +157,15 @@ namespace VisualMusicBlockLooper.Tests
             m.Pubblica(PartituraMidiPreparata.Prepara(p, u)); m.Avvia(); Tick(m, 6);
             Assert.Throws<InvalidOperationException>(() => m.TickInterno()); m.Arresta();
             Assert.That(u.TentativiOff, Is.EqualTo(2));
+        }
+        [Test]
+        public void StopVieneInviatoAncheSeUnoSpegnimentoFallisceDuranteLArresto()
+        {
+            var u = new OffFallisceUnaVolta(); var m = new MotorePartitura(u, new Mappa());
+            var s = new StatoTavolo(new[] { new CartoncinoNota { Riga = 0, Traccia = 0, IdClip = 40, DurataStep = 4 } }, null, null);
+            m.Pubblica(PartituraMidiPreparata.Prepara(new CompilatorePartitura(new ConfigGriglia(), new Mappa()).Compila(s, 1, 1), u));
+            m.Avvia(); m.TickInterno(); Assert.Throws<InvalidOperationException>(() => m.Arresta()); m.Arresta();
+            Assert.That(u.TentativiOff, Is.EqualTo(2)); Assert.That(u.TentativiStop, Is.EqualTo(1));
         }
     }
 }

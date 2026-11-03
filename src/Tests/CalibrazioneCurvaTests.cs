@@ -124,6 +124,24 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void AnteprimaEAnalizzatoreAlternatiNonRicostruisconoLaMappaOgniVolta()
+        {
+            var c=Crea();
+            using(var f=new Mat(720,1280,MatType.CV_8UC1,Scalar.All(0)))
+            {
+                using(var a=c.Raddrizza(f,640,360)){}
+                using(var b=c.Raddrizza(f,520,293)){}
+                f.SetTo(Scalar.All(71));
+                AppDomain.MonitoringIsEnabled=true;
+                long prima=AppDomain.CurrentDomain.MonitoringTotalAllocatedMemorySize;
+                using(var a=c.Raddrizza(f,640,360))
+                    Assert.That(a.At<byte>(180,320),Is.EqualTo(71),"La cache riguarda la geometria, non il contenuto del frame.");
+                long allocate=AppDomain.CurrentDomain.MonitoringTotalAllocatedMemorySize-prima;
+                Assert.That(allocate,Is.LessThan(100000),"Il formato giÃ  preparato deve evitare nuove matrici gestite per ogni pixel.");
+            }
+        }
+
+        [Test]
         public void Maschera_CoincideConLeCoordinateCurveENonCondivideIlBuffer()
         {
             var curva = Crea();
@@ -149,7 +167,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void BordiCurvi_IncludonoEstremiFraGliAngoli()
         {
-            // Con il cuscinetto, l'estremo del bordo raddrizzato può essere a metà del lato.
+            // Con il cuscinetto, l'estremo del bordo raddrizzato puÃ² essere a metÃ  del lato.
             var curva = SchemaCalibrazione.Calcola(SchemaCalibrazione.Punti.Select(p => Camera(p, false, 0.3)).ToArray(),
                 1280, 720, out _);
             var r = new Rect(200, 200, 800, 200);

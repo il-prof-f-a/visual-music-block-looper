@@ -14,6 +14,8 @@ Core espone interfacce (`IRilevatoreCartoncini`, `IUscitaMidi`, `IIngressoMidi`,
 
 Il [modello produttore–consumatore](esecuzione-midi.md) separa acquisizione, analisi e compilazione dal clock. `PreparatoreFoglio` produce eventi immutabili; `ScambioPartiture` pubblica una sola versione pronta. `MotorePartitura` consuma il buffer attivo e sostituisce il riferimento alla frontiera del giro. I messaggi del driver vengono preparati prima della pubblicazione. Solo l'esecutore modifica trasporto e invia MIDI; comandi/UI/callback consegnano richieste limitate, con Stop prioritario.
 
+`PreparatoreAnteprima` legge copie dal registro video e pubblica la coppia Bitmap grezza/raddrizzata più recente. La UI acquisisce la proprietà della coppia e la rilascia quando la sostituisce; il worker non attende la UI. La cache geometrica CAL3 è limitata a due formati. Il campo BPM manuale usa la coda del consumatore e mantiene la fase musicale; in Slave il tempo è quello del clock esterno.
+
 ```mermaid
 flowchart LR
   cam[Acquisitore video] --> vis[Variazioni e lettore ROI]

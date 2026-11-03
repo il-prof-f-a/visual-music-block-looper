@@ -7,11 +7,12 @@ namespace VisualMusicBlockLooper.App
     /// <summary>Unico consumatore/inviatore MIDI; UI, ottica e callback sono soltanto produttori di richieste.</summary>
     public sealed class EsecutoreMidi : IMotoreMusicale, IDisposable
     {
-        private enum Tipo { Play, Tap, Modo, OneShot, ClockEsterno, StartEsterno, ContinueEsterno, StopEsterno }
+        private enum Tipo { Play, Tap, Bpm, Modo, OneShot, ClockEsterno, StartEsterno, ContinueEsterno, StopEsterno }
         private readonly struct Richiesta
         {
-            public Richiesta(Tipo tipo, int parametro, long istante, long sequenza)
-            { Tipo = tipo; Parametro = parametro; Istante = istante; Sequenza = sequenza; }
+            public Richiesta(Tipo tipo, int parametro, long istante, long sequenza,double bpm)
+            { Tipo = tipo; Parametro = parametro; Istante = istante; Sequenza = sequenza;Bpm=bpm; }
+            public readonly double Bpm;
             public readonly Tipo Tipo;
             public readonly int Parametro;
             public readonly long Istante, Sequenza;
@@ -61,6 +62,7 @@ namespace VisualMusicBlockLooper.App
         public void Silenzia() => RichiediStop();
         public void CambiaModo() => Richiedi(Tipo.Modo);
         public void Tap(long istante) => Richiedi(Tipo.Tap, 0, istante);
+        public void ImpostaBpm(double bpm)=>Richiedi(Tipo.Bpm,bpm:Tempo.Limita(bpm));
         public void OneShot(int nota) => Richiedi(Tipo.OneShot, nota);
         public PartituraMidiPreparata Prepara(StatoTavolo foglio, long versioneFoglio, long generazione, long frontiera)
             => PartituraMidiPreparata.Prepara(compilatore.Compila(foglio, versioneFoglio, generazione, frontiera), uscita);
@@ -86,10 +88,10 @@ namespace VisualMusicBlockLooper.App
                 }
             }
         }
-        private void Richiedi(Tipo tipo, int parametro = 0, long istante = 0)
+        private void Richiedi(Tipo tipo, int parametro = 0, long istante = 0,double bpm=0)
         {
             if (Volatile.Read(ref eliminato) != 0) return;
-            var r = new Richiesta(tipo, parametro, istante, Interlocked.Increment(ref sequenza));
+            var r = new Richiesta(tipo, parametro, istante, Interlocked.Increment(ref sequenza),bpm);
             if (!coda.ProvaInserisci(r)) { Volatile.Write(ref ultimoErrore, "Coda MIDI piena: arresto controllato."); RichiediStop(); }
         }
         private void RichiediStop(bool esterno = false)
@@ -128,7 +130,7 @@ namespace VisualMusicBlockLooper.App
             for (int i = 0; i < 4096 && elaborati < 64 && coda.ProvaEstrai(out r); i++)
             {
                 ApplicaArrestiUrgenti();
-                bool controllo = r.Tipo == Tipo.Modo || r.Tipo == Tipo.Tap;
+                bool controllo = r.Tipo == Tipo.Modo || r.Tipo == Tipo.Tap || r.Tipo==Tipo.Bpm;
                 if (!controllo && r.Sequenza <= Volatile.Read(ref ultimoStop)) continue;
                 bool ingressoEsterno = r.Tipo == Tipo.ClockEsterno || r.Tipo == Tipo.StartEsterno || r.Tipo == Tipo.ContinueEsterno;
                 if (!controllo && r.Sequenza <= Volatile.Read(ref ultimoStopEsterno) && (ingressoEsterno || Modo == ModoSincronia.Slave)) continue;
@@ -137,6 +139,7 @@ namespace VisualMusicBlockLooper.App
                 {
                     case Tipo.Play: Stato.Avvia(); break;
                     case Tipo.Tap: Stato.Tap(r.Istante); break;
+                    case Tipo.Bpm: Stato.ImpostaBpm(r.Bpm);break;
                     case Tipo.Modo: Stato.CambiaModo(); break;
                     case Tipo.OneShot: Stato.OneShot(r.Parametro); break;
                     case Tipo.ClockEsterno:

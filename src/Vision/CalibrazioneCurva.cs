@@ -15,6 +15,7 @@ namespace VisualMusicBlockLooper.Vision
         private PuntoTavolo[] riferimentiTavolo;
         private readonly object sincronizzazioneMappe = new object();
         private MappaAnteprima mappaAnteprima;
+        private MappaAnteprima altraMappaAnteprima;
         private byte[] mascheraCurva;
         private int larghezzaMaschera, altezzaMaschera, restringimentoMaschera;
 
@@ -92,6 +93,8 @@ namespace VisualMusicBlockLooper.Vision
             MappaAnteprima mappa;
             lock (sincronizzazioneMappe)
             {
+                if(altraMappaAnteprima!=null&&altraMappaAnteprima.Larghezza==larghezza&&altraMappaAnteprima.Altezza==altezza)
+                {var precedente=mappaAnteprima;mappaAnteprima=altraMappaAnteprima;altraMappaAnteprima=precedente;}
                 if (mappaAnteprima == null || mappaAnteprima.Larghezza != larghezza || mappaAnteprima.Altezza != altezza)
                 {
                     int numero = checked(larghezza * altezza);
@@ -104,11 +107,11 @@ namespace VisualMusicBlockLooper.Vision
                             nuova.X[y * larghezza + x] = (float)p.X;
                             nuova.Y[y * larghezza + x] = (float)p.Y;
                         }
-                    mappaAnteprima = nuova;
+                    altraMappaAnteprima=mappaAnteprima;mappaAnteprima = nuova;
                 }
                 mappa = mappaAnteprima;
             }
-            // Solo array gestiti nella cache, al massimo un formato. I Mat sono locali alla chiamata:
+            // Solo array geometrici gestiti, al massimo due formati per analisi e anteprima. I Mat sono locali:
             // nessuna risorsa nativa persistente da perdere al cambio di calibrazione o durante il resize.
             using (var mx = new Mat(altezza, larghezza, MatType.CV_32FC1))
             using (var my = new Mat(altezza, larghezza, MatType.CV_32FC1))

@@ -22,6 +22,7 @@ namespace VisualMusicBlockLooper.App
         private bool eliminato;
         public long NumeroFotogrammi { get { lock (blocco) return id; } }
         public long GenerazioneCorrente { get { lock (blocco) return generazione; } }
+        public Size DimensioniCorrenti {get {lock(blocco)return eliminato||immagine==null?new Size():immagine.Size();}}
         public void Pubblica(Mat frame, long istanteMs)
         {
             if (frame == null || frame.Empty()) return;

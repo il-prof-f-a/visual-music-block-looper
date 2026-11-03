@@ -154,6 +154,12 @@ namespace VisualMusicBlockLooper.Core
             }
         }
 
+        public void ImpostaBpm(double bpm)
+        {
+            lock(bloccoLock)
+            {if(Modo!=ModoSincronia.Master)return;tapTempo.Azzera();Bpm=Tempo.Limita(bpm);}
+        }
+
         /// <summary>
         /// Controlla che il clock esterno sia ancora presente: in Slave, se il clock manca da più di 500 ms
         /// (dall'ultimo clock o dall'ultimo cambio di modo) spegne gli one-shot pendenti, anche con il DAW

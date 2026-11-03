@@ -43,6 +43,11 @@ namespace VisualMusicBlockLooper.Tests
             {
                 Assert.That(f.Controls.Find("etichettaVersioniFoglio",true),Has.Length.EqualTo(1));
                 Assert.That(f.Controls.Find("pulsanteSalvaTempiMidi",true),Has.Length.EqualTo(1));
+                var bpm=(NumericUpDown)f.Controls.Find("campoBpm",true).Single();bpm.Value=137.5m;c.Esecutore.ElaboraPendenti();
+                Assert.That(c.Motore.Bpm,Is.EqualTo(137.5));
+                c.Motore.CambiaModo();c.Esecutore.ElaboraPendenti();
+                typeof(FormControllo).GetMethod("AggiornaInterfaccia",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(f,null);
+                Assert.That(bpm.Enabled,Is.False);
                 var bottone=f.Controls.Find("pulsanteRileggiFoglio",true).Single();int larghezza=bottone.Width;
                 var iniziale=f.ClientSize;f.ClientSize=new Size(iniziale.Width*2,iniziale.Height*2);
                 Assert.That(bottone.Width,Is.EqualTo(larghezza*2).Within(2));

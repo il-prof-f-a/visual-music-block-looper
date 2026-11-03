@@ -41,6 +41,7 @@ I comandi ottici hanno un worker indipendente: confronto fino a 10 Hz e decodifi
 
 ## Controlli e diagnosi
 
+- **BPM:** campo numerico accanto a Tap, da 30 a 300 con un decimale. Scrivere il valore e premere Invio oppure usare le frecce. In Master il comando passa all'esecutore: cambia subito da fermo e alla pulsazione successiva durante Play, senza ricompilare la partitura. In Slave il campo segue il clock esterno ed è disabilitato. Una scelta manuale azzera la storia del Tap; il Tap richiede almeno due colpi.
 - **Foglio letto / pronto / in uso:** versioni osservata, preparata e attiva; possono essere diverse durante Play.
 - **Verde:** note della partitura attiva. **Blu tratteggiato:** note osservate che attendono l'attivazione. **Rosso:** errore di interpretazione/vincolo; gli esiti di lettura incerta sono riportati nello stato e nel debug.
 - **Rileggi foglio:** ripete la lettura senza sostituire direttamente il buffer attivo.
@@ -48,6 +49,8 @@ I comandi ottici hanno un worker indipendente: confronto fino a 10 Hz e decodifi
 - **Debug cartoncini:** conserva le ultime 50 catture delle due corsie; include ID frame, versioni, esiti e ROI effettive. I due registri sono limitati e non contengono immagini.
 
 Il clock Master usa scadenze QPC assolute e MMCSS del solo thread quando disponibile. In Slave l'esecutore segue gli ingressi timestampati e non genera un secondo Clock. Se un ritardo richiederebbe recuperare più tick, il trasporto viene fermato con spegnimenti e segnalazione: occorre riavviare. Non vengono inviati pacchetti di arretrati per nascondere lo stallo. Windows, GC e driver restano sorgenti possibili di ritardo; il doppio buffer garantisce coerenza del contenuto, non una garanzia hard real time.
+
+L'anteprima viene preparata su un worker distinto, a partire dai frame condivisi. La finestra preleva soltanto l'ultima coppia di Bitmap pronta: grezza a risoluzione originale per calibrare, raddrizzata per la scena. Non esegue acquisizione o remap durante l'aggiornamento periodico della UI. La cache CAL3 conserva due formati geometrici, per evitare ricostruzioni alternate fra analizzatore e anteprima; non conserva il contenuto delle immagini.
 
 ## Banco temporale isolato
 

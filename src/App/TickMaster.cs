@@ -5,130 +5,102 @@ using VisualMusicBlockLooper.Core;
 
 namespace VisualMusicBlockLooper.App
 {
-    /// <summary>
-    /// Thread ad alta priorità che genera i tick di clock interno a <see cref="Tempo.IntervalloTickMs"/>
-    /// e controlla periodicamente il timeout del clock esterno.
-    /// </summary>
+    /// <summary>Clock a scadenze assolute. Camera, compilazione e notifiche UI non girano su questo thread.</summary>
     public sealed class TickMaster : IDisposable
     {
-        private const double PeriodoTimeoutMs = 100;
-
-        private readonly MotoreMusicale motore;
+        private readonly IMotoreMusicale motore;
         private readonly Func<long> orologioMs;
         private readonly Action dopoTick;
         private Thread thread;
+        private Timer notifiche;
         private volatile bool fermare;
-
-        /// <param name="orologioMs">Stesso orologio del motore, usato per il controllo del timeout del clock.</param>
-        /// <param name="dopoTick">Opzionale: chiamata sul thread dei tick dopo ogni tick, per aggiornare subito la proiezione.</param>
-        public TickMaster(MotoreMusicale motore, Func<long> orologioMs, Action dopoTick = null)
+        private int notificaInCorso;
+        private long tickEmessi, ultimoNotificato;
+        private string ultimoErrore;
+        public TickMaster(IMotoreMusicale motore, Func<long> orologioMs, Action dopoTick = null)
         {
             this.motore = motore ?? throw new ArgumentNullException(nameof(motore));
             this.orologioMs = orologioMs ?? throw new ArgumentNullException(nameof(orologioMs));
             this.dopoTick = dopoTick;
         }
-
-        /// <summary>Avvia il thread; non fa nulla se è già avviato.</summary>
+        public RegistroTempiMidi RegistroTempi { get; } = new RegistroTempiMidi();
+        public bool MmcssAttiva { get; private set; }
+        public string UltimoErrore => Volatile.Read(ref ultimoErrore);
         public void Avvia()
         {
-            if (thread != null)
-            {
-                return;
-            }
-
+            if (thread != null) return;
             fermare = false;
-            thread = new Thread(Ciclo)
-            {
-                Name = "TickMaster",
-                IsBackground = true,
-                Priority = ThreadPriority.Highest
-            };
+            if (dopoTick != null) notifiche = new Timer(Notifica, null, 15, 15);
+            thread = new Thread(Ciclo) { Name = "Esecutore MIDI", IsBackground = true, Priority = ThreadPriority.Highest };
             thread.Start();
         }
-
-        /// <summary>Ferma il thread e attende la sua terminazione.</summary>
         public void Ferma()
         {
-            fermare = true;
+            fermare = true; notifiche?.Dispose(); notifiche = null;
             Thread corrente = thread;
+            if (corrente == null || corrente == Thread.CurrentThread) return;
+            if (!corrente.Join(2000)) throw new TimeoutException("L'uscita MIDI non ha terminato l'invio in corso.");
             thread = null;
-            if (corrente != null && corrente != Thread.CurrentThread)
-            {
-                corrente.Join(1000);
-            }
         }
-
-        public void Dispose()
+        public void Dispose() => Ferma();
+        private void Notifica(object _)
         {
-            Ferma();
-        }
-
-        private void Ciclo()
-        {
-            // Senza risoluzione 1 ms Thread.Sleep(1) dura fino a ~15,6 ms e il clock MIDI avrebbe jitter.
-            bool risoluzioneAlzata = RisoluzioneTimer.Richiedi();
+            if (fermare || Interlocked.Exchange(ref notificaInCorso, 1) != 0) return;
             try
             {
-                CicloInterno();
+                long n = Volatile.Read(ref tickEmessi);
+                if (n != ultimoNotificato) { ultimoNotificato = n; dopoTick(); }
             }
-            finally
+            catch (Exception) { }
+            finally { Volatile.Write(ref notificaInCorso, 0); }
+        }
+        private void Ciclo()
+        {
+            bool timerRichiesto = RisoluzioneTimer.Richiedi();
+            var proprietario = motore as EsecutoreMidi;
+            using (var priorita = new PrioritaMultimediale())
             {
-                if (risoluzioneAlzata)
+                MmcssAttiva = priorita.Attiva;
+                try { CicloInterno(proprietario); }
+                catch (Exception e) { Volatile.Write(ref ultimoErrore, e.GetType().Name + ": " + e.Message); }
+                finally
                 {
-                    RisoluzioneTimer.Rilascia();
+                    try { proprietario?.CompletaArresto(); }
+                    catch (Exception e) { Volatile.Write(ref ultimoErrore, "Arresto MIDI: " + e.Message); }
+                    if (timerRichiesto) RisoluzioneTimer.Rilascia();
                 }
             }
         }
-
-        private void CicloInterno()
+        private void CicloInterno(EsecutoreMidi proprietario)
         {
-            Stopwatch cronometro = Stopwatch.StartNew();
-            double prossimoTick = 0;
-            double prossimoTimeout = PeriodoTimeoutMs;
-
+            double frequenzaMs = Stopwatch.Frequency / 1000.0;
+            double prossimoTick = Stopwatch.GetTimestamp(), prossimoTimeout = prossimoTick + 100 * frequenzaMs;
+            ModoSincronia modoPrima = motore.Modo;
             while (!fermare)
             {
-                double adesso = cronometro.Elapsed.TotalMilliseconds;
-
+                proprietario?.ElaboraPendenti();
+                long adesso = Stopwatch.GetTimestamp();
+                if (modoPrima != motore.Modo) { modoPrima = motore.Modo; prossimoTick = adesso; }
+                if (adesso >= prossimoTimeout)
+                { motore.ControllaTimeoutClock(orologioMs()); prossimoTimeout = adesso + 100 * frequenzaMs; }
+                if (motore.Modo == ModoSincronia.Slave) { Thread.Sleep(1); continue; }
                 if (adesso >= prossimoTick)
                 {
-                    double intervallo = Tempo.IntervalloTickMs(motore.Bpm);
-                    try
+                    long previsto = (long)prossimoTick;
+                    double periodo = Tempo.IntervalloTickMs(motore.Bpm) * frequenzaMs;
+                    if (adesso - prossimoTick >= periodo)
                     {
-                        motore.TickInterno();
-                        dopoTick?.Invoke();
+                        if (proprietario != null && motore.InEsecuzione)
+                            proprietario.PerditaSincronia("Clock in ritardo: arresto controllato, premi Avvia per ripartire.");
+                        prossimoTick = adesso;
                     }
-                    catch (Exception)
-                    {
-                        // Un errore MIDI momentaneo non deve fermare il clock.
-                    }
-
-                    // Accumulatore senza deriva; dopo uno stallo si recuperano al massimo 2 tick.
-                    prossimoTick = PianificatoreTick.Prossima(prossimoTick, adesso, intervallo);
+                    long inizio = Stopwatch.GetTimestamp(); motore.TickInterno(); long fine = Stopwatch.GetTimestamp();
+                    long n = tickEmessi + 1;
+                    RegistroTempi.Registra(n, previsto, inizio, fine); Volatile.Write(ref tickEmessi, n);
+                    prossimoTick += Tempo.IntervalloTickMs(motore.Bpm) * frequenzaMs;
                 }
-
-                if (adesso >= prossimoTimeout)
-                {
-                    try
-                    {
-                        motore.ControllaTimeoutClock(orologioMs());
-                    }
-                    catch (Exception)
-                    {
-                        // Come sopra: il controllo verrà ripetuto al giro successivo.
-                    }
-
-                    prossimoTimeout = adesso + PeriodoTimeoutMs;
-                }
-
-                if (prossimoTick - cronometro.Elapsed.TotalMilliseconds > 2)
-                {
-                    Thread.Sleep(1);
-                }
-                else
-                {
-                    Thread.SpinWait(50);
-                }
+                if (prossimoTick - Stopwatch.GetTimestamp() > 2 * frequenzaMs) Thread.Sleep(1);
+                else Thread.SpinWait(50);
             }
         }
     }

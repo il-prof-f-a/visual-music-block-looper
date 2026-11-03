@@ -13,7 +13,7 @@ namespace VisualMusicBlockLooper.Midi
     /// Invii e rilascio sono sincronizzati: thread diversi possono inviare
     /// in sicurezza, e dopo Dispose ogni invio lancia ObjectDisposedException.
     /// </summary>
-    public class UscitaMidiDryWet : IUscitaMidi, IDisposable
+    public class UscitaMidiDryWet : IUscitaMidi, IUscitaMidiPreparabile, IDisposable
     {
         private readonly OutputDevice dispositivo;
         private readonly GuardiaRilascio guardia = new GuardiaRilascio("Uscita MIDI");
@@ -86,6 +86,22 @@ namespace VisualMusicBlockLooper.Midi
         {
             guardia.Esegui(() => dispositivo.SendEvent(evento));
         }
+
+        // Delegate e messaggio sono costruiti prima della pubblicazione della partitura.
+        private Action PreparaInvio(MidiEvent evento)
+        {
+            Action invio = () => dispositivo.SendEvent(evento);
+            return () => guardia.Esegui(invio);
+        }
+        public Action PreparaNotaOn(int canale, int nota, int velocity) => PreparaInvio(new NoteOnEvent(
+            (SevenBitNumber)ConversioneMidi.Nota(nota), (SevenBitNumber)ConversioneMidi.Velocity(velocity))
+            { Channel = (FourBitNumber)ConversioneMidi.Canale(canale) });
+        public Action PreparaNotaOff(int canale, int nota) => PreparaInvio(new NoteOffEvent(
+            (SevenBitNumber)ConversioneMidi.Nota(nota), (SevenBitNumber)0) { Channel = (FourBitNumber)ConversioneMidi.Canale(canale) });
+        public Action PreparaClock() => PreparaInvio(new TimingClockEvent());
+        public Action PreparaStart() => PreparaInvio(new StartEvent());
+        public Action PreparaStop() => PreparaInvio(new StopEvent());
+        public Action PreparaContinue() => PreparaInvio(new ContinueEvent());
 
         private static OutputDevice ApriPorta(string nomePorta)
         {

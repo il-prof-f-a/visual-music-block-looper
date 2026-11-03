@@ -30,11 +30,11 @@ namespace VisualMusicBlockLooper.Core
         private IstantaneaFoglio ultima;
         private long versione;
         public IstantaneaFoglio Ultima => Volatile.Read(ref ultima);
-        public bool Aggiorna(StatoTavolo stato, bool confermata, long generazione, long istante)
+        public bool Aggiorna(StatoTavolo stato, bool confermata, long generazione, long istante,bool forzaNuovaVersione=false)
         {
             if (!confermata || stato == null) return false;
             var prima = Ultima;
-            if (prima != null && prima.Generazione == generazione && prima.StessoContenuto(stato)) return false;
+            if (!forzaNuovaVersione && prima != null && prima.Generazione == generazione && prima.StessoContenuto(stato)) return false;
             Volatile.Write(ref ultima, new IstantaneaFoglio(stato, ++versione, generazione, istante));
             return true;
         }

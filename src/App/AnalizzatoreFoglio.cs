@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using OpenCvSharp;
@@ -30,6 +31,9 @@ namespace VisualMusicBlockLooper.App
         private string firmaCandidata, ultimoEsito="Preparazione del foglio";
         private int conferme, tentativoBurst, forzaRilettura;
         private bool inizializzato;
+        private IReadOnlyList<RettangoloTavolo> regioniDaVerificare=new RettangoloTavolo[0];
+        private double primaPubblicazioneMs;
+        public double PrimaPubblicazioneMs=>Volatile.Read(ref primaPubblicazioneMs);
         public AnalizzatoreFoglio(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
             LayoutTavolo layout,PreparatoreFoglio preparatore,RegistroCatture registro,Func<long> orologio)
         {
@@ -63,11 +67,13 @@ namespace VisualMusicBlockLooper.App
             if(!forza&&!manuale&&!normale&&ora<retryAt)return false;
             using(var f=immagini.Copia())
             {
-                if(f==null||f.Id==ultimoFrame)return false;
+                if(f==null)
+                {if(motore.InPreparazione&&preparatore.Esecutore.AttesaAvvioMs>=1000)FallimentoAvvio("Nessun frame disponibile dalla webcam.");return false;}
+                if(f.Id==ultimoFrame&&!manuale&&!motore.InPreparazione)return false;
                 var c=calibrazione();
-                if(c==null){Volatile.Write(ref ultimoEsito,"Calibrazione assente");return false;}
+                if(c==null){FallimentoAvvio("Calibrazione assente.");return false;}
                 if(c.VerificaRisoluzione(f.Immagine.Cols,f.Immagine.Rows)==EsitoRisoluzione.Diversa)
-                {Volatile.Write(ref ultimoEsito,"Risoluzione diversa dalla calibrazione");return false;}
+                {FallimentoAvvio("Risoluzione diversa dalla calibrazione.");return false;}
                 if(!ReferenceEquals(c,corrente)||f.Generazione!=generazioneVideo)
                 {
                     corrente=c;generazioneVideo=f.Generazione;generazione++;
@@ -82,19 +88,17 @@ namespace VisualMusicBlockLooper.App
                 try
                 {
                     if(traccia!=null){traccia.Layout=layout;traccia.CalibrazionePresente=true;traccia.LarghezzaFrame=f.Immagine.Cols;traccia.AltezzaFrame=f.Immagine.Rows;}
-                    using(var tavolo=c.Raddrizza(f.Immagine,640,360))
+                    if(!inizializzato)return PrimaIstantanea(f,c,traccia);
+                    using(var tavolo=ImmagineTavolo(f.Immagine,c))
                     {
-                        // La zona comandi ha un osservatore indipendente.
-                        Rect cmd=new Rect((int)(layout.Comandi.X*640),(int)(layout.Comandi.Y*360),
-                            (int)(layout.Comandi.Larghezza*640),(int)(layout.Comandi.Altezza*360))&new Rect(0,0,640,360);
-                        if(cmd.Width>0&&cmd.Height>0)Cv2.Rectangle(tavolo,cmd,Scalar.White,-1);
                         var variazioni=differenze.Confronta(tavolo);
-                        Volatile.Write(ref ultimeRegioni,variazioni.Regioni);
+                        var regioni=variazioni.Regioni.Concat(regioniDaVerificare).ToArray();
+                        Volatile.Write(ref ultimeRegioni,regioni);
                         if(!variazioni.Affidabile){firmaCandidata=null;conferme=0;Descrivi(traccia,"ImmagineNonAffidabile",f);return true;}
-                        if(variazioni.Regioni.Count==0)
+                        if(regioni.Length==0)
                         {firmaCandidata=null;conferme=0;Descrivi(traccia,"FoglioInvariato",f);return true;}
                         var lavoro=catalogo;var risolte=new List<RettangoloTavolo>();bool completa=true;
-                        foreach(var z in variazioni.Regioni)
+                        foreach(var z in regioni)
                         {
                             double destra=Math.Min(z.X+z.Larghezza,layout.Comandi.X);
                             if(destra<=z.X)continue;
@@ -117,23 +121,60 @@ namespace VisualMusicBlockLooper.App
                             catalogo=lavoro;inizializzato=true;Volatile.Write(ref ultimoStato,stato);
                             preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
                             differenze.Conferma(risolte);
+                            regioniDaVerificare=regioniDaVerificare.Where(z=>!risolte.Contains(z)).ToArray();
                             Descrivi(traccia,completa?"FoglioConfermato":"ZoneDaRileggere",f);
                         }
                         else Descrivi(traccia,completa?"InAttesaDiConferma":"ZoneDaRileggere",f);
                         if(tentativoBurst==0&&(conferme<2||!completa)){tentativoBurst=1;retryAt=orologio()+80;}
                     }
                 }
-                catch(Exception e){Volatile.Write(ref ultimoEsito,"Analisi non applicata: "+e.Message);if(traccia!=null){traccia.Errore=e.GetType().Name+": "+e.Message;traccia.EsitoVisione="ErroreAnalisi";}}
+                catch(Exception e){FallimentoAvvio("Analisi non applicata: "+e.Message);if(traccia!=null){traccia.Errore=e.GetType().Name+": "+e.Message;traccia.EsitoVisione="ErroreAnalisi";}}
                 finally{registro.CompletaCattura(cattura);}
                 return true;
             }
         }
-        private void Descrivi(TracciaCartoncini t,string esito,FotogrammaAcquisito f)
+        private bool PrimaIstantanea(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia)
+        {
+            var tempo=Stopwatch.StartNew();var letta=new LettoreIstantanea(c,config).Leggi(f.Immagine,traccia);
+            Interlocked.Increment(ref letture);
+            if(vita.InChiusura||Sospesa()||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)return true;
+            var nuovi=letta.Cartoncini.Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
+            var stato=interprete.Interpreta(nuovi,traccia,true);
+            if(stato.Note.Count==0&&!letta.VuotoAffidabile&&(nuovi.Length==0||stato.Errori.Count!=0))
+            {
+                FallimentoAvvio(nuovi.Length==0?"Nessun QR leggibile nell'istantanea.":"Nessuna nota applicabile: controlla i vincoli nel debug.");
+                if(traccia!=null){traccia.EsitoVisione="AvvioRifiutato";traccia.Errore=UltimoEsito;}
+                return true;
+            }
+            Volatile.Write(ref ultimoStato,stato);
+            if(!preparatore.PreparaAvvio(stato,generazione,f.IstanteMs,()=>Volatile.Write(ref primaPubblicazioneMs,tempo.Elapsed.TotalMilliseconds)))return true;
+            catalogo=nuovi;inizializzato=true;conferme=1;
+            regioniDaVerificare=letta.RegioniDaRileggere.Where(z=>z.X<layout.Comandi.X).ToArray();
+            Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
+            // La base visiva viene preparata dopo la prima pubblicazione, senza ritardare il MIDI.
+            using(var tavolo=ImmagineTavolo(f.Immagine,c))
+            {var v=differenze.Confronta(tavolo);if(v.Affidabile)differenze.Conferma(new[]{new RettangoloTavolo(0,0,1,1)});}
+            Descrivi(traccia,"AvvioDaIstantanea",f,1);
+            if(traccia!=null)traccia.Visione.Add(new EventoDiagnosticoCartoncino("Avvio","PrimoGruppoPronto","PrimoGruppoPronto",
+                $"Frame {f.Id}; lettura={letta.DurataMs:0.0}ms; prima pubblicazione={PrimaPubblicazioneMs:0.0}ms; regioni da verificare={regioniDaVerificare.Count}."));
+            return true;
+        }
+        private Mat ImmagineTavolo(Mat frame,Calibrazione c)
+        {
+            var tavolo=c.Raddrizza(frame,640,360);
+            Rect cmd=new Rect((int)(layout.Comandi.X*640),(int)(layout.Comandi.Y*360),
+                (int)(layout.Comandi.Larghezza*640),(int)(layout.Comandi.Altezza*360))&new Rect(0,0,640,360);
+            if(cmd.Width>0&&cmd.Height>0)Cv2.Rectangle(tavolo,cmd,Scalar.White,-1);
+            return tavolo;
+        }
+        private void FallimentoAvvio(string motivo)
+        {Volatile.Write(ref ultimoEsito,motivo);if(preparatore.Esecutore.Stato.InPreparazione)preparatore.Esecutore.RifiutaAvvio("Avvio impossibile: "+motivo);}
+        private void Descrivi(TracciaCartoncini t,string esito,FotogrammaAcquisito f,int richieste=2)
         {
             Volatile.Write(ref ultimoEsito,esito);
             if(t==null)return;
             var s=UltimoStato;t.EsitoVisione=esito;t.NoteStabili=s.Note.Count;t.StrutturaStabile=s.Struttura;
-            t.EsitoStabilizzazione=esito;t.ConfermeRichieste=2;t.ConfermeStruttura=conferme;
+            t.EsitoStabilizzazione=esito;t.ConfermeRichieste=richieste;t.ConfermeStruttura=conferme;
             t.Visione.Add(new EventoDiagnosticoCartoncino("Osservazione",esito,"VersioniFoglio",
                 $"Frame {f.Id} a {f.IstanteMs}ms; osservata={preparatore.Foglio.Ultima?.Versione??0}, pronta={preparatore.Esecutore.Stato.VersionePronta}, attiva={preparatore.Esecutore.Stato.VersioneAttiva}; letture ROI={NumeroLettureZone}."));
         }

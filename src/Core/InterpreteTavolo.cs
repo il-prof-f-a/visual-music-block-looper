@@ -68,7 +68,9 @@ namespace VisualMusicBlockLooper.Core
                     continue;
                 }
 
-                if (payload.Tipo == TipoCartoncino.Nota && rilevato.AreaQr.HasValue)
+                // Il QR determina la zona del cartoncino: il corpo colorato può sporgere
+                // oltre il bordo della zona e non deve far scartare impostazioni o comandi.
+                if (rilevato.AreaQr.HasValue)
                 {
                     RettangoloTavolo qr = rilevato.AreaQr.Value;
                     zona = layout.ZonaDelCentro(new RettangoloTavolo(qr.X, qr.Y + qr.Altezza / 2, 0, 0));

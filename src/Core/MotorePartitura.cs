@@ -18,6 +18,7 @@ namespace VisualMusicBlockLooper.Core
         private PartituraMidiPreparata attiva;
         private PosizioneGiro posizione = StrutturaTavolo.Default.Posizione(0);
         private volatile bool inEsecuzione, richiestaPlay;
+        private bool stopPendente;
         private volatile ModoSincronia modo;
         private double bpm, bpmPendente;
         private int tickNelGiro, indiceEvento;
@@ -142,8 +143,15 @@ namespace VisualMusicBlockLooper.Core
         }
         public void Arresta()
         {
-            bool invia = modo == ModoSincronia.Master && inEsecuzione;
-            Silenzia(); if (invia) stop();
+            if (modo == ModoSincronia.Master && inEsecuzione) stopPendente = true;
+            Exception errore = null;
+            try { Silenzia(); } catch (Exception e) { errore = e; }
+            if (stopPendente)
+            {
+                try { stop(); stopPendente = false; }
+                catch (Exception e) { if (errore == null) errore = e; }
+            }
+            if (errore != null) throw errore;
         }
         public void Silenzia()
         {

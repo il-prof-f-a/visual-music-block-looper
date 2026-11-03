@@ -27,6 +27,19 @@ namespace VisualMusicBlockLooper.Tests
             public void ApplicaImpostazioni(ConfigurazioneWebcam c){}public StatoImpostazioniWebcam LeggiImpostazioni()=>StatoImpostazioniWebcam.NonSupportato();public void Dispose(){}
         }
         private sealed class Fonte : IFonteImmagini {public Mat Frame()=>null;}
+        [TestCase(false)] [TestCase(true)]
+        public void BitmapPossiedeIPixelAncheSeIlBufferNativoVieneRiscritto(bool ritaglio)
+        {
+            using(var originale=new Mat(90,170,MatType.CV_8UC4,new Scalar(40,80,120,255)))
+            using(var frame=new Mat(originale,new Rect(ritaglio?3:0,0,ritaglio?160:170,90)))
+            using(var bitmap=(Bitmap)typeof(PreparatoreAnteprima).GetMethod("ABitmap",BindingFlags.Static|BindingFlags.NonPublic)
+                .Invoke(null,new object[]{frame}))
+            {
+                frame.SetTo(new Scalar(1,2,3,255));
+                Assert.That(bitmap.GetPixel(80,45),Is.EqualTo(Color.FromArgb(255,120,80,40)),
+                    "La Bitmap per la UI deve possedere memoria indipendente dal Mat del worker.");
+            }
+        }
         [Test]
         public void FinestraPrelevaImmaginiPronteECalibrazioneUsaLaRisoluzioneOriginale()
         {

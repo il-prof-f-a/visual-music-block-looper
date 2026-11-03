@@ -48,6 +48,10 @@ QR con lo stesso payload in posizioni diverse rappresentano attacchi distinti. P
 Nel modello corrente A-B è contato in battute applicative di quattro step. **A-B 1-2 è valido con tutte le MISURA/LINK previste**, quando il QR è letto correttamente e il cartoncino è nella zona A-B. L'applicazione richiede normalmente tre catture consecutive.
 La presenza del solo `CorpoCandidato`, o l'assenza di un payload A-B, non prova quale cartoncino fosse ripreso: l'analisi deve usare posizione e letture effettivamente disponibili.
 
+Nel runtime con [partitura per giro](esecuzione-midi.md), il foglio richiede due osservazioni affidabili concordi; la pipeline compatibile precedente usa ancora lo stabilizzatore a tre catture. Gli esiti `FoglioInvariato`, `InAttesaDiConferma`, `FoglioConfermato`, `ZoneDaRileggere` e `ImmagineNonAffidabile` distinguono controllo leggero, nuova lettura e incertezza. `LetturaZona` riporta il ritaglio effettivo inviato al decoder; `VersioniFoglio` distingue osservata/pronta/attiva. La corsia comandi è indipendente. Una cattura invariata può quindi non contenere alcun nuovo evento QR senza indicare una mancata lettura.
+
+Il pulsante «Salva tempi MIDI» esporta un rapporto distinto con capienza 8192 campioni; leggere `FrequenzaQpc` per convertire i timestamp in secondi. Non confondere il tempo di riconoscimento di un cartoncino con il ritardo del Clock MIDI.
+
 ## Prestazioni e salvataggio
 
 Il buffer usa un array circolare: inserimento e rimozione del più vecchio hanno costo costante.

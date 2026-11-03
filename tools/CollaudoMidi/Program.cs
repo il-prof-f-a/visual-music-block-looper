@@ -88,7 +88,9 @@ internal static class Program
                 using(var rapidi=carico?new CicloCattura(()=>comandi.Passo(),20):null)
                 {
                     if(carico&&(frame==null||frame.Empty()))throw new InvalidDataException("Immagine del carico assente.");
-                    var campioni=new List<CampioneTempoMidi>();long ultimo=0,prossimaCopia=0,prossimaRilettura=15000;
+                    var campioni=new List<CampioneTempoMidi>(checked(secondi*130+1024));
+                    var buffer=new CampioneTempoMidi[8192];
+                    long ultimo=0,prossimaCopia=0,prossimaRilettura=15000,progresso=60000;
                     int framePubblicati=0,disegni=0;var render=new RenderGuida(cfg,LayoutTavolo.Default);
                     int gc0=GC.CollectionCount(0),gc1=GC.CollectionCount(1),gc2=GC.CollectionCount(2);
                     e.Avvia();clock.Avvia();ciclo?.Avvia();rapidi?.Avvia();long inizio=ora();
@@ -102,17 +104,20 @@ internal static class Program
                             render.Disegna(grafica,immagine.Size,analisi.UltimoStato,e.Posizione,e.InEsecuzione);disegni++;
                         }
                         if(ora()-inizio>=prossimaCopia)
-                        {Copia(clock.RegistroTempi,campioni,ref ultimo);prossimaCopia+=1000;}
+                        {Copia(clock.RegistroTempi,campioni,buffer,ref ultimo);prossimaCopia+=1000;}
+                        if(ora()-inizio>=progresso)
+                        {Console.WriteLine(nome+" "+(ora()-inizio)/1000+"s; Clock="+u.ClockTotali+"; GC2="+(GC.CollectionCount(2)-gc2)+"; attivo="+e.InEsecuzione+"; errore="+e.UltimoErrore);progresso+=60000;}
                         Thread.Sleep(carico?33:100);
                     }
-                    bool ancoraSuona=e.InEsecuzione;clock.Ferma();Copia(clock.RegistroTempi,campioni,ref ultimo);
+                    bool ancoraSuona=e.InEsecuzione;double secEffettivi=(ora()-inizio)/1000.0;
+                    clock.Ferma();Copia(clock.RegistroTempi,campioni,buffer,ref ultimo);
                     ciclo?.Ferma();rapidi?.Ferma();input?.StopEventsListening();
                     double f=1000.0/Stopwatch.Frequency,periodo=60000.0/(bpm*24);
                     var ritardi=campioni.Select(c=>Math.Max(0,c.InizioInvio-c.Previsto)*f).OrderBy(x=>x).ToArray();
                     var intervalli=campioni.Skip(1).Select((c,i)=>Math.Abs((c.InizioInvio-campioni[i].InizioInvio)*f-periodo)).OrderBy(x=>x).ToArray();
                     Func<double[],double,double> p=(v,q)=>v.Length==0?0:v[Math.Max(0,(int)Math.Ceiling(v.Length*q)-1)];
                     double deriva=campioni.Count<2?0:(campioni.Last().InizioInvio-campioni[0].InizioInvio)*f-(campioni.Count-1)*periodo;
-                    var rapporto=new{Scenario=nome,Bpm=bpm,Secondi=secondi,SecondiEffettivi=(ora()-inizio)/1000.0,TipoUscita=loopback?"loopback VMBL Test":"memoria: loopback non disponibile",
+                    var rapporto=new{Scenario=nome,Bpm=bpm,Secondi=secondi,SecondiEffettivi=secEffettivi,TipoUscita=loopback?"loopback VMBL Test":"memoria: loopback non disponibile",
                         Clock=u.ClockTotali,Campioni=campioni.Count,CampioniMancanti=clock.RegistroTempi.TotaleCampioni-campioni.Count,ClockRicevuti=nRicevuti,
                         ClockDifferenzaRicevuti=loopback?u.ClockTotali-nRicevuti:(long?)null,
                         NoteOn=u.NoteOn,NoteOff=u.NoteOff,Start=u.StartTotali,Stop=u.StopTotali,AncoraInEsecuzione=ancoraSuona,
@@ -121,8 +126,11 @@ internal static class Program
                         IntervalloP99Ms=p(intervalli,.99),IntervalloMassimoMs=p(intervalli,1),DerivaMs=deriva,
                         InvioMassimoMs=campioni.Count==0?0:campioni.Max(c=>(c.FineInvio-c.InizioInvio)*f),
                         FramePubblicati=framePubblicati,DisegniOffscreen=disegni,LettureZone=analisi?.NumeroLettureZone??0,Compilazioni=preparatore.NumeroCompilazioni,
+                        NoteOsservate=analisi?.UltimoStato.Note.Count??0,VersioneOsservata=preparatore.Foglio.Ultima?.Versione??0,
+                        VersioneAttiva=e.Stato.VersioneAttiva,EsitoAnalisi=analisi?.UltimoEsito,ErroreAnalisi=ciclo?.UltimoErrore,
                         Gc0=GC.CollectionCount(0)-gc0,Gc1=GC.CollectionCount(1)-gc1,Gc2=GC.CollectionCount(2)-gc2,
-                        TargetRaggiunto=p(ritardi,.99)<=2&&p(ritardi,1)<=10&&ancoraSuona&&clock.RegistroTempi.TotaleCampioni==campioni.Count};
+                        TargetLocaleRaggiunto=p(ritardi,.99)<=2&&p(ritardi,1)<=10&&ancoraSuona&&clock.RegistroTempi.TotaleCampioni==campioni.Count,
+                        TargetRaggiunto=loopback&&u.ClockTotali==nRicevuti&&p(ritardi,.99)<=2&&p(ritardi,1)<=10&&ancoraSuona&&clock.RegistroTempi.TotaleCampioni==campioni.Count};
                     File.WriteAllText(Path.Combine(dir,nome+".json"),JsonConvert.SerializeObject(rapporto,Formatting.Indented));
                     File.WriteAllText(Path.Combine(dir,nome+"-campioni.json"),JsonConvert.SerializeObject(new{FrequenzaQpc=Stopwatch.Frequency,Campioni=campioni,Ricevuti=ricevuti.Take(Math.Min(nRicevuti,ricevuti.Length))}));
                     Console.WriteLine(JsonConvert.SerializeObject(rapporto));
@@ -130,6 +138,6 @@ internal static class Program
             }
         }
     }
-    private static void Copia(RegistroTempiMidi registro,List<CampioneTempoMidi> campioni,ref long ultimo)
-    {foreach(var c in registro.Istantanea())if(c.Tick>ultimo){campioni.Add(c);ultimo=c.Tick;}}
+    private static void Copia(RegistroTempiMidi registro,List<CampioneTempoMidi> campioni,CampioneTempoMidi[] buffer,ref long ultimo)
+    {int n=registro.CopiaIn(buffer);for(int i=0;i<n;i++){var c=buffer[i];if(c.Tick>ultimo){campioni.Add(c);ultimo=c.Tick;}}}
 }

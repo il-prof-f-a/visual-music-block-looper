@@ -121,7 +121,7 @@ namespace VisualMusicBlockLooper.Vision
             }
         }
 
-        private Mat MascheraDellaCurva(int larghezza, int altezza, int restringi)
+        private Mat MascheraDellaCurva(int larghezza, int altezza, int restringi,Rect? ritaglio=null)
         {
             if (larghezza <= 0 || altezza <= 0 || restringi < 0) throw new ArgumentOutOfRangeException(nameof(larghezza));
             byte[] dati;
@@ -155,8 +155,10 @@ namespace VisualMusicBlockLooper.Vision
                 }
                 dati = mascheraCurva;
             }
-            var copia = new Mat(altezza, larghezza, MatType.CV_8UC1);
-            Marshal.Copy(dati, 0, copia.Data, dati.Length);
+            var area=ritaglio??new Rect(0,0,larghezza,altezza);
+            var copia = new Mat(area.Height,area.Width, MatType.CV_8UC1);
+            for(int y=0;y<area.Height;y++)
+                Marshal.Copy(dati,(area.Y+y)*larghezza+area.X,copia.Ptr(y),area.Width);
             return copia;
         }
 

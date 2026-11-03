@@ -47,6 +47,16 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void LetturaInBufferRiutilizzabileMantieneSoloICampioniRecenti()
+        {
+            var r=new RegistroTempiMidi(3);var buffer=new CampioneTempoMidi[2];
+            for(int i=1;i<=5;i++)r.Registra(i,i*10,i*10+1,i*10+2);
+            Assert.That(r.CopiaIn(buffer),Is.EqualTo(2));
+            Assert.That(buffer.Select(c=>c.Tick),Is.EqualTo(new long[]{4,5}));
+            r.Registra(6,60,61,62);Assert.That(r.CopiaIn(buffer),Is.EqualTo(2));
+            Assert.That(buffer.Select(c=>c.Tick),Is.EqualTo(new long[]{5,6}));
+        }
+        [Test]
         public void CapacitaNullaNonValida() => Assert.Throws<ArgumentOutOfRangeException>(() => new RegistroTempiMidi(0));
     }
 }

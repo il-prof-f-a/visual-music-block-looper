@@ -54,5 +54,20 @@ namespace VisualMusicBlockLooper.App
             }
             return risultato.AsReadOnly();
         }
+
+        /// <summary>Copia in memoria del lettore, riutilizzabile; non alloca né blocca il produttore.</summary>
+        public int CopiaIn(CampioneTempoMidi[] destinazione)
+        {
+            if(destinazione==null)throw new ArgumentNullException(nameof(destinazione));
+            long fine=TotaleCampioni;int copiati=0;
+            for(long n=Math.Max(1,fine-Math.Min(slot.Length,destinazione.Length)+1);n<=fine;n++)
+            {
+                Slot s=slot[(int)((n-1)%slot.Length)];
+                if(Volatile.Read(ref s.Sequenza)!=n)continue;
+                var c=s.Campione;Thread.MemoryBarrier();
+                if(Volatile.Read(ref s.Sequenza)==n)destinazione[copiati++]=c;
+            }
+            return copiati;
+        }
     }
 }

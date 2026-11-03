@@ -65,7 +65,15 @@ namespace VisualMusicBlockLooper.App
                     using(var zona=new Mat(tavolo,area))
                     {
                         var v=differenze.Confronta(zona);
-                        if(!v.Affidabile||v.Regioni.Count==0)return true;
+                        if(!v.Affidabile)
+                        {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();return true;}
+                        if(v.Regioni.Count==0)
+                        {
+                            // Il riferimento è già confermato: interrompe le presenze candidate senza nuova decodifica.
+                            candidata=null;conferme=0;
+                            stabilizzatore.Aggiorna(interprete.Interpreta(catalogo));
+                            return true;
+                        }
                         var cattura=registro.IniziaCattura();var traccia=cattura?.Traccia;
                         try
                         {
@@ -80,12 +88,12 @@ namespace VisualMusicBlockLooper.App
                                 else completa=false;
                             }
                             if(!completa||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
-                            {Volatile.Write(ref ultimoEsito,"Comandi da rileggere");return true;}
-                            catalogo=lavoro;var grezzo=interprete.Interpreta(catalogo,traccia);
+                            {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();Volatile.Write(ref ultimoEsito,"Comandi da rileggere");return true;}
+                            var grezzo=interprete.Interpreta(lavoro,traccia);
                             string firma=string.Join(";",grezzo.Comandi.Select(k=>k.Tipo+":"+k.Parametro).OrderBy(k=>k));
                             if(firma!=candidata){candidata=firma;conferme=1;istanteCandidato=f.IstanteMs;}else conferme=Math.Min(2,conferme+1);
                             var stabile=stabilizzatore.Aggiorna(grezzo,traccia);
-                            if(conferme>=2)differenze.Conferma(v.Regioni);
+                            if(conferme>=2){catalogo=lavoro;differenze.Conferma(v.Regioni);}
                             esecutore.InviaComandi(stabile.Comandi,istanteCandidato);
                             Volatile.Write(ref ultimoEsito,"Comandi letti: "+stabile.Comandi.Count);
                             if(traccia!=null)

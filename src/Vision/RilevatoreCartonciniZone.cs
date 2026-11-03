@@ -21,7 +21,7 @@ namespace VisualMusicBlockLooper.Vision
             if(!GeometriaRegioni.Interseca(zona,griglia.Area))fascia=zona;
             Rect areaMaschera=GeometriaRegioni.InCamera(calibrazione,fascia,frame.Cols,frame.Rows,55);
             using(var convertita=new Mat())
-            using(var maschera=new Mat(frame.Rows,frame.Cols,MatType.CV_8UC1,Scalar.Black))
+            using(var maschera=new Mat())
             {
                 Mat bgr=frame;
                 if(frame.Channels()!=3)
@@ -29,11 +29,9 @@ namespace VisualMusicBlockLooper.Vision
                 Rect[] corpi;
                 using(var taglioMaschera=new Mat(bgr,areaMaschera))
                 using(var locale=MascheraCorpoInterna(taglioMaschera,calibrazione,out Rect[] _,false,frame.Cols*(double)frame.Rows))
-                using(var tavolo=calibrazione.MascheraTavolo(frame.Cols,frame.Rows,RestringiTavolo))
-                using(var clipTavolo=new Mat(tavolo,areaMaschera))
-                using(var destinazione=new Mat(maschera,areaMaschera))
+                using(var clipTavolo=calibrazione.MascheraTavolo(areaMaschera,frame.Cols,frame.Rows,RestringiTavolo))
                 {
-                    Cv2.BitwiseAnd(locale,clipTavolo,locale);locale.CopyTo(destinazione);
+                    Cv2.BitwiseAnd(locale,clipTavolo,locale);locale.CopyTo(maschera);
                     using(var copia=locale.Clone())
                     {
                         Cv2.FindContours(copia,out Point[][] contorni,out HierarchyIndex[] _,RetrievalModes.External,ContourApproximationModes.ApproxSimple);
@@ -56,7 +54,7 @@ namespace VisualMusicBlockLooper.Vision
                 var letti=new List<CartoncinoRilevato>();
                 foreach(var c in candidati)
                 {
-                    var letto=Converti(c,candidati,maschera,out Rect _);
+                    var letto=Converti(c,candidati,maschera,out Rect _,areaMaschera.TopLeft,frame.Size());
                     if(letto!=null&&GeometriaRegioni.Interseca(zona,letto.AreaQr??letto.Area)) letti.Add(letto);
                 }
                 bool completa=true;
@@ -84,15 +82,17 @@ namespace VisualMusicBlockLooper.Vision
                     if(GeometriaRegioni.ContieneCentro(zona,a))
                     {
                         Rect box=GeometriaRegioni.InCamera(calibrazione,a,frame.Cols,frame.Rows);
+                        Rect limitato=box&areaMaschera;
+                        if(limitato!=box){completa=false;continue;}
                         if(box.Width>0&&box.Height>0)
-                            using(var contenuto=new Mat(maschera,box))
+                            using(var contenuto=new Mat(maschera,new Rect(box.X-areaMaschera.X,box.Y-areaMaschera.Y,box.Width,box.Height)))
                             {
                                 if(Cv2.CountNonZero(contenuto)<box.Width*box.Height*.015){rimossi.Add(i);continue;}
                                 completa=false; // non letto non equivale a rimosso
                             }
                     }
                     else if(c.AreaQr.HasValue&&GeometriaRegioni.Interseca(fascia,a))
-                        c.FineEstensioneX=MisuratoreEstensioneNota.Misura(maschera,calibrazione,a,griglia);
+                        c.FineEstensioneX=MisuratoreEstensioneNota.Misura(maschera,calibrazione,a,griglia,areaMaschera.TopLeft,frame.Size());
                 }
                 foreach(int i in rimossi.OrderByDescending(i=>i))catalogo.RemoveAt(i);
                 foreach(Rect corpo in corpi)
@@ -113,7 +113,7 @@ namespace VisualMusicBlockLooper.Vision
                         $"ROI effettiva {regione}; {qr.Count} QR; completa={completa}.",null,
                         new RettangoloTavolo(regione.X,regione.Y,regione.Width,regione.Height),zona));
                 }
-                return new LetturaZona(catalogo.AsReadOnly(),completa,qr.Count,regione);
+                return new LetturaZona(catalogo.AsReadOnly(),completa,qr.Count,regione){RegioneMaschera=areaMaschera};
             }
         }
         private static double DistanzaQr(CartoncinoRilevato a,CartoncinoRilevato b)

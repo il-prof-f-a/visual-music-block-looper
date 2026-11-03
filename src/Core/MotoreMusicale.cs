@@ -9,7 +9,7 @@ namespace VisualMusicBlockLooper.Core
     /// Master (clock interno) o Slave (clock esterno del DAW). Tutti i metodi sono sincronizzati
     /// perché gli eventi MIDI arrivano da altri thread.
     /// </summary>
-    public class MotoreMusicale
+    public class MotoreMusicale : IMotoreMusicale
     {
         /// <summary>Tick di clock dopo i quali un one-shot viene spento.</summary>
         private const int TickOneShot = 6;

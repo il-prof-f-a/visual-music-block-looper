@@ -124,7 +124,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void TickMaster_ChiamaDopoTickPerOgniTick()
+        public void TickMaster_NotificaFuoriDalClockConAggiornamentiCoalescenti()
         {
             var uscita = new UscitaContaClock();
             var motore = new MotoreMusicale(new Sequencer(new ConfigGriglia()), uscita, null, new MappaturaFinta(), 300);
@@ -136,8 +136,8 @@ namespace VisualMusicBlockLooper.Tests
                 tickMaster.Ferma();
             }
 
-            Assert.That(chiamate, Is.GreaterThan(10));
-            Assert.That(chiamate, Is.EqualTo(uscita.Clock_));
+            Assert.That(chiamate, Is.GreaterThan(0));
+            Assert.That(chiamate, Is.LessThanOrEqualTo(uscita.Clock_));
         }
 
         [Test]

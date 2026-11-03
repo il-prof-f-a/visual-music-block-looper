@@ -25,6 +25,7 @@ namespace VisualMusicBlockLooper.App
         private readonly Action clockRicevuto, startRicevuto, stopRicevuto, continueRicevuto;
         private long sequenza, ultimoStop, ultimoStopEsterno, versione;
         private long ultimoIngressoClock = -1;
+        private long istanteAvvio;
         private double intervalloEsternoMs = 60000.0 / (120 * 24);
         private int proprietario, stopUrgente, stopEsternoUrgente, eliminato;
         private string ultimoErrore;
@@ -50,14 +51,16 @@ namespace VisualMusicBlockLooper.App
             { ingresso.ClockRicevuto += clockRicevuto; ingresso.StartRicevuto += startRicevuto; ingresso.StopRicevuto += stopRicevuto; ingresso.ContinueRicevuto += continueRicevuto; }
         }
         public MotorePartitura Stato { get; }
-        public string UltimoErrore => Volatile.Read(ref ultimoErrore);
+        public string UltimoErrore => Volatile.Read(ref ultimoErrore)??Stato.UltimoErrore;
+        public long AttesaAvvioMs=>Stato.InPreparazione?Math.Max(0,orologioMs()-Volatile.Read(ref istanteAvvio)):0;
         public ModoSincronia Modo => Stato.Modo;
         public bool InEsecuzione => Stato.InEsecuzione;
         public double Bpm => Modo == ModoSincronia.Slave ? Tempo.Limita(60000.0 / (24 * Volatile.Read(ref intervalloEsternoMs))) : Stato.Bpm;
         public PosizioneGiro Posizione => Stato.Posizione;
         public int StepCorrente => Stato.StepCorrente;
         public StrutturaTavolo Struttura => Stato.Struttura;
-        public void Avvia() => Richiedi(Tipo.Play);
+        public void Avvia() => Richiedi(Tipo.Play,istante:orologioMs());
+        public void RifiutaAvvio(string motivo){Volatile.Write(ref ultimoErrore,motivo);RichiediStop();}
         public void Arresta() => RichiediStop();
         public void Silenzia() => RichiediStop();
         public void CambiaModo() => Richiedi(Tipo.Modo);
@@ -66,6 +69,8 @@ namespace VisualMusicBlockLooper.App
         public void OneShot(int nota) => Richiedi(Tipo.OneShot, nota);
         public PartituraMidiPreparata Prepara(StatoTavolo foglio, long versioneFoglio, long generazione, long frontiera)
             => PartituraMidiPreparata.Prepara(compilatore.Compila(foglio, versioneFoglio, generazione, frontiera), uscita);
+        public PartituraMidiPreparata PreparaProgressiva(StatoTavolo foglio,long versioneFoglio,long generazione,long frontiera,Action<PartituraMidiPreparata> primoGruppo)
+            =>PartituraMidiPreparata.PreparaProgressiva(compilatore.Compila(foglio,versioneFoglio,generazione,frontiera),uscita,primoGruppo);
         public bool Pubblica(PartituraMidiPreparata p) => Volatile.Read(ref eliminato) == 0 && Stato.Pubblica(p);
         public void AggiornaTavolo(StatoTavolo foglio)
         {
@@ -137,7 +142,7 @@ namespace VisualMusicBlockLooper.App
                 elaborati++;
                 switch (r.Tipo)
                 {
-                    case Tipo.Play: Stato.Avvia(); break;
+                    case Tipo.Play: Volatile.Write(ref istanteAvvio,r.Istante);Volatile.Write(ref ultimoErrore,null);Stato.Avvia(); break;
                     case Tipo.Tap: Stato.Tap(r.Istante); break;
                     case Tipo.Bpm: Stato.ImpostaBpm(r.Bpm);break;
                     case Tipo.Modo: Stato.CambiaModo(); break;
@@ -148,8 +153,8 @@ namespace VisualMusicBlockLooper.App
                         { PerditaSincronia("Clock esterno in ritardo: arresto controllato."); RichiediStop(); }
                         else Stato.RiceviClock(r.Istante);
                         break;
-                    case Tipo.StartEsterno: Stato.RiceviStart(); break;
-                    case Tipo.ContinueEsterno: Stato.RiceviContinue(); break;
+                    case Tipo.StartEsterno: Volatile.Write(ref istanteAvvio,r.Istante);Stato.RiceviStart(); break;
+                    case Tipo.ContinueEsterno: Volatile.Write(ref istanteAvvio,r.Istante);Stato.RiceviContinue(); break;
                     case Tipo.StopEsterno: Stato.RiceviStop(); break;
                 }
             }

@@ -19,6 +19,8 @@ namespace VisualMusicBlockLooper.Core
         private PosizioneGiro posizione = StrutturaTavolo.Default.Posizione(0);
         private volatile bool inEsecuzione, richiestaPlay;
         private bool stopPendente;
+        private string ultimoErrore;
+        public string UltimoErrore=>Volatile.Read(ref ultimoErrore);
         private volatile ModoSincronia modo;
         private double bpm, bpmPendente;
         private int tickNelGiro, indiceEvento;
@@ -57,7 +59,7 @@ namespace VisualMusicBlockLooper.Core
         public void Avvia()
         {
             if (modo != ModoSincronia.Master || inEsecuzione) return;
-            richiestaPlay = true; TentaAvvio(true);
+            Volatile.Write(ref ultimoErrore,null);richiestaPlay = true; TentaAvvio(true);
         }
         private void TentaAvvio(bool inviaStart)
         {
@@ -65,6 +67,7 @@ namespace VisualMusicBlockLooper.Core
             // Un nuovo Start apre una nuova esecuzione: una candidata già pronta non deve
             // restare vincolata al numero di frontiera del trasporto precedente.
             var pronta = scambio.Ultima;
+            if(pronta?.Errore!=null){Volatile.Write(ref ultimoErrore,pronta.Errore);richiestaPlay=false;return;}
             if (pronta != null && pronta.Dati.Generazione != scambio.Generazione) pronta = null;
             if (pronta != null) Volatile.Write(ref attiva, pronta);
             if (attiva == null || attiva.Dati.Generazione != scambio.Generazione) return;
@@ -85,7 +88,7 @@ namespace VisualMusicBlockLooper.Core
             {
                 if (tickNelGiro == attiva.Dati.TickGiro)
                 {
-                    EseguiEventi();
+                    if(!EseguiEventi())return;
                     Interlocked.Increment(ref giro);
                     var pronta = scambio.Leggi(giro);
                     if (pronta != null) Volatile.Write(ref attiva, pronta);
@@ -97,16 +100,19 @@ namespace VisualMusicBlockLooper.Core
                 int inizio = (attiva.Dati.Struttura.AInizio - 1) * 4;
                 int ultimoInizioMisura = ((attiva.Dati.Struttura.AFine - 1) * 4 / attiva.Dati.Struttura.StepPerMisura) * attiva.Dati.Struttura.StepPerMisura;
                 if (tickNelGiro == (Math.Max(inizio, ultimoInizioMisura) - inizio) * 6) Interlocked.Increment(ref segnalePreparazione);
-                EseguiEventi(); tickNelGiro++;
+                if(!EseguiEventi())return;tickNelGiro++;
             }
             for (int n = 0; n < 128; n++)
                 if (shotRimanenti[n] > 0 && --shotRimanenti[n] == 0) Spegni(canaleShot * 128 + n, shotOff[n]);
             Interlocked.Increment(ref tickTempo);
         }
-        private void EseguiEventi()
+        private bool EseguiEventi()
         {
             var eventi = attiva.Eventi;
-            while (indiceEvento < eventi.Length && eventi[indiceEvento].Dati.Tick == tickNelGiro)
+            int disponibili=attiva.EventiPubblicati;
+            if(attiva.Errore!=null||(indiceEvento>=disponibili&&indiceEvento<eventi.Length&&attiva.Dati.Eventi[indiceEvento].Tick<=tickNelGiro))
+            {Volatile.Write(ref ultimoErrore,attiva.Errore??"Buffer del produttore non pronto: arresto controllato.");Arresta();return false;}
+            while (indiceEvento < disponibili && eventi[indiceEvento].Dati.Tick == tickNelGiro)
             {
                 var e = eventi[indiceEvento++]; int indice = e.Dati.Canale * 128 + e.Dati.Nota;
                 if (e.Dati.NoteOn)
@@ -117,6 +123,7 @@ namespace VisualMusicBlockLooper.Core
                 }
                 else Spegni(indice, e.Off);
             }
+            return true;
         }
         private void Spegni(int indice, Action off)
         {

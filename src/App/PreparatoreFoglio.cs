@@ -37,7 +37,32 @@ namespace VisualMusicBlockLooper.App
             ultimoSegnale = segnale;
             PreparaUltima(esecutore.Stato.Giro + 1);
         }
-        public void Riprova() { ultimaTentata = 0; }
+        public void Riprova()
+        {
+            var f=Foglio.Ultima;
+            if(UltimoErrore!=null&&f!=null)Foglio.Aggiorna(f.CopiaStato(),true,f.Generazione,f.Istante,true);
+            ultimaTentata = 0;
+        }
+        public bool PreparaAvvio(StatoTavolo stato,long generazione,long istante,Action primoGruppo=null)
+        {
+            if(generazione!=Generazione)return false;
+            Foglio.Aggiorna(stato,true,generazione,istante,UltimoErrore!=null);var f=Foglio.Ultima;
+            if(esecutore.InEsecuzione){PreparaUltima(esecutore.Stato.Giro+1);return UltimoErrore==null;}
+            ultimaTentata=f.Versione;
+            try
+            {
+                bool pubblicata=false;
+                esecutore.PreparaProgressiva(f.CopiaStato(),f.Versione,f.Generazione,0,p=>{pubblicata=esecutore.Pubblica(p);if(pubblicata)primoGruppo?.Invoke();});
+                if(!pubblicata||generazione!=Generazione)return false;
+                Interlocked.Increment(ref numeroCompilazioni);Volatile.Write(ref ultimoErrore,null);
+                return true;
+            }
+            catch(Exception e)
+            {
+                if(generazione!=Generazione)return false;
+                Volatile.Write(ref ultimoErrore,"Avvio non preparato: "+e.Message);esecutore.RifiutaAvvio(UltimoErrore);return false;
+            }
+        }
         private void PreparaUltima(long frontiera)
         {
             var f = Foglio.Ultima;

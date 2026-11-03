@@ -24,6 +24,7 @@ internal static class Program
     {
         private readonly UscitaMidiDryWet driver;
         public long ClockTotali,NoteOn,NoteOff,StartTotali,StopTotali;
+        public long PrimoStartQpc;
         public Uscita(UscitaMidiDryWet driver){this.driver=driver;}
         public void Clock(){Interlocked.Increment(ref ClockTotali);driver?.Clock();}
         public void Start(){Interlocked.Increment(ref StartTotali);driver?.Start();}
@@ -32,7 +33,7 @@ internal static class Program
         public void NotaOn(int c,int n,int v){Interlocked.Increment(ref NoteOn);driver?.NotaOn(c,n,v);}
         public void NotaOff(int c,int n){Interlocked.Increment(ref NoteOff);driver?.NotaOff(c,n);}
         public Action PreparaClock(){var a=driver?.PreparaClock();return ()=>{Interlocked.Increment(ref ClockTotali);a?.Invoke();};}
-        public Action PreparaStart(){var a=driver?.PreparaStart();return ()=>{Interlocked.Increment(ref StartTotali);a?.Invoke();};}
+        public Action PreparaStart(){var a=driver?.PreparaStart();return ()=>{Interlocked.CompareExchange(ref PrimoStartQpc,Stopwatch.GetTimestamp(),0);Interlocked.Increment(ref StartTotali);a?.Invoke();};}
         public Action PreparaStop(){var a=driver?.PreparaStop();return ()=>{Interlocked.Increment(ref StopTotali);a?.Invoke();};}
         public Action PreparaContinue()=>()=>driver?.Continue();
         public Action PreparaNotaOn(int c,int n,int v){var a=driver?.PreparaNotaOn(c,n,v);return ()=>{Interlocked.Increment(ref NoteOn);a?.Invoke();};}
@@ -48,6 +49,8 @@ internal static class Program
             if(secondi<1)throw new ArgumentOutOfRangeException("--secondi");
             string dir=Path.GetFullPath(Arg(args,"--output","TestResults/midi-deterministico/collaudo"));Directory.CreateDirectory(dir);
             string foto=Arg(args,"--immagine"),calFile=Arg(args,"--calibrazione");
+            string avvio=Arg(args,"--avvio");
+            if(avvio!=null){ProvaAvvio(avvio,calFile,dir);return 0;}
             int[] bpm=Arg(args,"--bpm","60,120,180").Split(',').Select(int.Parse).ToArray();
             bool[] carichi=Arg(args,"--carico","entrambi")=="base"?new[]{false}:Arg(args,"--carico")=="visione"?new[]{true}:new[]{false,true};
             string[] ingressi=InputDevice.GetAll().Select(d=>d.Name).ToArray(),uscite=OutputDevice.GetAll().Select(d=>d.Name).ToArray();
@@ -57,6 +60,32 @@ internal static class Program
             return 0;
         }
         catch(Exception e){Console.Error.WriteLine(e);return 1;}
+    }
+    private static void ProvaAvvio(string foto,string calFile,string dir)
+    {
+        var tempo=Stopwatch.StartNew();Func<long> ora=()=>tempo.ElapsedMilliseconds;
+        var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=Calibrazione.Carica(calFile);var u=new Uscita(null);
+        using(var frame=Cv2.ImRead(foto))using(var registro=new RegistroFotogrammi())
+        using(var e=new EsecutoreMidi(u,null,new Mappa(),cfg,ora))using(var clock=new TickMaster(e,ora))
+        {
+            var p=new PreparatoreFoglio(e);var debug=new RegistroCatture{Attivo=true};
+            using(var analisi=new AnalizzatoreFoglio(registro,()=>cal,cfg,LayoutTavolo.Default,p,debug,ora))
+            {
+                registro.Pubblica(frame,ora());long inizio=Stopwatch.GetTimestamp();e.Avvia();clock.Avvia();analisi.Passo(true);
+                SpinWait.SpinUntil(()=>u.PrimoStartQpc!=0||e.UltimoErrore!=null,1500);
+                bool attivo=e.InEsecuzione;clock.Ferma();
+                double? avvioMs=u.PrimoStartQpc==0?(double?)null:(u.PrimoStartQpc-inizio)*1000.0/Stopwatch.Frequency;
+                var risultato=new{Formato="VMBL-avvio-istantanea-1",TipoUscita="memoria: nessun MIDI fisico",Frame=Path.GetFileName(foto),
+                    Calibrazione=Path.GetFileName(calFile),Note=analisi.UltimoStato.Note.Count,Errori=analisi.UltimoStato.Errori.Count,
+                    PrimaPubblicazioneMs=analisi.PrimaPubblicazioneMs,PrimoStartMs=avvioMs,AncoraInEsecuzione=attivo,
+                    Errore=e.UltimoErrore,Esito=analisi.UltimoEsito,TargetAvvioRaggiunto=avvioMs.HasValue&&avvioMs.Value<1000&&attivo,
+                    Attacchi=u.NoteOn,Versione=p.Foglio.Ultima?.Versione??0};
+                string nome=Path.GetFileNameWithoutExtension(foto);
+                File.WriteAllText(Path.Combine(dir,nome+"-avvio.json"),JsonConvert.SerializeObject(risultato,Formatting.Indented));
+                File.WriteAllText(Path.Combine(dir,nome+"-debug.json"),JsonConvert.SerializeObject(debug.Istantanea(),Formatting.Indented));
+                Console.WriteLine(JsonConvert.SerializeObject(risultato));
+            }
+        }
     }
     private static void Esegui(int secondi,int bpm,bool carico,bool loopback,string foto,string calFile,string dir)
     {

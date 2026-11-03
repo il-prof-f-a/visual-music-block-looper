@@ -44,7 +44,7 @@ namespace VisualMusicBlockLooper.Core
         /// </summary>
         public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati) => Interpreta(rilevati, null);
 
-        public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati, TracciaCartoncini diagnostica)
+        public StatoTavolo Interpreta(IReadOnlyList<CartoncinoRilevato> rilevati, TracciaCartoncini diagnostica,bool mantieniOrdine=false)
         {
             var note = new List<(CartoncinoRilevato Rilevato, PayloadCartoncino Payload)>();
             var comandi = new List<ComandoRilevato>();
@@ -55,9 +55,8 @@ namespace VisualMusicBlockLooper.Core
                 .Where(r => r != null)
                 ?? Enumerable.Empty<CartoncinoRilevato>();
 
-            IEnumerable<CartoncinoRilevato> ordinati = validi
-                .OrderBy(r => (r.AreaQr ?? r.Area).X)
-                .ThenBy(r => (r.AreaQr ?? r.Area).Y);
+            IEnumerable<CartoncinoRilevato> ordinati = mantieniOrdine?validi:validi
+                .OrderBy(r => (r.AreaQr ?? r.Area).X).ThenBy(r => (r.AreaQr ?? r.Area).Y);
 
             // Primo passaggio: classificazione per zona e lettura del payload.
             foreach (CartoncinoRilevato rilevato in ordinati)

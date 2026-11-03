@@ -40,7 +40,7 @@ namespace VisualMusicBlockLooper.Tests
                 var p=new PreparatoreFoglio(e);var c=NoteContigueVisionTests.Calibra(false);
                 using(var a=new AnalizzatoreFoglio(r,()=>c,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora))
                 {
-                    for(int i=0;i<2;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
+                    for(int i=0;i<3;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));Assert.That(p.NumeroCompilazioni,Is.EqualTo(1));
                     long letture=a.NumeroLettureZone;
                     for(int i=0;i<6;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
@@ -69,7 +69,7 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
         [Test]
-        public void UnFotogrammaGiaUsatoNonContaComeSecondaConferma()
+        public void AvvioSingoloMaUnFotogrammaGiaUsatoNonConfermaUnaModifica()
         {
             var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
             using(var f=NoteContigueVisionTests.Scena(false))
@@ -80,8 +80,13 @@ namespace VisualMusicBlockLooper.Tests
                 using(var a=new AnalizzatoreFoglio(r,()=>c,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>0))
                 {
                     r.Pubblica(f,0);a.Passo(true);a.Passo(true);
-                    Assert.That(p.NumeroCompilazioni,Is.EqualTo(0));
-                    r.Pubblica(f,1);a.Passo(true);Assert.That(p.NumeroCompilazioni,Is.EqualTo(1));
+                    Assert.That(p.NumeroCompilazioni,Is.EqualTo(1),"Il primo frame basta per l'avvio.");
+                    Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
+                    r.Pubblica(f,1);a.Passo(true);a.Passo(true);
+                    Assert.That(p.NumeroCompilazioni,Is.EqualTo(1),"Riusare lo stesso ID non conferma una rimozione.");
+                    r.Pubblica(f,2);a.Passo(true);
+                    Assert.That(p.NumeroCompilazioni,Is.EqualTo(2));
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9));
                 }
             }
         }

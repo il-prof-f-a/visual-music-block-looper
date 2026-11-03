@@ -15,7 +15,7 @@ namespace VisualMusicBlockLooper.App
     /// a 12 click, comandi di trasporto e scelta del monitor del proiettore. Contiene solo UI:
     /// la logica resta nel <see cref="Compositore"/> e nel motore.
     /// </summary>
-    public class FormControllo : Form
+    public partial class FormControllo : Form
     {
         private readonly Compositore compositore;
         private readonly FormProiettore proiettore;
@@ -46,7 +46,6 @@ namespace VisualMusicBlockLooper.App
         private readonly Timer timerRisoluzione = new Timer { Interval = 500 };
         private readonly Timer timerApplicaImpostazioni = new Timer { Interval = 150 };
         private readonly Timer timerSalvaConfigurazione = new Timer { Interval = 500 };
-        private volatile int ultimoStepProiettato = -1;
 
         private Label etichettaStato;
         private Label etichettaPorte;
@@ -125,7 +124,7 @@ namespace VisualMusicBlockLooper.App
             this.risorse = (risorse ?? Enumerable.Empty<IDisposable>()).ToList();
             this.calibrazionePresente = calibrazionePresente;
 
-            tickMaster = new TickMaster(compositore.Motore, orologioMs, AggiornaProiezioneSeCambiaStep);
+            tickMaster = new TickMaster(compositore.Motore, orologioMs);
             cicloCattura = new CicloCattura(PassoCattura);
 
             CostruisciInterfaccia();
@@ -134,6 +133,7 @@ namespace VisualMusicBlockLooper.App
             timerRisoluzione.Tick += (mittente, argomenti) => ApplicaRisoluzione();
             timerApplicaImpostazioni.Tick += (mittente, argomenti) => ApplicaImpostazioniInSospeso();
             timerSalvaConfigurazione.Tick += (mittente, argomenti) => SalvaDaTimer();
+            timerProiezione.Tick += (mittente, argomenti) => AggiornaProiezioneMidi();
 
             // Una sola lettura (con sonda) della webcam all'avvio: il timer da 150 ms non la ripete mai.
             AggiornaStatoControlli();
@@ -143,9 +143,11 @@ namespace VisualMusicBlockLooper.App
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            compositore.AvviaAcquisizione();
             tickMaster.Avvia();
             cicloCattura.Avvia();
             timerInterfaccia.Start();
+            timerProiezione.Start();
             SelezionaMonitorIniziale();
         }
 
@@ -161,6 +163,7 @@ namespace VisualMusicBlockLooper.App
             {
                 Chiudi();
                 timerInterfaccia.Dispose();
+                timerProiezione.Dispose();
                 timerRisoluzione.Dispose();
                 timerApplicaImpostazioni.Dispose();
                 timerSalvaConfigurazione.Dispose();
@@ -263,6 +266,7 @@ namespace VisualMusicBlockLooper.App
 
             chiusuraEseguita = true;
             timerInterfaccia.Stop();
+            timerProiezione.Stop();
             timerRisoluzione.Stop();
             timerApplicaImpostazioni.Stop();
 
@@ -276,6 +280,8 @@ namespace VisualMusicBlockLooper.App
 
             cicloCattura.Ferma();
             tickMaster.Ferma();
+            try { compositore.Dispose(); }
+            catch (Exception) { /* Proseguire con il rilascio delle altre risorse. */ }
 
             try
             {
@@ -426,6 +432,7 @@ namespace VisualMusicBlockLooper.App
                 casellaDebugCartoncini, pulsanteSalvaDebug, etichettaDebugCartoncini
             });
 
+            AggiungiControlliMidi();
             dimensioniLayout = ClientSize;
             limitiIniziali = Controls.Cast<Control>().ToDictionary(c => c, c => c.Bounds);
             fontIniziali = Controls.Cast<Control>().ToDictionary(c => c, c => c.Font);
@@ -485,7 +492,7 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Un passo del ciclo di cattura (thread in background): visione, motore e proiezione.</summary>
         private void PassoCattura()
         {
-            if (rilevatore.Attivo)
+            if (compositore.EsecuzioneDeterministica || rilevatore.Attivo)
             {
                 compositore.Passo();
             }
@@ -515,34 +522,22 @@ namespace VisualMusicBlockLooper.App
                 }
             }
 
-            MotoreMusicale motore = compositore.Motore;
-            proiettore.Aggiorna(compositore.UltimoStato, motore.Posizione, motore.InEsecuzione);
-        }
-
-        /// <summary>Sul thread dei tick: ridisegna il proiettore appena cambia lo step, senza attendere il frame webcam.</summary>
-        private void AggiornaProiezioneSeCambiaStep()
-        {
-            MotoreMusicale motore = compositore.Motore;
-            PosizioneGiro posizione = motore.Posizione;
-            int chiave = posizione.MisuraNelGiro * 1000 + posizione.StepInMisura;
-            if (chiave == ultimoStepProiettato)
+            if (!compositore.EsecuzioneDeterministica)
             {
-                return;
+                IMotoreMusicale motore = compositore.Motore;
+                proiettore.Aggiorna(compositore.UltimoStato, motore.Posizione, motore.InEsecuzione);
             }
-
-            ultimoStepProiettato = chiave;
-            proiettore.Aggiorna(compositore.UltimoStato, posizione, motore.InEsecuzione);
         }
 
         private void AggiornaInterfaccia()
         {
             AggiornaAnteprima();
-            MotoreMusicale motore = compositore.Motore;
+            IMotoreMusicale motore = compositore.Motore;
             string modo = motore.Modo == ModoSincronia.Master ? "Master" : "Slave";
-            string stato = motore.InEsecuzione ? "in esecuzione" : "fermo";
+            string stato = motore.InEsecuzione ? "in esecuzione" : compositore.Esecutore?.Stato.InPreparazione == true ? "in preparazione" : "fermo";
             etichettaStato.Text = $"BPM {motore.Bpm:0.#}   |   {modo}   |   {stato}";
             pulsanteAvviaFerma.Text = motore.InEsecuzione ? "Ferma" : "Avvia";
-            pulsanteTap.Enabled = motore.Modo == ModoSincronia.Master;
+            pulsanteTap.Enabled = !inCalibrazione && motore.Modo == ModoSincronia.Master;
 
             List<string> righe = new List<string>(avvisi);
             if (!webcam.Disponibile)
@@ -566,6 +561,7 @@ namespace VisualMusicBlockLooper.App
             etichettaFps.Text = PresentatoreRegoliWebcam.TestoFps(
                 webcam.FpsCatturati, fpsDichiarati, cicloCattura.PassiAlSecondo, webcam.Larghezza, webcam.Altezza);
             AggiornaDebugCartoncini();
+            AggiornaStatoMidi();
         }
 
         private void AggiornaDebugCartoncini()
@@ -694,6 +690,12 @@ namespace VisualMusicBlockLooper.App
 
         private void ImpostaControlliCalibrazione(bool raccolta)
         {
+            compositore.OsservazioneSospesa = raccolta;
+            if(raccolta) compositore.Motore.Arresta();
+            else compositore.RileggiFoglio();
+            pulsanteAvviaFerma.Enabled = !raccolta;
+            pulsanteModo.Enabled = !raccolta;
+            pulsanteTap.Enabled = !raccolta && compositore.Motore.Modo == ModoSincronia.Master;
             comboWebcam.Enabled = !raccolta;
             comboMonitor.Enabled = !raccolta;
             pulsanteAggiornaWebcam.Enabled = !raccolta;

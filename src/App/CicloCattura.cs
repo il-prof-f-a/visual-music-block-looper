@@ -13,6 +13,8 @@ namespace VisualMusicBlockLooper.App
         private readonly MisuraFps misura;
         private Thread thread;
         private volatile bool fermare;
+        private string ultimoErrore;
+        public string UltimoErrore=>Volatile.Read(ref ultimoErrore);
 
         public CicloCattura(Action passo, int periodoMs = 66)
         {
@@ -42,10 +44,9 @@ namespace VisualMusicBlockLooper.App
         {
             fermare = true;
             Thread corrente = thread;
-            thread = null;
             if (corrente != null && corrente != Thread.CurrentThread)
             {
-                corrente.Join(2000);
+                if(corrente.Join(2000))thread=null;
             }
         }
 
@@ -64,9 +65,9 @@ namespace VisualMusicBlockLooper.App
                 {
                     passo();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    // Il ciclo di visione non deve mai terminare per un errore di un singolo frame.
+                    Volatile.Write(ref ultimoErrore,e.GetType().Name+": "+e.Message);
                 }
 
                 // Il passo conta come completato anche se ha lanciato: misura il ritmo del ciclo, non gli errori.

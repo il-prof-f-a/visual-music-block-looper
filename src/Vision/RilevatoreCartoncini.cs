@@ -23,7 +23,7 @@ namespace VisualMusicBlockLooper.Vision
     /// La lettura del QR usa OpenCV; per i cartoncini il cui corpo e' visibile ma il QR non e' stato letto
     /// (piccolo, sfocato, sovraesposto) si ritenta sul ritaglio ingrandito e livellato con ZXing e OpenCV.
     /// </summary>
-    public sealed class RilevatoreCartoncini : IRilevatoreDiagnostico
+    public sealed partial class RilevatoreCartoncini : IRilevatoreDiagnostico
     {
         private const double FattoreZonaQuieta = 0.2; // zona quieta ~4 moduli su 21 (frazione del lato del QR)
         private const int TolleranzaContatto = 3;
@@ -653,6 +653,10 @@ namespace VisualMusicBlockLooper.Vision
         // Maschera del corpo: pixel il cui canale minimo e' molto sotto il livello locale della carta/sfondo
         // (qualsiasi colore pieno o grigio scuro; linee sottili e la griglia chiara sono escluse).
         private static Mat MascheraCorpo(Mat bgr, Calibrazione calibrazione, out Rect[] rettangoli)
+            => MascheraCorpoInterna(bgr, calibrazione, out rettangoli, true, AreaMassimaCorpo * bgr.Cols * bgr.Rows);
+
+        private static Mat MascheraCorpoInterna(Mat bgr, Calibrazione calibrazione, out Rect[] rettangoli,
+            bool limitaAlTavolo, double areaMassima)
         {
             var maschera = new Mat();
             try
@@ -688,9 +692,10 @@ namespace VisualMusicBlockLooper.Vision
                 }
 
                 // Fuori dall'area calibrata (cornice dello schermo, mani, tavolo) non ci sono cartoncini.
-                using (Mat tavolo = calibrazione.MascheraTavolo(bgr.Cols, bgr.Rows, RestringiTavolo))
+                if (limitaAlTavolo)
                 {
-                    Cv2.BitwiseAnd(maschera, tavolo, maschera);
+                    using (Mat tavolo = calibrazione.MascheraTavolo(bgr.Cols, bgr.Rows, RestringiTavolo))
+                        Cv2.BitwiseAnd(maschera, tavolo, maschera);
                 }
 
                 using (var apertura = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(LatoNucleoApertura, LatoNucleoApertura)))
@@ -708,7 +713,7 @@ namespace VisualMusicBlockLooper.Vision
                     rettangoli = contorni
                         .Select(Cv2.BoundingRect)
                         .Where(r => r.Width * r.Height >= AreaMinimaCorpo
-                            && r.Width * r.Height <= AreaMassimaCorpo * bgr.Cols * bgr.Rows)
+                            && r.Width * r.Height <= areaMassima)
                         .ToArray();
                 }
 

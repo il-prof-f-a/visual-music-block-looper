@@ -241,7 +241,13 @@ namespace VisualMusicBlockLooper.App
             }
         }
 
-        private void DisegnaNote(Graphics g, Rectangle griglia, StatoTavolo stato, StrutturaTavolo struttura)
+        /// <summary>Bordi blu tratteggiati: osservazioni che non fanno ancora parte della partitura attiva.</summary>
+        public void DisegnaInAttesa(Graphics g,Size dimensione,StatoTavolo osservato)
+        {
+            DisegnaNote(g,InPixel(config.Area,dimensione),osservato,osservato?.Struttura??StrutturaTavolo.Default,true);
+        }
+
+        private void DisegnaNote(Graphics g, Rectangle griglia, StatoTavolo stato, StrutturaTavolo struttura,bool attesa=false)
         {
             if (stato == null)
             {
@@ -249,7 +255,8 @@ namespace VisualMusicBlockLooper.App
             }
 
             // Solo il bordo: il proiettore illumina il tavolo, un riempimento colorerebbe il cartoncino sotto.
-            using (var penna = new Pen(ColoreNota, 4) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset })
+            using (var penna = new Pen(attesa?Color.RoyalBlue:ColoreNota, attesa?3:4)
+                { Alignment = PenAlignment.Inset,DashStyle=attesa?DashStyle.Dash:DashStyle.Solid })
             {
                 foreach (CartoncinoNota nota in stato.Note)
                 {

@@ -12,6 +12,7 @@ namespace VisualMusicBlockLooper.App
         private string ultimoErrore;
         public PreparatoreFoglio(EsecutoreMidi esecutore) { this.esecutore = esecutore ?? throw new ArgumentNullException(nameof(esecutore)); }
         public FoglioOsservato Foglio { get; } = new FoglioOsservato();
+        public EsecutoreMidi Esecutore=>esecutore;
         public long NumeroCompilazioni => Volatile.Read(ref numeroCompilazioni);
         public string UltimoErrore => Volatile.Read(ref ultimoErrore);
         public long Generazione => Volatile.Read(ref generazione);

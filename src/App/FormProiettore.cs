@@ -18,6 +18,7 @@ namespace VisualMusicBlockLooper.App
         private readonly object bloccoStato = new object();
         private readonly RenderGuida renderGuida;
         private StatoTavolo stato;
+        private StatoTavolo inAttesa;
         private PosizioneGiro posizione;
         private bool inEsecuzione;
         private int? puntoCalibrazione;
@@ -92,6 +93,18 @@ namespace VisualMusicBlockLooper.App
             RichiediDisegno();
         }
 
+        public void AggiornaPosizione(PosizioneGiro nuovaPosizione,bool esecuzione)
+        {
+            lock(bloccoStato){if(IsDisposed)return;posizione=nuovaPosizione;inEsecuzione=esecuzione;}
+            RichiediDisegno();
+        }
+
+        public void MostraInAttesa(StatoTavolo osservato)
+        {
+            lock(bloccoStato){if(IsDisposed)return;inAttesa=CopiaStato(osservato);}
+            RichiediDisegno();
+        }
+
         private void RichiediDisegno()
         {
             if (!IsHandleCreated)
@@ -133,6 +146,7 @@ namespace VisualMusicBlockLooper.App
         protected override void OnPaint(PaintEventArgs e)
         {
             StatoTavolo statoCorrente;
+            StatoTavolo attesa;
             PosizioneGiro posizioneDisegnata;
             bool esecuzione;
             int? riferimento;
@@ -140,13 +154,18 @@ namespace VisualMusicBlockLooper.App
             lock (bloccoStato)
             {
                 statoCorrente = stato;
+                attesa = inAttesa;
                 posizioneDisegnata = posizione;
                 esecuzione = inEsecuzione;
                 riferimento = puntoCalibrazione;
             }
 
             if (riferimento.HasValue) RenderCalibrazione.Disegna(e.Graphics, ClientSize, riferimento.Value);
-            else renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
+            else
+            {
+                renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
+                renderGuida.DisegnaInAttesa(e.Graphics,ClientSize,attesa);
+            }
         }
 
         /// <summary>Stato attualmente proiettato (copia interna), null se non ancora impostato.</summary>

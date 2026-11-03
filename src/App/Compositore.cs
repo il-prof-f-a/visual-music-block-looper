@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using VisualMusicBlockLooper.Core;
+using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
 {
     /// <summary>
     /// Compone la catena di elaborazione: rilevamento, interpretazione del tavolo, stabilizzazione
-    /// e aggiornamento del motore musicale. Non contiene UI né thread propri.
+    /// e preparazione della partitura. Il runtime separa acquisizione e corsia comandi dall'esecutore MIDI.
     /// </summary>
-    public class Compositore
+    public class Compositore : IDisposable
     {
         /// <summary>Zona comandi di default (coordinate normalizzate del tavolo).</summary>
         public static readonly RettangoloTavolo ZonaComandiDefault = new RettangoloTavolo(0.84, 0.04, 0.14, 0.92);
@@ -18,6 +21,10 @@ namespace VisualMusicBlockLooper.App
         private readonly StabilizzatoreTavolo stabilizzatore = new StabilizzatoreTavolo();
         private readonly object bloccoStato = new object();
         private StatoTavolo ultimoStato = new StatoTavolo(null, null, null);
+        private readonly CicloCattura cicloComandi;
+        private readonly Func<long> orologio;
+        private int avviato,eliminato;
+        private volatile bool osservazioneSospesa;
 
         /// <summary>Crea il compositore e il relativo motore musicale.</summary>
         /// <param name="ingresso">Ingresso MIDI; può essere null.</param>
@@ -31,7 +38,9 @@ namespace VisualMusicBlockLooper.App
             IMappaturaMidi mappatura,
             ConfigGriglia config,
             LayoutTavolo layout = null,
-            Func<long> orologioMs = null)
+            Func<long> orologioMs = null,
+            bool esecuzioneDeterministica = false,
+            IFonteImmagini fonteVideo = null)
         {
             this.rilevatore = rilevatore ?? throw new ArgumentNullException(nameof(rilevatore));
             if (uscita == null)
@@ -51,8 +60,25 @@ namespace VisualMusicBlockLooper.App
 
             Layout = layout ?? LayoutTavolo.ConSoloComandi(ZonaComandiDefault);
             ConfigurazioneGriglia = config;
+            if(orologioMs==null){var t=Stopwatch.StartNew();orologioMs=()=>t.ElapsedMilliseconds;}
+            orologio=orologioMs;
             interprete = new InterpreteTavolo(new Griglia(config), Layout);
-            Motore = new MotoreMusicale(new Sequencer(config), uscita, ingresso, mappatura, 120, orologioMs);
+            if(esecuzioneDeterministica)
+            {
+                Esecutore=new EsecutoreMidi(uscita,ingresso,mappatura,config,orologioMs);Motore=Esecutore;
+                Preparatore=new PreparatoreFoglio(Esecutore);
+                if(fonteVideo!=null)
+                {
+                    Video=new AcquisitoreVideo(fonteVideo,orologioMs);
+                    Func<Calibrazione> calibrazione=()=> (rilevatore as RilevatoreCommutabile)?.CalibrazioneAttiva
+                        ?? (rilevatore as RilevatoreCartoncini)?.Calibrazione;
+                    Analizzatore=new AnalizzatoreFoglio(Video.Registro,calibrazione,config,Layout,Preparatore,RegistroDiagnostica,orologioMs);
+                    ComandiRapidi=new GestoreComandiRapidi(Video.Registro,calibrazione,config,Layout,Esecutore,RegistroDiagnostica,orologioMs);
+                    Analizzatore.Sospesa=()=>osservazioneSospesa;ComandiRapidi.Sospesa=()=>osservazioneSospesa;
+                    cicloComandi=new CicloCattura(()=>ComandiRapidi.Passo(),20);
+                }
+            }
+            else Motore = new MotoreMusicale(new Sequencer(config), uscita, ingresso, mappatura, 120, orologioMs);
         }
 
         /// <summary>Zone speciali del tavolo usate per interpretare i cartoncini.</summary>
@@ -61,7 +87,21 @@ namespace VisualMusicBlockLooper.App
         public ConfigGriglia ConfigurazioneGriglia { get; }
 
         /// <summary>Motore musicale pilotato dal compositore.</summary>
-        public MotoreMusicale Motore { get; }
+        public IMotoreMusicale Motore { get; }
+        public EsecutoreMidi Esecutore { get; }
+        public PreparatoreFoglio Preparatore { get; }
+        public AcquisitoreVideo Video { get; }
+        public AnalizzatoreFoglio Analizzatore { get; }
+        public GestoreComandiRapidi ComandiRapidi { get; }
+        public bool EsecuzioneDeterministica=>Esecutore!=null;
+        public bool OsservazioneSospesa { get=>osservazioneSospesa;set=>osservazioneSospesa=value; }
+        public void AvviaAcquisizione()
+        {
+            if(Volatile.Read(ref eliminato)!=0)throw new ObjectDisposedException(nameof(Compositore));
+            if(Interlocked.Exchange(ref avviato,1)!=0)return;
+            Video?.Avvia();cicloComandi?.Avvia();
+        }
+        public void RileggiFoglio()=>Analizzatore?.Rileggi();
 
         public RegistroCatture RegistroDiagnostica { get; } = new RegistroCatture();
 
@@ -70,6 +110,7 @@ namespace VisualMusicBlockLooper.App
         {
             get
             {
+                if(Analizzatore!=null)return Analizzatore.UltimoStato;
                 lock (bloccoStato)
                 {
                     return ultimoStato;
@@ -83,6 +124,8 @@ namespace VisualMusicBlockLooper.App
         /// </summary>
         public void Passo()
         {
+            if(Volatile.Read(ref eliminato)!=0||osservazioneSospesa)return;
+            if(Analizzatore!=null){Analizzatore.Passo();return;}
             CatturaInCorso cattura = RegistroDiagnostica.IniziaCattura();
             TracciaCartoncini traccia = cattura?.Traccia;
             try
@@ -109,7 +152,9 @@ namespace VisualMusicBlockLooper.App
                 StatoTavolo grezzo = interprete.Interpreta(rilevati, traccia);
                 StatoTavolo stabile = stabilizzatore.Aggiorna(grezzo, traccia);
                 lock (bloccoStato) { ultimoStato = stabile; }
-                Motore.AggiornaTavolo(stabile);
+                if(Esecutore!=null)
+                {Preparatore.Aggiorna(stabile,true);Esecutore.InviaComandi(stabile.Comandi,orologio());}
+                else Motore.AggiornaTavolo(stabile);
             }
             catch (Exception e)
             {
@@ -137,6 +182,12 @@ namespace VisualMusicBlockLooper.App
             cattura.Traccia.Errore = errore;
             stabilizzatore.DescriviStatoInvariato(cattura.Traccia);
             RegistroDiagnostica.CompletaCattura(cattura);
+        }
+        public void Dispose()
+        {
+            if(Interlocked.Exchange(ref eliminato,1)!=0)return;
+            cicloComandi?.Ferma();ComandiRapidi?.Dispose();Analizzatore?.Dispose();
+            try{Video?.Dispose();}finally{Esecutore?.Dispose();}
         }
     }
 }

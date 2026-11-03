@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Threading;
 using OpenCvSharp;
 using VisualMusicBlockLooper.Vision;
@@ -89,8 +90,25 @@ namespace VisualMusicBlockLooper.App
                     Cv2.CvtColor(immagine,convertita,immagine.Channels()==1?ColorConversionCodes.GRAY2BGRA:ColorConversionCodes.BGR2BGRA);
                     bgra=convertita;
                 }
-                using(var vista=new Bitmap(bgra.Cols,bgra.Rows,(int)bgra.Step(),PixelFormat.Format32bppArgb,bgra.Data))
-                    return vista.Clone(new Rectangle(0,0,vista.Width,vista.Height),PixelFormat.Format32bppArgb);
+                // Clone di una Bitmap su scan0 può condividere il buffer nativo fino alla scrittura.
+                // La UI sopravvive al Mat del worker: deve possedere una copia esplicita dei pixel.
+                var bitmap=new Bitmap(bgra.Cols,bgra.Rows,PixelFormat.Format32bppArgb);
+                try
+                {
+                    var dati=bitmap.LockBits(new Rectangle(0,0,bitmap.Width,bitmap.Height),ImageLockMode.WriteOnly,PixelFormat.Format32bppArgb);
+                    try
+                    {
+                        var riga=new byte[bgra.Cols*4];
+                        for(int y=0;y<bgra.Rows;y++)
+                        {
+                            Marshal.Copy(bgra.Ptr(y),riga,0,riga.Length);
+                            Marshal.Copy(riga,0,IntPtr.Add(dati.Scan0,y*dati.Stride),riga.Length);
+                        }
+                    }
+                    finally{bitmap.UnlockBits(dati);}
+                    return bitmap;
+                }
+                catch{bitmap.Dispose();throw;}
             }
         }
         public void Dispose(){ciclo.Ferma();vita.Dispose();}

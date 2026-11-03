@@ -86,6 +86,10 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Webcam da usare.</summary>
         public ConfigurazioneWebcam Webcam { get; set; } = new ConfigurazioneWebcam();
 
+        /// <summary>0: una osservazione per misura; altrimenti intervallo in pulsazioni.</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int PulsazioniPerOsservazione { get; set; }
+
         /// <summary>
         /// Carica la configurazione. Se il file non esiste restituisce i valori di default; se non è un
         /// JSON valido lancia <see cref="InvalidDataException"/>.

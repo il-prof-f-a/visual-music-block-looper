@@ -48,7 +48,8 @@ namespace VisualMusicBlockLooper.App
                 percorsoCalibrazione, webcam, rilevatore, avvisi, config);
 
             Compositore compositore = new Compositore(
-                rilevatore, uscita, ingresso, mappatura, config, LayoutTavolo.Default, orologioMs);
+                rilevatore, uscita, ingresso, mappatura, config, LayoutTavolo.Default, orologioMs,
+                esecuzioneDeterministica:true, fonteVideo:webcam);
             FormProiettore proiettore = new FormProiettore(config, LayoutTavolo.Default);
             string testoPorte = $"MIDI uscita: {configMidi.PortaUscita}  |  ingresso: {configMidi.PortaIngresso}"
                 + (avvisi.Exists(a => a.StartsWith("Porta MIDI")) ? "  (non disponibile)" : string.Empty);

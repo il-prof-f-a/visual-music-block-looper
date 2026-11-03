@@ -9,11 +9,12 @@ namespace VisualMusicBlockLooper.Vision
 {
     public sealed class EsitoVariazioni
     {
-        internal EsitoVariazioni(bool affidabile, IEnumerable<RettangoloTavolo> regioni, double frazione)
-        { Affidabile = affidabile; Regioni = Array.AsReadOnly(regioni.ToArray()); FrazioneCambiata = frazione; }
+        internal EsitoVariazioni(bool affidabile, IEnumerable<RettangoloTavolo> regioni, double frazione,int livelloSfondo)
+        { Affidabile = affidabile; Regioni = Array.AsReadOnly(regioni.ToArray()); FrazioneCambiata = frazione; LivelloSfondo=livelloSfondo; }
         public bool Affidabile { get; }
         public IReadOnlyList<RettangoloTavolo> Regioni { get; }
         public double FrazioneCambiata { get; }
+        public int LivelloSfondo { get; }
     }
     /// <summary>Firma leggera del foglio raddrizzato. Solo Conferma avanza il riferimento delle zone risolte.</summary>
     public sealed class RilevatoreVariazioni : IDisposable
@@ -26,7 +27,7 @@ namespace VisualMusicBlockLooper.Vision
         private readonly Mat piccola = new Mat(), convertita = new Mat(), maschera = new Mat(H, W, MatType.CV_8UC1);
         public EsitoVariazioni Confronta(Mat fotogramma)
         {
-            if (fotogramma == null || fotogramma.Empty()) return new EsitoVariazioni(false, new RettangoloTavolo[0], 0);
+            if (fotogramma == null || fotogramma.Empty()) return new EsitoVariazioni(false, new RettangoloTavolo[0], 0,0);
             Mat colore = fotogramma;
             if (fotogramma.Channels() == 1) { Cv2.CvtColor(fotogramma, convertita, ColorConversionCodes.GRAY2BGR); colore = convertita; }
             else if (fotogramma.Channels() == 4) { Cv2.CvtColor(fotogramma, convertita, ColorConversionCodes.BGRA2BGR); colore = convertita; }
@@ -56,9 +57,9 @@ namespace VisualMusicBlockLooper.Vision
             bool globaleInstabile = riferimento != null && cambiati > attuale.Length*.45 && (!haPrecedente || fraOsservazioni > attuale.Length*.02);
             Array.Copy(attuale, precedente, attuale.Length); haPrecedente = true;
             ultimoAffidabile = bianco >= 80 && !globaleInstabile;
-            if (!ultimoAffidabile) return new EsitoVariazioni(false, new RettangoloTavolo[0], (double)cambiati/attuale.Length);
-            if (riferimento == null) return new EsitoVariazioni(true, new[] { new RettangoloTavolo(0,0,1,1) }, 1);
-            if (cambiati == 0) return new EsitoVariazioni(true, new RettangoloTavolo[0], 0);
+            if (!ultimoAffidabile) return new EsitoVariazioni(false, new RettangoloTavolo[0], (double)cambiati/attuale.Length,bianco);
+            if (riferimento == null) return new EsitoVariazioni(true, new[] { new RettangoloTavolo(0,0,1,1) }, 1,bianco);
+            if (cambiati == 0) return new EsitoVariazioni(true, new RettangoloTavolo[0], 0,bianco);
             Marshal.Copy(differenze, 0, maschera.Data, differenze.Length);
             using (var nucleo = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(9,9)))
                 Cv2.Dilate(maschera, maschera, nucleo);
@@ -69,7 +70,7 @@ namespace VisualMusicBlockLooper.Vision
                 int x1 = Math.Min(W, a.Right+12), y1 = Math.Min(H, a.Bottom+12);
                 return new RettangoloTavolo((double)x/W,(double)y/H,(double)(x1-x)/W,(double)(y1-y)/H);
             }).ToArray();
-            return new EsitoVariazioni(true, regioni, (double)cambiati/attuale.Length);
+            return new EsitoVariazioni(true, regioni, (double)cambiati/attuale.Length,bianco);
         }
         public void Conferma(IReadOnlyList<RettangoloTavolo> regioni)
         {

@@ -97,14 +97,19 @@ namespace VisualMusicBlockLooper.App
                         if(!variazioni.Affidabile){firmaCandidata=null;conferme=0;Descrivi(traccia,"ImmagineNonAffidabile",f);return true;}
                         if(regioni.Length==0)
                         {firmaCandidata=null;conferme=0;Descrivi(traccia,"FoglioInvariato",f);return true;}
-                        var lavoro=catalogo;var richiesteLette=new List<RettangoloTavolo>();var areeLette=new List<RettangoloTavolo>();bool completa=true;
+                        var lavoro=catalogo;var richiesteLette=new List<RettangoloTavolo>();var areeLette=new List<RettangoloTavolo>();
+                        var rimozioniConfermate=new List<CartoncinoRilevato>();bool completa=true;
                         foreach(var z in regioni)
                         {
                             double destra=Math.Min(z.X+z.Larghezza,layout.Comandi.X);
                             if(destra<=z.X)continue;
                             var zona=new RettangoloTavolo(z.X,z.Y,destra-z.X,z.Altezza);
-                            var r=lettore.Leggi(f.Immagine,zona,lavoro,traccia);Interlocked.Increment(ref letture);
+                            var primaLettura=lavoro;
+                            var r=lettore.Leggi(f.Immagine,zona,primaLettura,traccia);Interlocked.Increment(ref letture);
                             if(vita.InChiusura||Sospesa())return true;
+                            // Una ROI incompleta puo' aver perso un QR per occlusione: applica
+                            // rimozioni solo quando il lettore dichiara affidabile quella ROI.
+                            if(r.Completa)rimozioniConfermate.AddRange(TrovaRimozioniConfermate(zona,primaLettura,r.Catalogo,tavolo,variazioni.LivelloSfondo));
                             // Una ROI parziale conserva i cartoncini noti e integra ogni QR valido.
                             // La completezza governa l'esito diagnostico, non annulla i risultati positivi.
                             var uniti=r.Completa?r.Catalogo:UnisciCatalogoParziale(lavoro,r.Catalogo);
@@ -117,9 +122,11 @@ namespace VisualMusicBlockLooper.App
                         // Un decoder può aver oltrepassato una scadenza: congela prima di fondere il nuovo contenuto.
                         preparatore.ControllaScadenza();
                         // Una sola ROI incerta rende provvisoria anche l'assenza di ogni cartoncino noto:
-                        // recupera i positivi ma conserva le identità iniziali finché il foglio è completo.
+                        // recupera i positivi e conserva le identità non verificate. Una ROI può però
+                        // confermare localmente l'assenza di un QR anche se un'altra resta incerta.
                         if(!completa)
-                            lavoro=UnisciCatalogoParziale(catalogo,lavoro)
+                            lavoro=UnisciCatalogoParziale(catalogo.Where(n=>
+                                    !rimozioniConfermate.Any(x=>StessaPosizioneQr(n,x))).ToArray(),lavoro)
                                 .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
                         var stato=interprete.Interpreta(lavoro,traccia);
                         string firma=Firma(stato);
@@ -192,6 +199,59 @@ namespace VisualMusicBlockLooper.App
         private void RiavviaConfronto(){differenze.Dispose();differenze=new RilevatoreVariazioni();firmaCandidata=null;conferme=0;}
         internal static string Firma(StatoTavolo s)=>s.Struttura.BattitiPerMisura+":"+s.Struttura.RigheCollegate+":"+s.Struttura.AInizio+":"+s.Struttura.AFine+"|"+
             string.Join(";",s.Note.Select(n=>n.Chiave+":"+n.DurataStep).OrderBy(x=>x));
+
+        private static IReadOnlyList<CartoncinoRilevato> TrovaRimozioniConfermate(RettangoloTavolo zona,
+            IReadOnlyList<CartoncinoRilevato> noti,IReadOnlyList<CartoncinoRilevato> catalogoLetto,Mat tavolo,int livelloSfondo)
+        {
+            var rimossi=new List<CartoncinoRilevato>();var associati=new HashSet<int>();
+            foreach(var noto in noti??new CartoncinoRilevato[0])
+            {
+                var area=noto.AreaQr??noto.Area;
+                if(!GeometriaRegioni.ContieneCentro(zona,area))continue;
+                int migliore=-1;double distanza=double.MaxValue;
+                var letti=catalogoLetto??new CartoncinoRilevato[0];
+                for(int i=0;i<letti.Count;i++)
+                {
+                    if(associati.Contains(i))continue;
+                    var altro=letti[i].AreaQr??letti[i].Area;
+                    double limite=Math.Max(area.Larghezza,altro.Larghezza)*.15;
+                    double dx=area.X+area.Larghezza/2-altro.X-altro.Larghezza/2;
+                    double dy=area.Y+area.Altezza/2-altro.Y-altro.Altezza/2;
+                    double d=Math.Sqrt(dx*dx+dy*dy);
+                    if(d<limite&&d<distanza){migliore=i;distanza=d;}
+                }
+                if(migliore>=0)associati.Add(migliore);
+                else if(QrSostituitoDaSfondo(tavolo,noto,livelloSfondo))rimossi.Add(GeometriaRegioni.Copia(noto));
+            }
+            return rimossi.AsReadOnly();
+        }
+
+        private static bool QrSostituitoDaSfondo(Mat tavolo,CartoncinoRilevato cartoncino,int livelloSfondo)
+        {
+            if(tavolo==null||tavolo.Empty()||livelloSfondo<80)return false;
+            var area=cartoncino.AreaQr??cartoncino.Area;
+            int x=(int)Math.Floor(area.X*tavolo.Cols),y=(int)Math.Floor(area.Y*tavolo.Rows);
+            int x1=(int)Math.Ceiling((area.X+area.Larghezza)*tavolo.Cols);
+            int y1=(int)Math.Ceiling((area.Y+area.Altezza)*tavolo.Rows);
+            if(x<0||y<0||x1>tavolo.Cols||y1>tavolo.Rows||x1-x<4||y1-y<4)return false;
+            using(var qr=new Mat(tavolo,new Rect(x,y,x1-x,y1-y)))
+            {
+                Scalar media=Cv2.Mean(qr);
+                double luminanza=qr.Channels()==1?media.Val0:(media.Val0*29+media.Val1*150+media.Val2*77)/256.0;
+                // QR illeggibile o occluso non equivale a tavolo vuoto: il box rimosso
+                // deve essere tornato vicino alla luminosita' di fondo della scena.
+                return luminanza>=livelloSfondo*.72;
+            }
+        }
+
+        private static bool StessaPosizioneQr(CartoncinoRilevato a,CartoncinoRilevato b)
+        {
+            var x=a.AreaQr??a.Area;var y=b.AreaQr??b.Area;
+            double limite=Math.Max(x.Larghezza,y.Larghezza)*.15;
+            double dx=x.X+x.Larghezza/2-y.X-y.Larghezza/2;
+            double dy=x.Y+x.Altezza/2-y.Y-y.Altezza/2;
+            return Math.Sqrt(dx*dx+dy*dy)<limite;
+        }
 
         private static IReadOnlyList<CartoncinoRilevato> UnisciCatalogoParziale(
             IReadOnlyList<CartoncinoRilevato> noti,IReadOnlyList<CartoncinoRilevato> letti)

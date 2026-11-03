@@ -63,7 +63,7 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(finale.Interpretazione.Any(e=>e.Payload=="VMBL1;S;LINK;2"&&e.Codice=="CollegamentoAccettato"),Is.True,
                     "LINK 2 non applicabile: "+string.Join(" | ",finale.Interpretazione.Where(e=>e.Payload=="VMBL1;S;LINK;2").Select(e=>e.Codice+"/"+e.Esito+"/"+e.Zona+"/"+e.Dettaglio)));
                 Assert.That(a.UltimoStato.Struttura.RigheCollegate,Is.EqualTo(2),"Il LINK già letto non deve essere scartato per un corpo anonimo altrove.");
-                Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),"Zone: "+string.Join(" || ",registro.Istantanea().Catture.Select(c=>string.Join(" | ",c.Visione.Where(v=>v.Codice=="LetturaZona").Select(v=>v.Dettaglio)))));
                 Assert.That(p.Foglio.Ultima.CopiaStato().Note,Has.Count.EqualTo(10),"Una zona parziale non deve cancellare la nota coperta dalla chiazza scura.");
                 Assert.That(p.Foglio.Ultima.CopiaStato().Struttura.RigheCollegate,Is.EqualTo(2));
             });

@@ -68,6 +68,35 @@ namespace VisualMusicBlockLooper.Tests
                 }
             }
         }
+
+        [Test]
+        public void RimozioneConfermataRestaApplicataAncheSeUnAltraZonaEIncompleta()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var c=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);var debug=new RegistroCatture{Attivo=true};
+                using(var a=new AnalizzatoreFoglio(r,()=>c,cfg,LayoutTavolo.Default,p,debug,()=>ora))
+                {
+                    for(int i=0;i<2;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
+                    long lettureIniziali=a.NumeroLettureZone;
+                    Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
+                    Cv2.Rectangle(f,new Rect(45,680,100,100),new Scalar(25,25,25),-1);
+                    for(int i=0;i<2;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
+                    var cattura=debug.Istantanea().Catture.Last(x=>x.Visione.Any(v=>v.Codice=="LetturaZona"));
+                    Assert.That(a.NumeroLettureZone,Is.GreaterThan(lettureIniziali),"La scena modificata deve riaprire almeno una ROI.");
+                    Assert.That(cattura.Visione.Any(v=>v.Codice=="LetturaZona"&&v.Dettaglio.Contains("completa=False")),Is.True,
+                        "La ROI volutamente ambigua deve restare incompleta. Esiti: "+string.Join(" | ",cattura.Visione.Select(v=>v.Codice+":"+v.Dettaglio)));
+                    Assert.That(cattura.Visione.Any(v=>v.Codice=="LetturaZona"&&v.Dettaglio.Contains("completa=True")),Is.True,
+                        "La ROI che contiene il cartoncino rimosso deve confermarne l'assenza.");
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9),
+                        "La zona incerta non deve ripristinare una rimozione confermata in un'altra ROI.");
+                }
+            }
+        }
+
         [Test]
         public void AvvioSingoloMaUnFotogrammaGiaUsatoNonConfermaUnaModifica()
         {

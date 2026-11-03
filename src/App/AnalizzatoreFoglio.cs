@@ -92,12 +92,12 @@ namespace VisualMusicBlockLooper.App
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))
                     {
                         var variazioni=differenze.Confronta(tavolo);
-                        var regioni=variazioni.Regioni.Concat(regioniDaVerificare).ToArray();
+                        var regioni=variazioni.Regioni.Concat(regioniDaVerificare).Distinct().ToArray();
                         Volatile.Write(ref ultimeRegioni,regioni);
                         if(!variazioni.Affidabile){firmaCandidata=null;conferme=0;Descrivi(traccia,"ImmagineNonAffidabile",f);return true;}
                         if(regioni.Length==0)
                         {firmaCandidata=null;conferme=0;Descrivi(traccia,"FoglioInvariato",f);return true;}
-                        var lavoro=catalogo;var risolte=new List<RettangoloTavolo>();bool completa=true;
+                        var lavoro=catalogo;var richiesteLette=new List<RettangoloTavolo>();var areeLette=new List<RettangoloTavolo>();bool completa=true;
                         foreach(var z in regioni)
                         {
                             double destra=Math.Min(z.X+z.Larghezza,layout.Comandi.X);
@@ -105,14 +105,22 @@ namespace VisualMusicBlockLooper.App
                             var zona=new RettangoloTavolo(z.X,z.Y,destra-z.X,z.Altezza);
                             var r=lettore.Leggi(f.Immagine,zona,lavoro,traccia);Interlocked.Increment(ref letture);
                             if(vita.InChiusura||Sospesa())return true;
-                            if(r.Completa)
-                            {lavoro=r.Catalogo.Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();risolte.Add(z);}
-                            else completa=false;
+                            // Una ROI parziale conserva i cartoncini noti e integra ogni QR valido.
+                            // La completezza governa l'esito diagnostico, non annulla i risultati positivi.
+                            var uniti=r.Completa?r.Catalogo:UnisciCatalogoParziale(lavoro,r.Catalogo);
+                            lavoro=uniti.Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
+                            richiesteLette.Add(z);areeLette.Add(zona);
+                            if(!r.Completa)completa=false;
                         }
                         if(!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
                         {Descrivi(traccia,"LetturaObsoleta",f);return true;}
                         // Un decoder può aver oltrepassato una scadenza: congela prima di fondere il nuovo contenuto.
                         preparatore.ControllaScadenza();
+                        // Una sola ROI incerta rende provvisoria anche l'assenza di ogni cartoncino noto:
+                        // recupera i positivi ma conserva le identità iniziali finché il foglio è completo.
+                        if(!completa)
+                            lavoro=UnisciCatalogoParziale(catalogo,lavoro)
+                                .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
                         var stato=interprete.Interpreta(lavoro,traccia);
                         string firma=Firma(stato);
                         if(firma!=firmaCandidata){firmaCandidata=firma;conferme=1;}else conferme=Math.Min(2,conferme+1);
@@ -120,12 +128,15 @@ namespace VisualMusicBlockLooper.App
                         {
                             catalogo=lavoro;inizializzato=true;Volatile.Write(ref ultimoStato,stato);
                             preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
-                            differenze.Conferma(risolte);
-                            regioniDaVerificare=regioniDaVerificare.Where(z=>!risolte.Contains(z)).ToArray();
-                            Descrivi(traccia,completa?"FoglioConfermato":"ZoneDaRileggere",f);
+                            // Dopo due frame coerenti si aggiorna il riferimento anche nelle zone
+                            // incomplete: l'incertezza resta registrata, ma non forza scansioni
+                            // identiche. Un cambiamento successivo o Rileggi riapre quelle zone.
+                            differenze.Conferma(areeLette);
+                            regioniDaVerificare=regioniDaVerificare.Where(z=>!richiesteLette.Contains(z)).ToArray();
+                            Descrivi(traccia,completa?"FoglioConfermato":"ZoneIncerteConfermate",f);
                         }
                         else Descrivi(traccia,completa?"InAttesaDiConferma":"ZoneDaRileggere",f);
-                        if(tentativoBurst==0&&(conferme<2||!completa)){tentativoBurst=1;retryAt=orologio()+80;}
+                        if(tentativoBurst==0&&conferme<2){tentativoBurst=1;retryAt=orologio()+80;}
                     }
                 }
                 catch(Exception e){FallimentoAvvio("Analisi non applicata: "+e.Message);if(traccia!=null){traccia.Errore=e.GetType().Name+": "+e.Message;traccia.EsitoVisione="ErroreAnalisi";}}
@@ -181,6 +192,31 @@ namespace VisualMusicBlockLooper.App
         private void RiavviaConfronto(){differenze.Dispose();differenze=new RilevatoreVariazioni();firmaCandidata=null;conferme=0;}
         internal static string Firma(StatoTavolo s)=>s.Struttura.BattitiPerMisura+":"+s.Struttura.RigheCollegate+":"+s.Struttura.AInizio+":"+s.Struttura.AFine+"|"+
             string.Join(";",s.Note.Select(n=>n.Chiave+":"+n.DurataStep).OrderBy(x=>x));
+
+        private static IReadOnlyList<CartoncinoRilevato> UnisciCatalogoParziale(
+            IReadOnlyList<CartoncinoRilevato> noti,IReadOnlyList<CartoncinoRilevato> letti)
+        {
+            var risultato=(noti??new CartoncinoRilevato[0]).Select(GeometriaRegioni.Copia).ToList();
+            var associati=new HashSet<int>();
+            foreach(var letto in letti??new CartoncinoRilevato[0])
+            {
+                int migliore=-1;double distanza=double.MaxValue;
+                for(int i=0;i<risultato.Count;i++)
+                {
+                    if(associati.Contains(i))continue;
+                    var a=risultato[i].AreaQr??risultato[i].Area;var b=letto.AreaQr??letto.Area;
+                    double limite=Math.Max(a.Larghezza,b.Larghezza)*
+                        (string.Equals(risultato[i].Payload,letto.Payload,StringComparison.Ordinal)?1.4:.15);
+                    double dx=a.X+a.Larghezza/2-b.X-b.Larghezza/2;
+                    double dy=a.Y+a.Altezza/2-b.Y-b.Altezza/2;
+                    double d=Math.Sqrt(dx*dx+dy*dy);
+                    if(d<limite&&d<distanza){migliore=i;distanza=d;}
+                }
+                if(migliore>=0){risultato[migliore]=GeometriaRegioni.Copia(letto);associati.Add(migliore);}
+                else{risultato.Add(GeometriaRegioni.Copia(letto));associati.Add(risultato.Count-1);}
+            }
+            return risultato.AsReadOnly();
+        }
         public void Dispose()=>vita.Dispose();
     }
 }

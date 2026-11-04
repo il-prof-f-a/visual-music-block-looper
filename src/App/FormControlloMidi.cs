@@ -49,7 +49,7 @@ namespace VisualMusicBlockLooper.App
                 Riavvia(timerSalvaConfigurazione);
             };
             etichettaVersioniFoglio=new Label {Name="etichettaVersioniFoglio",Left=10,Top=750,Width=735,Height=46,AutoEllipsis=true,ForeColor=Color.DarkBlue};
-            suggerimentiDebug.SetToolTip(rileggi,"Rilegge il foglio e richiede conferma. Durante l'esecuzione le modifiche entreranno a una frontiera del giro.");
+            suggerimentiDebug.SetToolTip(rileggi,"Forza una nuova scansione completa del foglio. Durante l'esecuzione la nuova partitura entrerà alla prossima frontiera del giro.");
             Controls.AddRange(new Control[]{rileggi,pulsanteSalvaTempiMidi,combo,etichettaVersioniFoglio});
         }
         private void AggiornaStatoMidi()

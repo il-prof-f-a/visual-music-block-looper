@@ -47,7 +47,6 @@ namespace VisualMusicBlockLooper.Tests
         {
             Esegui(capovolta,true,(a,p,r,registro,f,ora)=>
             {
-                a.Rileggi();
                 r.Pubblica(f,ora);a.Passo(true);
                 var cattura=registro.Istantanea().Catture.Last();
                 Assert.That(cattura.Visione.Any(e=>e.Codice=="LetturaZona"&&e.Dettaglio.Contains("completa=False")),Is.True,

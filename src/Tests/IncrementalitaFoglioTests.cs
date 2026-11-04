@@ -126,6 +126,133 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void ModalitaScenaCompletaLeggeAllaCadenzaMusicaleSelezionata()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);var debug=new RegistroCatture{Attivo=true};
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,debug,()=>ora,false))
+                {
+                    a.PulsazioniPerOsservazione=2;
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    long lettureIniziali=a.NumeroLettureZone;
+
+                    e.Avvia();e.TickInterno();
+                    for(int i=0;i<46;i++)
+                    {
+                        e.TickInterno();ora+=10;r.Pubblica(f,ora);a.Passo();
+                    }
+                    Assert.That(a.NumeroLettureZone,Is.EqualTo(lettureIniziali),
+                        "Con cadenza ogni 2 pulsazioni non si rilegge prima del tick MIDI 48.");
+
+                    e.TickInterno();ora+=10;r.Pubblica(f,ora);a.Passo();
+                    Assert.That(a.NumeroLettureZone,Is.EqualTo(lettureIniziali+1),
+                        "Alla cadenza scelta deve essere decodificata una nuova istantanea completa.");
+                    Assert.That(debug.Istantanea().Catture.Last().Visione.Any(v=>v.Codice=="TempiIstantanea"),Is.True,
+                        "La lettura pianificata deve passare dal lettore dell'intera istantanea.");
+
+                    long secondaLettura=a.NumeroLettureZone;
+                    for(int i=0;i<47;i++)
+                    {
+                        e.TickInterno();ora+=10;r.Pubblica(f,ora);a.Passo();
+                    }
+                    Assert.That(a.NumeroLettureZone,Is.EqualTo(secondaLettura),
+                        "Non si deve avviare una seconda lettura prima della cadenza successiva.");
+                    e.TickInterno();ora+=10;r.Pubblica(f,ora);a.Passo();
+                    Assert.That(a.NumeroLettureZone,Is.EqualTo(secondaLettura+1));
+                }
+            }
+        }
+
+        [Test]
+        public void ModalitaScenaCompletaConfermaLaRimozioneDiUnCartoncino()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,false))
+                {
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    long letture=a.NumeroLettureZone;
+                    Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
+                    for(int i=0;i<2;i++)
+                    {ora+=100;r.Pubblica(f,ora);a.Passo(true);}
+
+                    Assert.That(a.NumeroLettureZone,Is.EqualTo(letture+2),
+                        "Ogni osservazione deve decodificare l'intera scena, anche in assenza del filtro ROI.");
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9),
+                        "Due istantanee coerenti devono rimuovere la nota del cartoncino tolto.");
+                }
+            }
+        }
+
+        [Test]
+        public void ModalitaScenaCompletaConservaLeNoteQuandoLaCatturaEIlleggibile()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var buio=new Mat(900,1600,MatType.CV_8UC3,Scalar.Black))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,false))
+                {
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+
+                    ora+=100;r.Pubblica(buio,ora);a.Passo(true);
+
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),
+                        "Un frame troppo buio per una lettura affidabile non deve cancellare il catalogo MIDI.");
+                    Assert.That(a.UltimoEsito,Is.EqualTo("ScansioneCompletaNonAffidabile"));
+                }
+            }
+        }
+
+        [Test]
+        public void ModalitaScenaCompletaNonConfermaDueVolteLoStessoFrameDurantePreparazione()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,false))
+                {
+                    e.Avvia();e.TickInterno();
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(e.Stato.InPreparazione,Is.True);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+
+                    Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
+                    ora+=100;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),
+                        "La prima scansione nuova deve soltanto iniziare la conferma della rimozione.");
+                    long letture=a.NumeroLettureZone;
+
+                    ora+=300;a.Passo();
+                    Assert.That(a.NumeroLettureZone,Is.EqualTo(letture),
+                        "Il frame ripetuto dalla webcam non è una seconda cattura indipendente.");
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+
+                    ora+=100;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9),
+                        "Un nuovo frame coerente può completare la conferma e rimuovere la nota.");
+                }
+            }
+        }
+
+        [Test]
         public void AvvioSingoloMaUnFotogrammaGiaUsatoNonConfermaUnaModifica()
         {
             var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};

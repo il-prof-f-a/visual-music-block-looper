@@ -88,5 +88,23 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(d.Confronta(f).Regioni.Count, Is.GreaterThan(0));
             }
         }
+
+        [Test]
+        public void SogliaGrigioConfigurabileRilevaDifferenzeDeboli()
+        {
+            using(var f=new Mat(360,640,MatType.CV_8UC3,Scalar.White))
+            using(var defaultDetector=new RilevatoreVariazioni())
+            using(var detector=new RilevatoreVariazioni(new ParametriRilevatoreVariazioni{SogliaGrigioRelativa=.8}))
+            {
+                defaultDetector.Conferma(defaultDetector.Confronta(f).Regioni);
+                detector.Conferma(detector.Confronta(f).Regioni);
+                Cv2.Rectangle(f,new Rect(250,140,60,35),new Scalar(170,170,170),-1);
+
+                Assert.That(defaultDetector.Confronta(f).Regioni,Is.Empty,
+                    "La soglia predefinita non interpreta il grigio debole come cambiamento significativo.");
+                Assert.That(detector.Confronta(f).Regioni,Is.Not.Empty,
+                    "La soglia configurata deve essere applicata al confronto.");
+            }
+        }
     }
 }

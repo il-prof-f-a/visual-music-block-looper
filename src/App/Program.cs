@@ -49,7 +49,9 @@ namespace VisualMusicBlockLooper.App
 
             Compositore compositore = new Compositore(
                 rilevatore, uscita, ingresso, mappatura, config, LayoutTavolo.Default, orologioMs,
-                esecuzioneDeterministica:true, fonteVideo:webcam);
+                esecuzioneDeterministica:true, fonteVideo:webcam,
+                analizzaSoloSeCambia:configurazione.AnalizzaSoloSeCambia,
+                parametriVariazioni:configurazione.AnalisiVariazioni);
             FormProiettore proiettore = new FormProiettore(config, LayoutTavolo.Default);
             string testoPorte = $"MIDI uscita: {configMidi.PortaUscita}  |  ingresso: {configMidi.PortaIngresso}"
                 + (avvisi.Exists(a => a.StartsWith("Porta MIDI")) ? "  (non disponibile)" : string.Empty);
@@ -134,7 +136,14 @@ namespace VisualMusicBlockLooper.App
         {
             try
             {
-                return ConfigurazioneApplicazione.Carica(percorso);
+                var configurazione=ConfigurazioneApplicazione.Carica(percorso);
+                // Migra anche i file delle versioni precedenti, aggiungendo le nuove soglie
+                // e la modalità di analisi completa senza perdere webcam e cadenza salvate.
+                try{configurazione.Salva(percorso);}
+                catch(Exception eccezione) when(eccezione is IOException||eccezione is UnauthorizedAccessException||
+                    eccezione is ArgumentException||eccezione is System.Security.SecurityException)
+                {avvisi.Add("Configurazione non salvata ("+eccezione.Message+"): le nuove opzioni restano ai valori di default.");}
+                return configurazione;
             }
             catch (Exception eccezione) when (eccezione is IOException || eccezione is InvalidDataException || eccezione is ArgumentException)
             {

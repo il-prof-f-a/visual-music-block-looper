@@ -65,7 +65,7 @@ namespace VisualMusicBlockLooper.App
             long osservata=compositore.Preparatore.Foglio.Ultima?.Versione??0;
             string errore=tickMaster.UltimoErrore??e.UltimoErrore??compositore.Preparatore.UltimoErrore??cicloCattura.UltimoErrore??preparatoreAnteprima?.UltimoErrore;
             string testo=$"Foglio letto v{osservata} | pronto v{e.Stato.VersionePronta} | in uso v{e.Stato.VersioneAttiva}"
-                +$" | letture zone: {compositore.Analizzatore?.NumeroLettureZone??0}";
+                +$" | letture scena/zone: {compositore.Analizzatore?.NumeroLetture??0}";
             testo+=Environment.NewLine+(errore??messaggioTempi??compositore.Analizzatore?.UltimoEsito??"Preparazione del foglio");
             etichettaVersioniFoglio.Text=testo;
             etichettaVersioniFoglio.ForeColor=errore==null?Color.DarkBlue:Color.DarkRed;

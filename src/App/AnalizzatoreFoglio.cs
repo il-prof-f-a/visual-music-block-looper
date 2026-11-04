@@ -21,13 +21,16 @@ namespace VisualMusicBlockLooper.App
         private readonly Func<long> orologio;
         private readonly InterpreteTavolo interprete;
         private readonly RilascioDifferito vita;
-        private RilevatoreVariazioni differenze=new RilevatoreVariazioni();
+        private readonly bool analizzaSoloSeCambia;
+        private readonly ParametriRilevatoreVariazioni parametriVariazioni;
+        private RilevatoreVariazioni differenze;
         private Calibrazione corrente;
         private LettoreZone lettore;
         private IReadOnlyList<CartoncinoRilevato> catalogo=new CartoncinoRilevato[0];
         private StatoTavolo ultimoStato=new StatoTavolo(null,null,null);
         private IReadOnlyList<RettangoloTavolo> ultimeRegioni=new RettangoloTavolo[0];
-        private long generazione, generazioneVideo, ultimoFrame, ultimoSegnale=-1, ultimaOsservazione=-1000, letture, fotogrammi, retryAt=long.MaxValue;
+        private long generazione, generazioneVideo, ultimoFrame, ultimoFrameScansioneCompleta=long.MinValue,
+            ultimoSegnale=-1, ultimaOsservazione=-1000, letture, fotogrammi, retryAt=long.MaxValue;
         private string firmaCandidata, ultimoEsito="Preparazione del foglio";
         private int conferme, tentativoBurst, forzaRilettura;
         private bool inizializzato;
@@ -35,16 +38,21 @@ namespace VisualMusicBlockLooper.App
         private double primaPubblicazioneMs;
         public double PrimaPubblicazioneMs=>Volatile.Read(ref primaPubblicazioneMs);
         public AnalizzatoreFoglio(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
-            LayoutTavolo layout,PreparatoreFoglio preparatore,RegistroCatture registro,Func<long> orologio)
+            LayoutTavolo layout,PreparatoreFoglio preparatore,RegistroCatture registro,Func<long> orologio,
+            bool analizzaSoloSeCambia=true,ParametriRilevatoreVariazioni parametriVariazioni=null)
         {
             this.immagini=immagini;this.calibrazione=calibrazione;this.config=config;this.layout=layout;
             this.preparatore=preparatore;this.registro=registro;this.orologio=orologio;
+            this.analizzaSoloSeCambia=analizzaSoloSeCambia;
+            this.parametriVariazioni=(parametriVariazioni??new ParametriRilevatoreVariazioni()).Normalizzati();
+            differenze=new RilevatoreVariazioni(this.parametriVariazioni);
             interprete=new InterpreteTavolo(new Griglia(config),layout);
             vita=new RilascioDifferito(()=>differenze.Dispose());
         }
         public StatoTavolo UltimoStato=>Volatile.Read(ref ultimoStato);
         public IReadOnlyList<RettangoloTavolo> UltimeRegioni=>Volatile.Read(ref ultimeRegioni);
-        public long NumeroLettureZone=>Volatile.Read(ref letture);
+        public long NumeroLetture=>Volatile.Read(ref letture);
+        public long NumeroLettureZone=>NumeroLetture;
         public long NumeroFotogrammi=>Volatile.Read(ref fotogrammi);
         public string UltimoEsito=>Volatile.Read(ref ultimoEsito);
         public int PulsazioniPerOsservazione { get; set; }
@@ -82,6 +90,7 @@ namespace VisualMusicBlockLooper.App
                 {
                     corrente=c;generazioneVideo=f.Generazione;generazione++;
                     preparatore.ImpostaGenerazione(generazione);catalogo=new CartoncinoRilevato[0];inizializzato=false;
+                    ultimoFrameScansioneCompleta=long.MinValue;
                     RiavviaConfronto();lettore=new LettoreZone(c,config);
                 }
                 if(Interlocked.Exchange(ref forzaRilettura,0)!=0)
@@ -94,6 +103,7 @@ namespace VisualMusicBlockLooper.App
                     Volatile.Write(ref ultimoStato,new StatoTavolo(null,null,null));
                     Volatile.Write(ref ultimoEsito,"Rilettura completa in corso");
                 }
+                if(!analizzaSoloSeCambia&&inizializzato&&f.Id==ultimoFrameScansioneCompleta)return false;
                 if(normale||manuale)tentativoBurst=0;
                 ultimoFrame=f.Id;ultimoSegnale=segnale;ultimaOsservazione=ora;retryAt=long.MaxValue;
                 Interlocked.Increment(ref fotogrammi);
@@ -102,6 +112,11 @@ namespace VisualMusicBlockLooper.App
                 {
                     if(traccia!=null){traccia.Layout=layout;traccia.CalibrazionePresente=true;traccia.LarghezzaFrame=f.Immagine.Cols;traccia.AltezzaFrame=f.Immagine.Rows;}
                     if(!inizializzato)return PrimaIstantanea(f,c,traccia);
+                    if(!analizzaSoloSeCambia)
+                    {
+                        AnalizzaScenaCompleta(f,c,traccia);
+                        return true;
+                    }
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))
                     {
                         var variazioni=differenze.Confronta(tavolo);
@@ -207,13 +222,61 @@ namespace VisualMusicBlockLooper.App
             var s=UltimoStato;t.EsitoVisione=esito;t.NoteStabili=s.Note.Count;t.StrutturaStabile=s.Struttura;
             t.EsitoStabilizzazione=esito;t.ConfermeRichieste=richieste;t.ConfermeStruttura=conferme;
             t.Visione.Add(new EventoDiagnosticoCartoncino("Osservazione",esito,"VersioniFoglio",
-                $"Frame {f.Id} a {f.IstanteMs}ms; osservata={preparatore.Foglio.Ultima?.Versione??0}, pronta={preparatore.Esecutore.Stato.VersionePronta}, attiva={preparatore.Esecutore.Stato.VersioneAttiva}; letture ROI={NumeroLettureZone}."));
+                $"Frame {f.Id} a {f.IstanteMs}ms; osservata={preparatore.Foglio.Ultima?.Versione??0}, pronta={preparatore.Esecutore.Stato.VersionePronta}, attiva={preparatore.Esecutore.Stato.VersioneAttiva}; letture scena/ROI={NumeroLetture}."));
         }
-        private void RiavviaConfronto(){differenze.Dispose();differenze=new RilevatoreVariazioni();firmaCandidata=null;conferme=0;}
+        private void AnalizzaScenaCompleta(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia)
+        {
+            ultimoFrameScansioneCompleta=f.Id;
+            var letta=new LettoreIstantanea(c,config).Leggi(f.Immagine,traccia);
+            Interlocked.Increment(ref letture);
+            if(vita.InChiusura||Sospesa()||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
+            {Descrivi(traccia,"LetturaObsoleta",f);return;}
+
+            var incerte=letta.RegioniDaRileggere.Where(z=>z.X<layout.Comandi.X).ToArray();
+            // Una scena buia senza QR né regioni riconoscibili non conferma la rimozione di tutto.
+            // Si conserva il catalogo e si attende una cattura che il lettore possa valutare.
+            if(letta.Cartoncini.Count==0&&!letta.VuotoAffidabile&&incerte.Length==0)
+            {
+                firmaCandidata=null;
+                conferme=0;
+                Descrivi(traccia,"ScansioneCompletaNonAffidabile",f);
+                return;
+            }
+
+            preparatore.ControllaScadenza();
+            var nuovi=letta.Cartoncini
+                .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
+            var daConservare=incerte.Length==0?new CartoncinoRilevato[0]:catalogo.Where(n=>
+            {
+                var area=n.AreaQr??n.Area;
+                return incerte.Any(z=>GeometriaRegioni.ContieneCentro(z,area));
+            }).ToArray();
+            var lavoro=UnisciCatalogoParziale(daConservare,nuovi)
+                .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
+            bool completa=incerte.Length==0;
+            var stato=interprete.Interpreta(lavoro,traccia);
+            string firma=Firma(stato);
+            if(firma!=firmaCandidata){firmaCandidata=firma;conferme=1;}
+            else conferme=Math.Min(2,conferme+1);
+
+            if(conferme>=2)
+            {
+                catalogo=lavoro;
+                inizializzato=true;
+                regioniDaVerificare=incerte;
+                Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
+                Volatile.Write(ref ultimoStato,stato);
+                preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
+                Descrivi(traccia,completa?"ScansioneCompletaConfermata":"ScansioneCompletaConIncertezze",f);
+            }
+            else Descrivi(traccia,completa?"ScansioneCompletaInAttesaDiConferma":"ScansioneCompletaDaConfermare",f);
+        }
+
+        private void RiavviaConfronto(){differenze.Dispose();differenze=new RilevatoreVariazioni(parametriVariazioni);firmaCandidata=null;conferme=0;}
         internal static string Firma(StatoTavolo s)=>s.Struttura.BattitiPerMisura+":"+s.Struttura.RigheCollegate+":"+s.Struttura.AInizio+":"+s.Struttura.AFine+"|"+
             string.Join(";",s.Note.Select(n=>n.Chiave+":"+n.DurataStep).OrderBy(x=>x));
 
-        private static IReadOnlyList<CartoncinoRilevato> TrovaRimozioniConfermate(RettangoloTavolo zona,
+        private IReadOnlyList<CartoncinoRilevato> TrovaRimozioniConfermate(RettangoloTavolo zona,
             IReadOnlyList<CartoncinoRilevato> noti,IReadOnlyList<CartoncinoRilevato> catalogoLetto,Mat tavolo,int livelloSfondo)
         {
             var rimossi=new List<CartoncinoRilevato>();var associati=new HashSet<int>();
@@ -239,9 +302,9 @@ namespace VisualMusicBlockLooper.App
             return rimossi.AsReadOnly();
         }
 
-        private static bool QrSostituitoDaSfondo(Mat tavolo,CartoncinoRilevato cartoncino,int livelloSfondo)
+        private bool QrSostituitoDaSfondo(Mat tavolo,CartoncinoRilevato cartoncino,int livelloSfondo)
         {
-            if(tavolo==null||tavolo.Empty()||livelloSfondo<80)return false;
+            if(tavolo==null||tavolo.Empty()||livelloSfondo<parametriVariazioni.LuminositaMinimaSfondo)return false;
             var area=cartoncino.AreaQr??cartoncino.Area;
             int x=(int)Math.Floor(area.X*tavolo.Cols),y=(int)Math.Floor(area.Y*tavolo.Rows);
             int x1=(int)Math.Ceiling((area.X+area.Larghezza)*tavolo.Cols);
@@ -253,7 +316,7 @@ namespace VisualMusicBlockLooper.App
                 double luminanza=qr.Channels()==1?media.Val0:(media.Val0*29+media.Val1*150+media.Val2*77)/256.0;
                 // QR illeggibile o occluso non equivale a tavolo vuoto: il box rimosso
                 // deve essere tornato vicino alla luminosita' di fondo della scena.
-                return luminanza>=livelloSfondo*.72;
+                return luminanza>=livelloSfondo*parametriVariazioni.FrazioneQrVicinoAlFondo;
             }
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Newtonsoft.Json;
+using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
 {
@@ -90,6 +91,12 @@ namespace VisualMusicBlockLooper.App
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public int PulsazioniPerOsservazione { get; set; }
 
+        /// <summary>True usa le sole ROI cambiate; false legge l'intera scena a ogni osservazione programmata.</summary>
+        public bool AnalizzaSoloSeCambia { get; set; } = true;
+
+        /// <summary>Soglie e dimensioni del rilevatore delle differenze, modificabili nel file JSON.</summary>
+        public ParametriRilevatoreVariazioni AnalisiVariazioni { get; set; } = new ParametriRilevatoreVariazioni();
+
         /// <summary>
         /// Carica la configurazione. Se il file non esiste restituisce i valori di default; se non è un
         /// JSON valido lancia <see cref="InvalidDataException"/>.
@@ -126,6 +133,10 @@ namespace VisualMusicBlockLooper.App
             {
                 configurazione.Webcam = new ConfigurazioneWebcam();
             }
+
+            if(configurazione.AnalisiVariazioni==null)
+                configurazione.AnalisiVariazioni=new ParametriRilevatoreVariazioni();
+            configurazione.AnalisiVariazioni=configurazione.AnalisiVariazioni.Normalizzati();
 
             if (configurazione.Webcam.Indice < 0)
             {

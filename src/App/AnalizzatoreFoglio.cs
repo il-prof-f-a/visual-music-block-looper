@@ -49,7 +49,11 @@ namespace VisualMusicBlockLooper.App
         public string UltimoEsito=>Volatile.Read(ref ultimoEsito);
         public int PulsazioniPerOsservazione { get; set; }
         public Func<bool> Sospesa { get; set; }=()=>false;
-        public void Rileggi()=>Interlocked.Exchange(ref forzaRilettura,1);
+        public void Rileggi()
+        {
+            Interlocked.Exchange(ref forzaRilettura,1);
+            Volatile.Write(ref ultimoEsito,"Rilettura completa in attesa del prossimo frame");
+        }
         public bool Passo(bool forza=false)
         {
             if(!vita.ProvaEntra())return false;
@@ -80,7 +84,16 @@ namespace VisualMusicBlockLooper.App
                     preparatore.ImpostaGenerazione(generazione);catalogo=new CartoncinoRilevato[0];inizializzato=false;
                     RiavviaConfronto();lettore=new LettoreZone(c,config);
                 }
-                if(Interlocked.Exchange(ref forzaRilettura,0)!=0){RiavviaConfronto();preparatore.Riprova();}
+                if(Interlocked.Exchange(ref forzaRilettura,0)!=0)
+                {
+                    // La richiesta manuale deve ripartire da una nuova istantanea: il confronto
+                    // incrementale può rifiutare il frame dopo una variazione globale di esposizione.
+                    RiavviaConfronto();catalogo=new CartoncinoRilevato[0];inizializzato=false;
+                    firmaCandidata=null;conferme=0;regioniDaVerificare=new RettangoloTavolo[0];
+                    Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
+                    Volatile.Write(ref ultimoStato,new StatoTavolo(null,null,null));
+                    Volatile.Write(ref ultimoEsito,"Rilettura completa in corso");
+                }
                 if(normale||manuale)tentativoBurst=0;
                 ultimoFrame=f.Id;ultimoSegnale=segnale;ultimaOsservazione=ora;retryAt=long.MaxValue;
                 Interlocked.Increment(ref fotogrammi);

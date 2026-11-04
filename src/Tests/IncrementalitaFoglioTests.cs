@@ -98,6 +98,32 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void RileggiRiparteDaZeroEForzaUnaNuovaIstantaneaConEsposizioneBassa()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var buio=new Mat(900,1600,MatType.CV_8UC3,Scalar.Black))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora))
+                {
+                    for(int i=0;i<2;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    long letture=a.NumeroLettureZone;
+
+                    a.Rileggi();ora+=100;r.Pubblica(buio,ora);a.Passo(true);
+
+                    Assert.That(a.NumeroLettureZone,Is.GreaterThan(letture),
+                        "Una rilettura manuale deve avviare la lettura completa senza passare dal filtro delle differenze.");
+                    Assert.That(a.UltimoStato.Note,Is.Empty,
+                        "Una rilettura deve azzerare il catalogo rilevato prima di ricostruirlo dalla nuova istantanea.");
+                }
+            }
+        }
+
+        [Test]
         public void AvvioSingoloMaUnFotogrammaGiaUsatoNonConfermaUnaModifica()
         {
             var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};

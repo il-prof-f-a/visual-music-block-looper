@@ -106,8 +106,8 @@ namespace VisualMusicBlockLooper.Tests
             using(var r=new RegistroFotogrammi())
             using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
             {
-                var p=new PreparatoreFoglio(e);
-                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora))
+                var p=new PreparatoreFoglio(e);var debug=new RegistroCatture{Attivo=true};
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,debug,()=>ora))
                 {
                     for(int i=0;i<2;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
@@ -117,6 +117,8 @@ namespace VisualMusicBlockLooper.Tests
 
                     Assert.That(a.NumeroLettureZone,Is.GreaterThan(letture),
                         "Una rilettura manuale deve avviare la lettura completa senza passare dal filtro delle differenze.");
+                    Assert.That(debug.Istantanea().Catture.Last().Visione.Any(v=>v.Codice=="TempiIstantanea"),Is.True,
+                        "La nuova istantanea deve arrivare davvero al lettore QR.");
                     Assert.That(a.UltimoStato.Note,Is.Empty,
                         "Una rilettura deve azzerare il catalogo rilevato prima di ricostruirlo dalla nuova istantanea.");
                 }

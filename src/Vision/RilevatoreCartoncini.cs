@@ -30,6 +30,7 @@ namespace VisualMusicBlockLooper.Vision
         private const int LatoNucleoChiusura = 7;
         private const int LatoNucleoApertura = 5;
         private const int LatoFondoLocale = 101;      // finestra per stimare il livello locale della carta
+        private const int LatoMassimoMiniaturaIlluminazione = 384;
         private const double SogliaCorpo = 0.55;      // corpo = canale minimo sotto questa frazione del fondo locale
         private const int FondoMinimo = 80;           // sotto questo livello l'immagine e' troppo scura per il corpo
         private const int AreaMinimaCorpo = 400;      // pixel: scarta macchie piu' piccole di un cartoncino
@@ -519,10 +520,8 @@ namespace VisualMusicBlockLooper.Vision
             yield return grigio.Clone();
 
             Mat livellato = new Mat();
-            using (var sfondo = new Mat())
+            using (var sfondo = StimaSfondoIlluminazione(grigio))
             {
-                int sigma = Math.Max(5, grigio.Rows / 12);
-                Cv2.GaussianBlur(grigio, sfondo, new Size(), sigma);
                 Cv2.Divide(grigio, sfondo, livellato, 255);
             }
 
@@ -534,6 +533,47 @@ namespace VisualMusicBlockLooper.Vision
                 clahe.Apply(grigio, contrasto);
                 yield return contrasto;
             }
+        }
+
+        private static Mat StimaSfondoIlluminazione(Mat grigio)
+        {
+            Size dimensioni = DimensioneMiniaturaIlluminazione(grigio.Rows, grigio.Cols);
+            using (var miniatura = new Mat())
+            using (var sfondoMiniatura = new Mat())
+            {
+                if (dimensioni.Width == grigio.Cols && dimensioni.Height == grigio.Rows)
+                    grigio.CopyTo(miniatura);
+                else
+                    Cv2.Resize(grigio, miniatura, dimensioni, 0, 0, InterpolationFlags.Area);
+
+                // Mantiene il raggio relativo alla scena, ma evita il kernel enorme sui ritagli ingranditi.
+                int sigma = Math.Max(5, miniatura.Rows / 12);
+                Cv2.GaussianBlur(miniatura, sfondoMiniatura, new Size(), sigma);
+
+                var sfondo = new Mat();
+                try
+                {
+                    if (dimensioni.Width == grigio.Cols && dimensioni.Height == grigio.Rows)
+                        sfondoMiniatura.CopyTo(sfondo);
+                    else
+                        Cv2.Resize(sfondoMiniatura, sfondo, grigio.Size(), 0, 0, InterpolationFlags.Linear);
+                    return sfondo;
+                }
+                catch
+                {
+                    sfondo.Dispose();
+                    throw;
+                }
+            }
+        }
+
+        private static Size DimensioneMiniaturaIlluminazione(int righe, int colonne)
+        {
+            if (righe <= 0 || colonne <= 0) return new Size(0, 0);
+            double scala = Math.Min(1.0, LatoMassimoMiniaturaIlluminazione / (double)Math.Max(righe, colonne));
+            return new Size(
+                Math.Max(1, (int)Math.Round(colonne * scala)),
+                Math.Max(1, (int)Math.Round(righe * scala)));
         }
 
         private static IEnumerable<QrTrovato> DecodificaConOpenCv(Mat grigio)

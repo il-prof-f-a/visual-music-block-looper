@@ -2,6 +2,8 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using OpenCvSharp;
 using VisualMusicBlockLooper.Core;
@@ -91,6 +93,50 @@ namespace VisualMusicBlockLooper.Tests
                 catch (OpenCVException)
                 {
                     return false;
+                }
+            }
+        }
+
+        [Test]
+        public void NormalizzazioneLuminosa_SfocaUnaMiniaturaMantenendoLaCorrezioneDelGradiente()
+        {
+            const int righe = 1234, colonne = 2160;
+            MethodInfo dimensione = typeof(RilevatoreCartoncini).GetMethod(
+                "DimensioneMiniaturaIlluminazione", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(dimensione, Is.Not.Null, "La normalizzazione deve avere un limite verificabile sulla dimensione del blur.");
+            var miniatura = (Size)dimensione.Invoke(null, new object[] { righe, colonne });
+            Assert.That(Math.Max(miniatura.Width, miniatura.Height), Is.LessThanOrEqualTo(384));
+            Assert.That(miniatura.Width / (double)miniatura.Height,
+                Is.EqualTo(colonne / (double)righe).Within(.01));
+
+            using (var grigio = new Mat(righe, colonne, MatType.CV_8UC1))
+            {
+                var riga = new byte[colonne];
+                for (int y = 0; y < righe; y++)
+                {
+                    byte luminanza = (byte)(45 + 165 * y / (righe - 1));
+                    for (int x = 0; x < colonne; x++) riga[x] = luminanza;
+                    Marshal.Copy(riga, 0, grigio.Ptr(y), riga.Length);
+                }
+
+                MethodInfo variantiMetodo = typeof(RilevatoreCartoncini).GetMethod(
+                    "Varianti", BindingFlags.Static | BindingFlags.NonPublic);
+                Assert.That(variantiMetodo, Is.Not.Null);
+                var varianti = (System.Collections.Generic.IEnumerable<Mat>)variantiMetodo.Invoke(null, new object[] { grigio });
+                using (var enumeratore = varianti.GetEnumerator())
+                {
+                    Assert.That(enumeratore.MoveNext(), Is.True);
+                    enumeratore.Current.Dispose();
+                    Assert.That(enumeratore.MoveNext(), Is.True);
+                    using (var livellata = enumeratore.Current)
+                    using (var fasciaAlta = new Mat(livellata, new Rect(0, righe / 4, colonne, righe / 8)))
+                    using (var fasciaBassa = new Mat(livellata, new Rect(0, righe * 3 / 4, colonne, righe / 8)))
+                    {
+                        double alta = Cv2.Mean(fasciaAlta).Val0;
+                        double bassa = Cv2.Mean(fasciaBassa).Val0;
+                        Assert.That(alta, Is.EqualTo(255).Within(8));
+                        Assert.That(bassa, Is.EqualTo(255).Within(8));
+                    }
                 }
             }
         }

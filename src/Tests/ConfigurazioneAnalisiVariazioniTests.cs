@@ -39,6 +39,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(json["AnalizzaSoloSeCambia"]?.Value<bool>(),Is.True);
             Assert.That(json["ScansioneABlocchiAnticipata"]?.Value<bool>(),Is.True);
             Assert.That(json["MisureAnticipoScansione"]?.Value<int>(),Is.EqualTo(1));
+            Assert.That(json["NumeroThreadOpenCv"]?.Value<int>(),Is.EqualTo(2));
             Assert.That(json["AnalisiVariazioni"]?["LarghezzaAnalisi"]?.Value<int>(),Is.EqualTo(640));
             Assert.That(json["AnalisiVariazioni"]?["AltezzaAnalisi"]?.Value<int>(),Is.EqualTo(360));
             Assert.That(json["AnalisiVariazioni"]?["PercentileSfondo"]?.Value<double>(),Is.EqualTo(.85));
@@ -64,6 +65,7 @@ namespace VisualMusicBlockLooper.Tests
                   "AnalizzaSoloSeCambia": false,
                   "ScansioneABlocchiAnticipata": false,
                   "MisureAnticipoScansione": 3,
+                  "NumeroThreadOpenCv": 3,
                   "PulsazioniPerOsservazione": 4,
                   "AnalisiVariazioni": {
                     "LarghezzaAnalisi": 320,
@@ -84,6 +86,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(json["AnalizzaSoloSeCambia"]?.Value<bool>(),Is.False);
             Assert.That(ricaricata.ScansioneABlocchiAnticipata,Is.False);
             Assert.That(ricaricata.MisureAnticipoScansione,Is.EqualTo(3));
+            Assert.That(ricaricata.NumeroThreadOpenCv,Is.EqualTo(3));
             Assert.That(ricaricata.PulsazioniPerOsservazione,Is.EqualTo(4));
             Assert.That(json["AnalisiVariazioni"]?["LarghezzaAnalisi"]?.Value<int>(),Is.EqualTo(320));
             Assert.That(json["AnalisiVariazioni"]?["AltezzaAnalisi"]?.Value<int>(),Is.EqualTo(180));
@@ -101,6 +104,16 @@ namespace VisualMusicBlockLooper.Tests
             string percorso=Path.Combine(cartella,ConfigurazioneApplicazione.NomeFile);
             File.WriteAllText(percorso,"{\"MisureAnticipoScansione\":"+richiesto+"}");
             Assert.That(ConfigurazioneApplicazione.Carica(percorso).MisureAnticipoScansione,Is.EqualTo(atteso));
+        }
+
+        [TestCase(0,2)]
+        [TestCase(5,2)]
+        [TestCase(4,4)]
+        public void NumeroThreadOpenCvVieneLimitatoAllaFinestraConsentita(int richiesto,int atteso)
+        {
+            string percorso=Path.Combine(cartella,ConfigurazioneApplicazione.NomeFile);
+            File.WriteAllText(percorso,"{\"NumeroThreadOpenCv\":"+richiesto+"}");
+            Assert.That(ConfigurazioneApplicazione.Carica(percorso).NumeroThreadOpenCv,Is.EqualTo(atteso));
         }
     }
 }

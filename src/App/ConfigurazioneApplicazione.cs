@@ -100,6 +100,9 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Misure future incluse nella finestra di scansione, limitate a 1..5.</summary>
         public int MisureAnticipoScansione { get; set; } = 1;
 
+        /// <summary>Massimo di worker OpenCV paralleli; riduce la contesa CPU con il thread MIDI.</summary>
+        public int NumeroThreadOpenCv { get; set; } = 2;
+
         /// <summary>Soglie e dimensioni del rilevatore delle differenze, modificabili nel file JSON.</summary>
         public ParametriRilevatoreVariazioni AnalisiVariazioni { get; set; } = new ParametriRilevatoreVariazioni();
 
@@ -145,6 +148,8 @@ namespace VisualMusicBlockLooper.App
             configurazione.AnalisiVariazioni=configurazione.AnalisiVariazioni.Normalizzati();
             if(configurazione.MisureAnticipoScansione<1||configurazione.MisureAnticipoScansione>5)
                 configurazione.MisureAnticipoScansione=1;
+            if(configurazione.NumeroThreadOpenCv<1||configurazione.NumeroThreadOpenCv>4)
+                configurazione.NumeroThreadOpenCv=2;
 
             if (configurazione.Webcam.Indice < 0)
             {

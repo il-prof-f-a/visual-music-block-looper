@@ -45,6 +45,8 @@ In Master, se `AnalizzaSoloSeCambia=true` e `ScansioneABlocchiAnticipata=true`, 
 
 `MisureAnticipoScansione` accetta valori da 1 a 5; fuori intervallo torna a 1. Un anticipo maggiore aumenta i blocchi letti a ogni osservazione ma permette di scoprire le note prima che la riga diventi attiva.
 
+`NumeroThreadOpenCv` in `configurazione.json` limita i worker paralleli OpenCV (1–4, predefinito 2): un valore più basso riduce i picchi di CPU durante le letture, ma può allungarle.
+
 I comandi ottici hanno un worker indipendente: confronto fino a 10 Hz e decodifica solo delle zone cambiate. Il TAP conserva l'istante del primo frame della candidata. La latenza ottica comprende acquisizione, decoder e conferma: il cartoncino STOP può quindi essere più lento del pulsante o dell'ingresso MIDI. Stop/Panic ricevuti dal thread MIDI hanno un canale prioritario e non aspettano il confine del giro.
 
 ## Controlli e diagnosi

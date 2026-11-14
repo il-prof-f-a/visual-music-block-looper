@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
+using OpenCvSharp;
 using VisualMusicBlockLooper.Core;
 using VisualMusicBlockLooper.Midi;
 using VisualMusicBlockLooper.Vision;
@@ -35,6 +36,7 @@ namespace VisualMusicBlockLooper.App
 
             string percorsoConfigurazione = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
             ConfigurazioneApplicazione configurazione = CaricaConfigurazione(percorsoConfigurazione, avvisi);
+            Cv2.SetNumThreads(configurazione.NumeroThreadOpenCv);
 
             // L'elenco si rileva prima di aprire la webcam configurata: una webcam aperta risulterebbe occupata.
             IReadOnlyList<InfoWebcam> elencoWebcam = ElencoWebcam.RilevaReali();

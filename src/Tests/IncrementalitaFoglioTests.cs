@@ -11,6 +11,114 @@ namespace VisualMusicBlockLooper.Tests
     public class IncrementalitaFoglioTests
     {
         [Test]
+        public void PianificazioneABlocchiAnticipaRigheCollegateERispettaIlGiroAB()
+        {
+            var completa=StrutturaTavolo.Default;
+            var ultima=completa.Posizione(5*completa.StepPerMisura);
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,1),Is.EqualTo(new[]{0,5}),
+                "Dall'ultima riga del giro la scansione anticipata deve tornare alla prima.");
+
+            Assert.That(StrutturaTavolo.TryCrea(4,2,1,8,out var collegate),Is.True);
+            var prima=collegate.Posizione(0);
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(collegate,prima,1),Is.EqualTo(new[]{0,1,2,3,4,5}),
+                "Per due gruppi collegati vanno lette le righe attive e quelle della misura successiva.");
+
+            Assert.That(StrutturaTavolo.TryCrea(4,6,5,24,out var daA),Is.True);
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(daA,daA.Posizione(0),1),Is.EqualTo(new[]{1,2}),
+                "La misura anticipata deve partire dal punto A anche quando A cade dentro il foglio.");
+        }
+
+        [Test]
+        public void DuranteLaRiproduzioneLeggeSoloRigheAttiveAnticipateEVincoli()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,
+                    true,null,true,1))
+                {
+                    a.PulsazioniPerOsservazione=1;
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    long lettureIniziali=a.NumeroLettureZone;
+                    e.Avvia();e.TickInterno();
+                    for(int i=0;i<24;i++){ora+=21;e.TickInterno();}
+                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+
+                    int blocchiLetti=(int)(a.NumeroLettureZone-lettureIniziali);
+                    Assert.That(blocchiLetti,Is.InRange(5,9),
+                        "Una scansione live legge le righe attive/anticipate, le incertezze iniziali e tre zone dei vincoli, senza scansione globale.");
+                    Assert.That(a.UltimeRegioni,Has.Count.EqualTo(blocchiLetti));
+                    Assert.That(a.UltimoEsito,Is.EqualTo("ScansioneBlocchiAnticipata"));
+                }
+            }
+        }
+
+        [Test]
+        public void ScansioneAnticipataConfermaLaRimozioneSuDueFrameDelBlocco()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,
+                    true,null,true,1))
+                {
+                    a.PulsazioniPerOsservazione=4;
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
+                    e.Avvia();e.TickInterno();
+
+                    for(int i=0;i<96;i++){ora+=21;e.TickInterno();}
+                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),
+                        "Il primo blocco completo aggiornato richiede una seconda cattura indipendente.");
+
+                    for(int i=0;i<96;i++){ora+=21;e.TickInterno();}
+                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9),
+                        "La stessa riga, osservata nella misura successiva, conferma la rimozione.");
+                }
+            }
+        }
+
+        [Test]
+        public void ScansioneAnticipataNonCancellaLeNoteSuFrameNero()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var buio=new Mat(900,1600,MatType.CV_8UC3,Scalar.Black))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,
+                    true,null,true,1))
+                {
+                    a.PulsazioniPerOsservazione=4;
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    e.Avvia();e.TickInterno();
+
+                    for(int cattura=0;cattura<2;cattura++)
+                    {
+                        for(int i=0;i<96;i++){ora+=21;e.TickInterno();}
+                        ora+=21;r.Pubblica(buio,ora);a.Passo(true);
+                    }
+
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),
+                        "Due frame neri non devono sembrare conferma della rimozione di tutte le righe.");
+                }
+            }
+        }
+
+        [Test]
         public void DueModificheIsolateNonConfermanoUnaNuovaPartitura()
         {
             long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var c=NoteContigueVisionTests.Calibra(false);

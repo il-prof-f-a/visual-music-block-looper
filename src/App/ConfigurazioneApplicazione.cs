@@ -94,6 +94,12 @@ namespace VisualMusicBlockLooper.App
         /// <summary>True usa le sole ROI cambiate; false legge l'intera scena a ogni osservazione programmata.</summary>
         public bool AnalizzaSoloSeCambia { get; set; } = true;
 
+        /// <summary>Durante Play legge solo le righe musicali attive e quelle anticipate, senza confronto globale.</summary>
+        public bool ScansioneABlocchiAnticipata { get; set; } = true;
+
+        /// <summary>Misure future incluse nella finestra di scansione, limitate a 1..5.</summary>
+        public int MisureAnticipoScansione { get; set; } = 1;
+
         /// <summary>Soglie e dimensioni del rilevatore delle differenze, modificabili nel file JSON.</summary>
         public ParametriRilevatoreVariazioni AnalisiVariazioni { get; set; } = new ParametriRilevatoreVariazioni();
 
@@ -137,6 +143,8 @@ namespace VisualMusicBlockLooper.App
             if(configurazione.AnalisiVariazioni==null)
                 configurazione.AnalisiVariazioni=new ParametriRilevatoreVariazioni();
             configurazione.AnalisiVariazioni=configurazione.AnalisiVariazioni.Normalizzati();
+            if(configurazione.MisureAnticipoScansione<1||configurazione.MisureAnticipoScansione>5)
+                configurazione.MisureAnticipoScansione=1;
 
             if (configurazione.Webcam.Indice < 0)
             {

@@ -22,6 +22,8 @@ namespace VisualMusicBlockLooper.App
         private readonly InterpreteTavolo interprete;
         private readonly RilascioDifferito vita;
         private readonly bool analizzaSoloSeCambia;
+        private readonly bool scansioneABlocchiAnticipata;
+        private readonly int misureAnticipoScansione;
         private readonly ParametriRilevatoreVariazioni parametriVariazioni;
         private RilevatoreVariazioni differenze;
         private Calibrazione corrente;
@@ -34,16 +36,35 @@ namespace VisualMusicBlockLooper.App
         private string firmaCandidata, ultimoEsito="Preparazione del foglio";
         private int conferme, tentativoBurst, forzaRilettura;
         private bool inizializzato;
+        private readonly Dictionary<int, ConfermaBlocco> confermeBlocchi=new Dictionary<int, ConfermaBlocco>();
         private IReadOnlyList<RettangoloTavolo> regioniDaVerificare=new RettangoloTavolo[0];
         private double primaPubblicazioneMs;
         public double PrimaPubblicazioneMs=>Volatile.Read(ref primaPubblicazioneMs);
+        private sealed class ConfermaBlocco
+        {
+            public string Firma;
+            public long UltimoFrame;
+            public int Numero;
+            public IReadOnlyList<CartoncinoRilevato> Catalogo;
+        }
+        private sealed class BloccoScansione
+        {
+            public BloccoScansione(int id,RettangoloTavolo zona,ZonaSpeciale speciale=ZonaSpeciale.Nessuna)
+            {Id=id;Zona=zona;Speciale=speciale;}
+            public int Id;
+            public RettangoloTavolo Zona;
+            public ZonaSpeciale Speciale;
+        }
         public AnalizzatoreFoglio(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
             LayoutTavolo layout,PreparatoreFoglio preparatore,RegistroCatture registro,Func<long> orologio,
-            bool analizzaSoloSeCambia=true,ParametriRilevatoreVariazioni parametriVariazioni=null)
+            bool analizzaSoloSeCambia=true,ParametriRilevatoreVariazioni parametriVariazioni=null,
+            bool scansioneABlocchiAnticipata=false,int misureAnticipoScansione=1)
         {
             this.immagini=immagini;this.calibrazione=calibrazione;this.config=config;this.layout=layout;
             this.preparatore=preparatore;this.registro=registro;this.orologio=orologio;
             this.analizzaSoloSeCambia=analizzaSoloSeCambia;
+            this.scansioneABlocchiAnticipata=scansioneABlocchiAnticipata;
+            this.misureAnticipoScansione=Math.Max(1,Math.Min(5,misureAnticipoScansione));
             this.parametriVariazioni=(parametriVariazioni??new ParametriRilevatoreVariazioni()).Normalizzati();
             differenze=new RilevatoreVariazioni(this.parametriVariazioni);
             interprete=new InterpreteTavolo(new Griglia(config),layout);
@@ -90,6 +111,7 @@ namespace VisualMusicBlockLooper.App
                 {
                     corrente=c;generazioneVideo=f.Generazione;generazione++;
                     preparatore.ImpostaGenerazione(generazione);catalogo=new CartoncinoRilevato[0];inizializzato=false;
+                    confermeBlocchi.Clear();
                     ultimoFrameScansioneCompleta=long.MinValue;
                     RiavviaConfronto();lettore=new LettoreZone(c,config);
                 }
@@ -98,6 +120,7 @@ namespace VisualMusicBlockLooper.App
                     // La richiesta manuale deve ripartire da una nuova istantanea: il confronto
                     // incrementale può rifiutare il frame dopo una variazione globale di esposizione.
                     RiavviaConfronto();catalogo=new CartoncinoRilevato[0];inizializzato=false;
+                    confermeBlocchi.Clear();
                     firmaCandidata=null;conferme=0;regioniDaVerificare=new RettangoloTavolo[0];
                     Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
                     Volatile.Write(ref ultimoStato,new StatoTavolo(null,null,null));
@@ -115,6 +138,11 @@ namespace VisualMusicBlockLooper.App
                     if(!analizzaSoloSeCambia)
                     {
                         AnalizzaScenaCompleta(f,c,traccia);
+                        return true;
+                    }
+                    if(scansioneABlocchiAnticipata&&motore.InEsecuzione)
+                    {
+                        AnalizzaBlocchiAnticipati(f,c,traccia,motore.Struttura,motore.Posizione);
                         return true;
                     }
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))
@@ -271,6 +299,161 @@ namespace VisualMusicBlockLooper.App
             }
             else Descrivi(traccia,completa?"ScansioneCompletaInAttesaDiConferma":"ScansioneCompletaDaConfermare",f);
         }
+
+        public static int[] RigheAnticipate(StrutturaTavolo struttura,PosizioneGiro posizione,int misure)
+        {
+            if(struttura==null)throw new ArgumentNullException(nameof(struttura));
+            if(posizione==null)throw new ArgumentNullException(nameof(posizione));
+            if(misure<0)throw new ArgumentOutOfRangeException(nameof(misure));
+            var righe=new SortedSet<int>(posizione.RigheAttive??new int[0]);
+            long inizio=(struttura.AInizio-1L)*StrutturaTavolo.StepPerBattuta;
+            for(int anticipo=1;anticipo<=misure;anticipo++)
+            {
+                long passo=(long)(posizione.MisuraNelGiro+anticipo)*struttura.StepPerMisura-inizio;
+                foreach(int riga in struttura.Posizione(passo).RigheAttive)righe.Add(riga);
+            }
+            return righe.ToArray();
+        }
+
+        private void AnalizzaBlocchiAnticipati(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia,
+            StrutturaTavolo struttura,PosizioneGiro posizione)
+        {
+            var righe=new SortedSet<int>(RigheAnticipate(struttura,posizione,misureAnticipoScansione));
+            for(int riga=0;riga<config.Tracce;riga++)
+                if(regioniDaVerificare.Any(z=>GeometriaRegioni.Interseca(z,ZonaRiga(riga))))righe.Add(riga);
+            var blocchi=righe.Select(r=>new BloccoScansione(r,ZonaRiga(r)))
+                .Concat(new[]
+                {
+                    new BloccoScansione(-1,layout.Misura,ZonaSpeciale.Misura),
+                    new BloccoScansione(-2,layout.Collegamento,ZonaSpeciale.Collegamento),
+                    new BloccoScansione(-3,layout.Ab,ZonaSpeciale.Ab)
+                }).Where(b=>b.Zona.Larghezza>0&&b.Zona.Altezza>0).ToArray();
+            Volatile.Write(ref ultimeRegioni,blocchi.Select(b=>b.Zona).ToArray());
+
+            var lavoro=catalogo;
+            bool catalogoAggiornato=false;
+            int blocchiIncerti=0;
+            foreach(var blocco in blocchi)
+            {
+                var lettura=lettore.Leggi(f.Immagine,blocco.Zona,lavoro,traccia);
+                Interlocked.Increment(ref letture);
+                if(vita.InChiusura||Sospesa())return;
+                var correnti=LocaliDelBlocco(lavoro,blocco);
+                var letti=LocaliDelBlocco(lettura.Catalogo,blocco);
+                string firmaLettura=FirmaCatalogoBlocco(letti);
+                string firmaCorrente=FirmaCatalogoBlocco(correnti);
+                bool completa=lettura.Completa&&IlluminazioneAffidabile(f.Immagine,lettura.RegioneMaschera);
+                if(!completa)
+                {
+                    blocchiIncerti++;
+                    confermeBlocchi.Remove(blocco.Id);
+                    var integrati=UnisciCatalogoParziale(correnti,letti);
+                    if(FirmaCatalogoBlocco(integrati)!=firmaCorrente)
+                    {
+                        lavoro=SostituisciBlocco(lavoro,blocco,integrati);
+                        catalogoAggiornato=true;
+                    }
+                    continue;
+                }
+
+                regioniDaVerificare=regioniDaVerificare.Where(z=>!GeometriaRegioni.Interseca(z,blocco.Zona)).ToArray();
+                if(firmaLettura==firmaCorrente)
+                {
+                    confermeBlocchi.Remove(blocco.Id);
+                    continue;
+                }
+
+                if(!confermeBlocchi.TryGetValue(blocco.Id,out var candidata)||candidata.Firma!=firmaLettura)
+                {
+                    candidata=new ConfermaBlocco{Firma=firmaLettura,UltimoFrame=f.Id,Numero=1,Catalogo=letti};
+                    confermeBlocchi[blocco.Id]=candidata;
+                }
+                else if(candidata.UltimoFrame!=f.Id)
+                {
+                    candidata.UltimoFrame=f.Id;
+                    candidata.Numero=Math.Min(2,candidata.Numero+1);
+                    candidata.Catalogo=letti;
+                }
+                if(candidata.Numero>=2)
+                {
+                    lavoro=SostituisciBlocco(lavoro,blocco,candidata.Catalogo);
+                    catalogoAggiornato=true;
+                    confermeBlocchi.Remove(blocco.Id);
+                }
+            }
+
+            Volatile.Write(ref ultimeRegioni,blocchi.Select(b=>b.Zona).ToArray());
+            if(catalogoAggiornato)
+            {
+                if(!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
+                {Descrivi(traccia,"LetturaObsoleta",f);return;}
+                preparatore.ControllaScadenza();
+                catalogo=lavoro;
+                var stato=interprete.Interpreta(catalogo,traccia);
+                if(Firma(stato)!=Firma(UltimoStato))
+                {
+                    Volatile.Write(ref ultimoStato,stato);
+                    preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
+                }
+            }
+            conferme=confermeBlocchi.Count==0?0:confermeBlocchi.Values.Max(x=>x.Numero);
+            Descrivi(traccia,"ScansioneBlocchiAnticipata",f);
+            if(traccia!=null)traccia.Visione.Add(new EventoDiagnosticoCartoncino("Osservazione","BlocchiAnticipati","RigheMusicali",
+                $"Righe={string.Join(",",righe)}; vincoli MIDI=3; anticipo={misureAnticipoScansione} misure; " +
+                $"blocchi incerti={blocchiIncerti}; conferme in attesa={confermeBlocchi.Count}; frame={f.Id}."));
+        }
+
+        private bool IlluminazioneAffidabile(Mat frame,Rect regione)
+        {
+            regione&=new Rect(0,0,frame.Cols,frame.Rows);
+            if(regione.Width<8||regione.Height<8)return false;
+            using(var ritaglio=new Mat(frame,regione))
+            using(var grigio=new Mat())
+            using(var ridotto=new Mat())
+            {
+                Mat sorgente=ritaglio;
+                if(ritaglio.Channels()!=1)
+                {
+                    Cv2.CvtColor(ritaglio,grigio,ritaglio.Channels()==4?ColorConversionCodes.BGRA2GRAY:ColorConversionCodes.BGR2GRAY);
+                    sorgente=grigio;
+                }
+                Cv2.Resize(sorgente,ridotto,new Size(96,64),0,0,InterpolationFlags.Area);
+                return Cv2.Mean(ridotto).Val0>=parametriVariazioni.LuminositaMinimaSfondo;
+            }
+        }
+
+        private RettangoloTavolo ZonaRiga(int riga)
+        {
+            double altezza=config.Area.Altezza/config.Tracce;
+            double x=config.Area.X,y=config.Area.Y+riga*altezza;
+            double destra=Math.Min(config.Area.X+config.Area.Larghezza,layout.Comandi.X);
+            return new RettangoloTavolo(x,y,Math.Max(0,destra-x),altezza);
+        }
+
+        private IReadOnlyList<CartoncinoRilevato> LocaliDelBlocco(IReadOnlyList<CartoncinoRilevato> valori,BloccoScansione blocco)
+            =>(valori??new CartoncinoRilevato[0]).Where(n=>AppartieneAlBlocco(n,blocco)).ToArray();
+
+        private bool AppartieneAlBlocco(CartoncinoRilevato nota,BloccoScansione blocco)
+        {
+            var area=nota.AreaQr??nota.Area;
+            if(blocco.Id>=0)return GeometriaRegioni.ContieneCentro(blocco.Zona,area);
+            return layout.ZonaDelCentro(area)==blocco.Speciale;
+        }
+
+        private IReadOnlyList<CartoncinoRilevato> SostituisciBlocco(IReadOnlyList<CartoncinoRilevato> valori,
+            BloccoScansione blocco,IReadOnlyList<CartoncinoRilevato> nuovi)
+            =>valori.Where(n=>!AppartieneAlBlocco(n,blocco)).Select(GeometriaRegioni.Copia)
+                .Concat((nuovi??new CartoncinoRilevato[0]).Select(GeometriaRegioni.Copia)).ToArray();
+
+        private static string FirmaCatalogoBlocco(IEnumerable<CartoncinoRilevato> cartoncini)
+            =>string.Join(";",(cartoncini??new CartoncinoRilevato[0]).Select(n=>
+            {
+                var qr=n.AreaQr??n.Area;
+                return (n.Payload??"")+":"+Quantizza(qr.X)+":"+Quantizza(qr.Y)+":"+
+                    Quantizza(qr.Larghezza)+":"+Quantizza(qr.Altezza)+":"+Quantizza(n.FineEstensioneX??double.NaN);
+            }).OrderBy(x=>x,StringComparer.Ordinal));
+
+        private static long Quantizza(double valore)=>double.IsNaN(valore)||double.IsInfinity(valore)?0:(long)Math.Round(valore*200,MidpointRounding.AwayFromZero);
 
         private void RiavviaConfronto(){differenze.Dispose();differenze=new RilevatoreVariazioni(parametriVariazioni);firmaCandidata=null;conferme=0;}
         internal static string Firma(StatoTavolo s)=>s.Struttura.BattitiPerMisura+":"+s.Struttura.RigheCollegate+":"+s.Struttura.AInizio+":"+s.Struttura.AFine+"|"+

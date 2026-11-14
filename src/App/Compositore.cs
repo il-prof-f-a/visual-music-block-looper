@@ -42,7 +42,9 @@ namespace VisualMusicBlockLooper.App
             bool esecuzioneDeterministica = false,
             IFonteImmagini fonteVideo = null,
             bool analizzaSoloSeCambia = true,
-            ParametriRilevatoreVariazioni parametriVariazioni = null)
+            ParametriRilevatoreVariazioni parametriVariazioni = null,
+            bool scansioneABlocchiAnticipata = false,
+            int misureAnticipoScansione = 1)
         {
             this.rilevatore = rilevatore ?? throw new ArgumentNullException(nameof(rilevatore));
             if (uscita == null)
@@ -75,7 +77,8 @@ namespace VisualMusicBlockLooper.App
                     Func<Calibrazione> calibrazione=()=> (rilevatore as RilevatoreCommutabile)?.CalibrazioneAttiva
                         ?? (rilevatore as RilevatoreCartoncini)?.Calibrazione;
                     Analizzatore=new AnalizzatoreFoglio(Video.Registro,calibrazione,config,Layout,Preparatore,
-                        RegistroDiagnostica,orologioMs,analizzaSoloSeCambia,parametriVariazioni);
+                        RegistroDiagnostica,orologioMs,analizzaSoloSeCambia,parametriVariazioni,
+                        scansioneABlocchiAnticipata,misureAnticipoScansione);
                     ComandiRapidi=new GestoreComandiRapidi(Video.Registro,calibrazione,config,Layout,Esecutore,RegistroDiagnostica,orologioMs);
                     Analizzatore.Sospesa=()=>osservazioneSospesa;ComandiRapidi.Sospesa=()=>osservazioneSospesa;
                     cicloComandi=new CicloCattura(()=>ComandiRapidi.Passo(),20);

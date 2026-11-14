@@ -51,7 +51,9 @@ namespace VisualMusicBlockLooper.App
                 rilevatore, uscita, ingresso, mappatura, config, LayoutTavolo.Default, orologioMs,
                 esecuzioneDeterministica:true, fonteVideo:webcam,
                 analizzaSoloSeCambia:configurazione.AnalizzaSoloSeCambia,
-                parametriVariazioni:configurazione.AnalisiVariazioni);
+                parametriVariazioni:configurazione.AnalisiVariazioni,
+                scansioneABlocchiAnticipata:configurazione.ScansioneABlocchiAnticipata,
+                misureAnticipoScansione:configurazione.MisureAnticipoScansione);
             FormProiettore proiettore = new FormProiettore(config, LayoutTavolo.Default);
             string testoPorte = $"MIDI uscita: {configMidi.PortaUscita}  |  ingresso: {configMidi.PortaIngresso}"
                 + (avvisi.Exists(a => a.StartsWith("Porta MIDI")) ? "  (non disponibile)" : string.Empty);

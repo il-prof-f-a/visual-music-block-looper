@@ -41,6 +41,10 @@ La camera acquisisce indipendentemente dal riconoscimento e conserva un solo fra
 
 Due frame affidabili concordi confermano le modifiche successive alla prima istantanea. Un ritorno al riferimento interrompe la candidata; buio e letture incomplete non cancellano le note. La rimozione richiede evidenza di zona vuota e conferma. Sul foglio invariato, completata la verifica iniziale, non vengono richiamati il decoder delle note o il compilatore. «Rileggi foglio» forza un controllo completo in background.
 
+In Master, se `AnalizzaSoloSeCambia=true` e `ScansioneABlocchiAnticipata=true`, durante Play l'analizzatore legge le righe attive e quelle delle prossime `MisureAnticipoScansione` misure, più le tre zone dei vincoli. Non raddrizza né confronta l'intero foglio a ogni osservazione; le righe incerte dell'istantanea iniziale restano nella finestra finché non sono verificabili. Le modifiche alle righe lontane vengono lette quando entrano nella finestra di anticipo. Ogni rimozione di QR richiede due frame distinti e completi del proprio blocco. Un blocco sotto `AnalisiVariazioni.LuminositaMinimaSfondo` può integrare QR leggibili, ma non conferma assenze. Avvio e «Rileggi foglio» mantengono la scansione completa. Con `ScansioneABlocchiAnticipata=false` resta attivo il confronto incrementale tradizionale; con `AnalizzaSoloSeCambia=false` viene letta la scena completa alla cadenza scelta.
+
+`MisureAnticipoScansione` accetta valori da 1 a 5; fuori intervallo torna a 1. Un anticipo maggiore aumenta i blocchi letti a ogni osservazione ma permette di scoprire le note prima che la riga diventi attiva.
+
 I comandi ottici hanno un worker indipendente: confronto fino a 10 Hz e decodifica solo delle zone cambiate. Il TAP conserva l'istante del primo frame della candidata. La latenza ottica comprende acquisizione, decoder e conferma: il cartoncino STOP può quindi essere più lento del pulsante o dell'ingresso MIDI. Stop/Panic ricevuti dal thread MIDI hanno un canale prioritario e non aspettano il confine del giro.
 
 ## Controlli e diagnosi

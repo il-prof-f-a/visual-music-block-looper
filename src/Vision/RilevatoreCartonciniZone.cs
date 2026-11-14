@@ -67,9 +67,9 @@ namespace VisualMusicBlockLooper.Vision
                     {
                         if(associati.Contains(i))continue;
                         var a=catalogo[i].AreaQr??catalogo[i].Area;var b=letto.AreaQr??letto.Area;
-                        double limite=Math.Max(a.Larghezza,b.Larghezza)*(catalogo[i].Payload==letto.Payload?1.4:.45);
+                        if(!GeometriaRegioni.StessaPosizioneQr(a,b))continue;
                         double d=DistanzaQr(catalogo[i],letto);
-                        if(d<limite&&d<distanza){distanza=d;migliore=i;}
+                        if(d<distanza){distanza=d;migliore=i;}
                     }
                     if(migliore>=0){catalogo[migliore]=letto;associati.Add(migliore);}
                     else {catalogo.Add(letto);associati.Add(catalogo.Count-1);}

@@ -13,6 +13,16 @@ namespace VisualMusicBlockLooper.Vision
             double x=b.X+b.Larghezza/2,y=b.Y+b.Altezza/2;
             return x>=a.X && x<=a.X+a.Larghezza && y>=a.Y && y<=a.Y+a.Altezza;
         }
+        /// <summary>Associa lo stesso QR anche dopo un piccolo spostamento o una lieve variazione prospettica.</summary>
+        public static bool StessaPosizioneQr(RettangoloTavolo a,RettangoloTavolo b)
+        {
+            if(a.Larghezza<=0||a.Altezza<=0||b.Larghezza<=0||b.Altezza<=0)return false;
+            double larghezza=Math.Max(0,Math.Min(a.X+a.Larghezza,b.X+b.Larghezza)-Math.Max(a.X,b.X));
+            double altezza=Math.Max(0,Math.Min(a.Y+a.Altezza,b.Y+b.Altezza)-Math.Max(a.Y,b.Y));
+            double intersezione=larghezza*altezza;
+            double unione=a.Larghezza*a.Altezza+b.Larghezza*b.Altezza-intersezione;
+            return unione>0&&intersezione/unione>=.25;
+        }
         public static Rect InCamera(Calibrazione calibrazione, RettangoloTavolo r, int w, int h, int margine = 0)
         {
             double minX=double.PositiveInfinity,minY=minX,maxX=double.NegativeInfinity,maxY=maxX;

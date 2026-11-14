@@ -473,11 +473,11 @@ namespace VisualMusicBlockLooper.App
                 {
                     if(associati.Contains(i))continue;
                     var altro=letti[i].AreaQr??letti[i].Area;
-                    double limite=Math.Max(area.Larghezza,altro.Larghezza)*.15;
+                    if(!GeometriaRegioni.StessaPosizioneQr(area,altro))continue;
                     double dx=area.X+area.Larghezza/2-altro.X-altro.Larghezza/2;
                     double dy=area.Y+area.Altezza/2-altro.Y-altro.Altezza/2;
                     double d=Math.Sqrt(dx*dx+dy*dy);
-                    if(d<limite&&d<distanza){migliore=i;distanza=d;}
+                    if(d<distanza){migliore=i;distanza=d;}
                 }
                 if(migliore>=0)associati.Add(migliore);
                 else if(QrSostituitoDaSfondo(tavolo,noto,livelloSfondo))rimossi.Add(GeometriaRegioni.Copia(noto));
@@ -506,10 +506,7 @@ namespace VisualMusicBlockLooper.App
         private static bool StessaPosizioneQr(CartoncinoRilevato a,CartoncinoRilevato b)
         {
             var x=a.AreaQr??a.Area;var y=b.AreaQr??b.Area;
-            double limite=Math.Max(x.Larghezza,y.Larghezza)*.15;
-            double dx=x.X+x.Larghezza/2-y.X-y.Larghezza/2;
-            double dy=x.Y+x.Altezza/2-y.Y-y.Altezza/2;
-            return Math.Sqrt(dx*dx+dy*dy)<limite;
+            return GeometriaRegioni.StessaPosizioneQr(x,y);
         }
 
         private static IReadOnlyList<CartoncinoRilevato> UnisciCatalogoParziale(
@@ -524,12 +521,11 @@ namespace VisualMusicBlockLooper.App
                 {
                     if(associati.Contains(i))continue;
                     var a=risultato[i].AreaQr??risultato[i].Area;var b=letto.AreaQr??letto.Area;
-                    double limite=Math.Max(a.Larghezza,b.Larghezza)*
-                        (string.Equals(risultato[i].Payload,letto.Payload,StringComparison.Ordinal)?1.4:.15);
+                    if(!GeometriaRegioni.StessaPosizioneQr(a,b))continue;
                     double dx=a.X+a.Larghezza/2-b.X-b.Larghezza/2;
                     double dy=a.Y+a.Altezza/2-b.Y-b.Altezza/2;
                     double d=Math.Sqrt(dx*dx+dy*dy);
-                    if(d<limite&&d<distanza){migliore=i;distanza=d;}
+                    if(d<distanza){migliore=i;distanza=d;}
                 }
                 if(migliore>=0){risultato[migliore]=GeometriaRegioni.Copia(letto);associati.Add(migliore);}
                 else{risultato.Add(GeometriaRegioni.Copia(letto));associati.Add(risultato.Count-1);}

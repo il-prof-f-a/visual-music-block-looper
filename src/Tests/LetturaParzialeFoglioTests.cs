@@ -42,6 +42,23 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(risultato,Has.Count.EqualTo(2));
         }
 
+        [TestCase(.004,1)]
+        [TestCase(.030,2)]
+        public void FusioneParziale_AssociaUnQrSpostatoDiPochiMillimetriMaNonQuelloVicino(double spostamento,int attesi)
+        {
+            var primaArea=new RettangoloTavolo(.20,.30,.024,.024);
+            var dopoArea=new RettangoloTavolo(.20+spostamento,.30,.024,.024);
+            var prima=new CartoncinoRilevato{Payload="VMBL1;N;0",Area=primaArea,AreaQr=primaArea};
+            var dopo=new CartoncinoRilevato{Payload="VMBL1;N;1",Area=dopoArea,AreaQr=dopoArea};
+            var metodo=typeof(AnalizzatoreFoglio).GetMethod("UnisciCatalogoParziale",BindingFlags.NonPublic|BindingFlags.Static);
+
+            var risultato=(System.Collections.Generic.IReadOnlyList<CartoncinoRilevato>)metodo.Invoke(null,
+                new object[]{new[]{prima},new[]{dopo}});
+
+            Assert.That(risultato,Has.Count.EqualTo(attesi));
+            if(attesi==1)Assert.That(risultato[0].Payload,Is.EqualTo("VMBL1;N;1"));
+        }
+
         [TestCase(false)] [TestCase(true)]
         public void LinkValidoVieneConfermatoAncheSeUnAltraZonaRestaIlleggibile(bool capovolta)
         {

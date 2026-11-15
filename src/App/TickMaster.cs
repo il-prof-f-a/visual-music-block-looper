@@ -98,9 +98,10 @@ namespace VisualMusicBlockLooper.App
                     long inizio = Stopwatch.GetTimestamp(); motore.TickInterno(); long fine = Stopwatch.GetTimestamp();
                     long n = tickEmessi + 1;
                     RegistroTempi.Registra(n, previsto, inizio, fine); Volatile.Write(ref tickEmessi, n);
-                    if (fine - prossimoTick >= periodo && proprietario != null && motore.InEsecuzione)
-                        proprietario.PerditaSincronia("Clock in ritardo: arresto controllato, premi Avvia per ripartire.");
                     double intervalloMs = Tempo.IntervalloTickMs(motore.Bpm);
+                    double periodoCorrente = intervalloMs * frequenzaMs;
+                    if (fine - prossimoTick >= periodoCorrente && proprietario != null && motore.InEsecuzione)
+                        proprietario.PerditaSincronia("Clock in ritardo: arresto controllato, premi Avvia per ripartire.");
                     prossimoTick = PianificatoreTick.Prossima(
                         prossimoTick / frequenzaMs,
                         fine / frequenzaMs,

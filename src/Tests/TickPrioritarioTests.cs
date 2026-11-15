@@ -46,6 +46,61 @@ namespace VisualMusicBlockLooper.Tests
             public void NotaOn(int c, int n, int v) { } public void NotaOff(int c, int n) { }
         }
 
+        private sealed class UscitaCambioBpm : IUscitaMidi
+        {
+            public readonly ManualResetEventSlim ClockCompletato = new ManualResetEventSlim();
+            public readonly ManualResetEventSlim Arrestato = new ManualResetEventSlim();
+            private int clock;
+            public void Clock()
+            {
+                if (Interlocked.Increment(ref clock) != 1) return;
+                Thread.Sleep(12);
+                ClockCompletato.Set();
+            }
+            public void Start() { } public void Stop() => Arrestato.Set(); public void Continue() { }
+            public void NotaOn(int c, int n, int v) { } public void NotaOff(int c, int n) { }
+        }
+
+        private static void VerificaCambioBpmAlConfine(double bpmIniziale, double bpmNuovo, bool deveArrestarsi)
+        {
+            var u = new UscitaCambioBpm();
+            using (var e = new EsecutoreMidi(u, null, new EsecutorePartituraTests.Mappa(), new ConfigGriglia(), () => 0, bpmIniziale))
+            using (var t = new TickMaster(e, () => 0))
+            {
+                var n = new CartoncinoNota { Riga = 0, Traccia = 0, IdClip = 41, DurataStep = 4 };
+                e.Pubblica(e.Prepara(new StatoTavolo(new[] { n }, null, null), 1, 1, 0));
+                e.Avvia();
+                e.ImpostaBpm(bpmNuovo);
+
+                try
+                {
+                    t.Avvia();
+                    Assert.That(u.ClockCompletato.Wait(1000), Is.True, "Il primo invio MIDI deve completarsi.");
+                    Assert.That(e.Bpm, Is.EqualTo(bpmNuovo).Within(0.001), "Il nuovo BPM deve applicarsi al confine di battuta.");
+                    if (deveArrestarsi)
+                        Assert.That(u.Arrestato.Wait(1000), Is.True, "Un invio più lungo del nuovo intervallo deve arrestare il trasporto.");
+                    else
+                    {
+                        Assert.That(u.Arrestato.Wait(40), Is.False, "L'invio va confrontato con il nuovo intervallo, più lungo.");
+                        Assert.That(e.InEsecuzione, Is.True);
+                    }
+                }
+                finally { t.Ferma(); }
+            }
+        }
+
+        [Test]
+        public void CambioBpmDa300A30_NonArrestaPerIlVecchioIntervalloPiuBreve()
+        {
+            VerificaCambioBpmAlConfine(300, 30, deveArrestarsi: false);
+        }
+
+        [Test]
+        public void CambioBpmDa30A300_ArrestaUsandoIlNuovoIntervalloPiuBreve()
+        {
+            VerificaCambioBpmAlConfine(30, 300, deveArrestarsi: true);
+        }
+
         [Test]
         public void StalloDelDriverArrestaIlTrasportoEConservaIlRitardoNellaDiagnostica()
         {

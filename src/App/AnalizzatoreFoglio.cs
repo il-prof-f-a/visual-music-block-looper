@@ -155,6 +155,17 @@ namespace VisualMusicBlockLooper.App
                 if(!analizzaSoloSeCambia&&inizializzato&&f.Id==ultimoFrameScansioneCompleta)return false;
                 if(normale||manuale)tentativoBurst=0;
                 ultimoFrame=f.Id;ultimoSegnale=segnale;ultimaOsservazione=ora;retryAt=long.MaxValue;
+                if(analizzaSoloSeCambia&&scansioneABlocchiAnticipata&&inizializzato
+                    &&!motore.InEsecuzione&&!motore.InPreparazione&&!manuale
+                    &&Volatile.Read(ref forzaRilettura)==0)
+                {
+                    // I blocchi si aggiornano quando la riproduzione li avvicina; da fermo
+                    // decodificarli a rotazione spreca CPU e non può influire sul MIDI.
+                    esecuzionePrecedente=false;
+                    Volatile.Write(ref ultimeRegioni,new RettangoloTavolo[0]);
+                    Volatile.Write(ref ultimoEsito,"ScansioneBlocchiInPausa");
+                    return false;
+                }
                 Interlocked.Increment(ref fotogrammi);
                 CatturaInCorso cattura=registro.IniziaCattura();var traccia=cattura?.Traccia;
                 try

@@ -108,7 +108,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void ModalitaABlocchiFermiLeggeUnaSolaZonaPerOsservazione()
+        public void ModalitaABlocchiFermiSospendeLeLettureDopoIstantaneaCompleta()
         {
             long ora = 0;
             var cfg = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
@@ -130,9 +130,38 @@ namespace VisualMusicBlockLooper.Tests
                     r.Pubblica(f, ora);
                     a.Passo(true);
 
-                    Assert.That(a.NumeroLettureZone - letture, Is.EqualTo(1));
-                    Assert.That(a.UltimeRegioni, Has.Count.EqualTo(1));
-                    Assert.That(a.UltimoEsito, Is.EqualTo("ScansioneBlocchiFermi"));
+                    Assert.That(a.NumeroLettureZone, Is.EqualTo(letture),
+                        "A riproduzione ferma, i blocchi si leggono solo con istantanea iniziale o richiesta manuale.");
+                    Assert.That(a.UltimeRegioni, Is.Empty);
+                    Assert.That(a.UltimoEsito, Is.EqualTo("ScansioneBlocchiInPausa"));
+                }
+            }
+        }
+
+        [Test]
+        public void DuranteLaPreparazioneContinuaLaScansioneAnticipata()
+        {
+            long ora=0;
+            var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,
+                new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,
+                    new RegistroCatture(),()=>ora,true,null,true,2))
+                {
+                    e.Avvia();e.TickInterno();
+                    Assert.That(e.Stato.InPreparazione,Is.True);
+                    r.Pubblica(f,ora);a.Passo(true);
+                    long letture=a.NumeroLettureZone;
+
+                    ora+=250;r.Pubblica(f,ora);a.Passo(true);
+
+                    Assert.That(a.NumeroLettureZone,Is.GreaterThan(letture),
+                        "La scansione deve proseguire durante la preparazione del primo avvio MIDI.");
                 }
             }
         }
@@ -322,7 +351,8 @@ namespace VisualMusicBlockLooper.Tests
             using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
             {
                 var p=new PreparatoreFoglio(e);var debug=new RegistroCatture{Attivo=true};
-                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,debug,()=>ora))
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,debug,()=>ora,
+                    true,null,true,2))
                 {
                     for(int i=0;i<2;i++){ora+=100;r.Pubblica(f,ora);a.Passo(true);}
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));

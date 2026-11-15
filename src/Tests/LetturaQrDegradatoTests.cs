@@ -45,10 +45,10 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         // Frame sintetico: sfondo bianco, cartoncino ridotto di "scala", sfocato, con bagliore e contrasto ridotto.
-        private static Mat Frame(double scala, double sfocatura, double contrasto, bool bagliore)
+        private static Mat Frame(double scala, double sfocatura, double contrasto, bool bagliore, int idClip=3)
         {
             Mat mat;
-            using (Bitmap carta = GeneratoreCartoncini.CartoncinoNota(0, 3, passi: 2))
+            using (Bitmap carta = GeneratoreCartoncini.CartoncinoNota(0, idClip, passi: 2))
             using (Bitmap tavolo = new Bitmap(Larghezza, Altezza))
             using (Graphics g = Graphics.FromImage(tavolo))
             {
@@ -155,6 +155,46 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(dopo.Select(c => c.Payload), Is.EqualTo(prima.Select(c => c.Payload)));
                 Assert.That(primo.Visione.Any(e => e.Codice == "QrDecodificato" && e.Origine != "Memoria"), Is.True);
                 Assert.That(secondo.Visione.Any(e => e.Codice == "QrDecodificato" && e.Origine == "Memoria"), Is.True);
+            }
+        }
+
+        [Test]
+        public void LettoreZone_RiusaIlRecuperoMemorizzatoSoloNellaStessaZona()
+        {
+            using (Mat mat = Frame(0.15, 0.7, 0.7, true))
+            {
+                var config = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+                var lettore = new LettoreZone(CalibrazioneSuFrame(), config);
+                var zonaCartoncino = new RettangoloTavolo(0, 0, 1, 1);
+                var zonaVuota = new RettangoloTavolo(.75, .75, .2, .2);
+                var primoDebug = new TracciaCartoncini();
+                var primo = lettore.Leggi(mat, zonaCartoncino, new CartoncinoRilevato[0], primoDebug,"zona-cartoncino");
+                Assert.That(primo.Catalogo.Select(c => c.Payload), Is.EqualTo(new[] { "VMBL1;N;3" }));
+
+                var vuoto = lettore.Leggi(mat, zonaVuota, new CartoncinoRilevato[0],null,"zona-vuota");
+                Assert.That(vuoto.Catalogo, Is.Empty);
+
+                var secondoDebug = new TracciaCartoncini();
+                var secondo = lettore.Leggi(mat, zonaCartoncino, primo.Catalogo, secondoDebug,"zona-cartoncino");
+                Assert.That(secondo.Catalogo.Select(c => c.Payload), Is.EqualTo(new[] { "VMBL1;N;3" }));
+                Assert.That(secondoDebug.Visione.Any(e => e.Codice == "QrDecodificato" && e.Origine == "Memoria"),
+                    Is.True, "La seconda lettura della stessa ROI deve poter riusare il fallback QR memorizzato. Origini: "
+                        + string.Join(", ",secondoDebug.Visione.Where(e=>e.Codice=="QrDecodificato").Select(e=>e.Origine)));
+            }
+        }
+
+        [Test]
+        public void LettoreZone_RileggeUnNuovoQrQuandoIlCartoncinoCambiaNellaStessaPosizione()
+        {
+            using (Mat prima = Frame(0.15, 0.7, 0.7, true, 3))
+            using (Mat dopo = Frame(0.15, 0.7, 0.7, true, 4))
+            {
+                var lettore = new LettoreZone(CalibrazioneSuFrame(), new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault });
+                var zona = new RettangoloTavolo(0, 0, 1, 1);
+                var lettaPrima = lettore.Leggi(prima, zona, new CartoncinoRilevato[0],null,"blocco-riga-0");
+                var lettaDopo = lettore.Leggi(dopo, zona, lettaPrima.Catalogo,null,"blocco-riga-0");
+                Assert.That(lettaPrima.Catalogo.Select(c => c.Payload), Is.EqualTo(new[] { "VMBL1;N;3" }));
+                Assert.That(lettaDopo.Catalogo.Select(c => c.Payload), Is.EqualTo(new[] { "VMBL1;N;4" }));
             }
         }
 

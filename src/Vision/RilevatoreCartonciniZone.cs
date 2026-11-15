@@ -10,6 +10,8 @@ namespace VisualMusicBlockLooper.Vision
     {
         internal LetturaZona LeggiZona(Mat frame,RettangoloTavolo zona,IReadOnlyList<CartoncinoRilevato> noti,TracciaCartoncini traccia)
         {
+            // Una zona memorizza i fallback solo per frame consecutivi: avanzare qui, come nella lettura completa.
+            sequenzaFrame++;
             var catalogo=(noti??new CartoncinoRilevato[0]).Select(GeometriaRegioni.Copia).ToList();
             Rect regione=GeometriaRegioni.InCamera(calibrazione,zona,frame.Cols,frame.Rows,48);
             if(regione.Width<8||regione.Height<8) return new LetturaZona(catalogo,false,0,regione);

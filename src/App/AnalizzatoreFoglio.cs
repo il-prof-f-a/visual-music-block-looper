@@ -350,7 +350,7 @@ namespace VisualMusicBlockLooper.App
             int blocchiIncerti=0;
             foreach(var blocco in blocchi)
             {
-                var lettura=lettore.Leggi(f.Immagine,blocco.Zona,lavoro,traccia);
+                var lettura=lettore.Leggi(f.Immagine,blocco.Zona,lavoro,traccia,"blocco:"+blocco.Id);
                 Interlocked.Increment(ref letture);
                 if(vita.InChiusura||Sospesa())return;
                 var correnti=LocaliDelBlocco(lavoro,blocco);

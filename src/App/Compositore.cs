@@ -44,7 +44,8 @@ namespace VisualMusicBlockLooper.App
             bool analizzaSoloSeCambia = true,
             ParametriRilevatoreVariazioni parametriVariazioni = null,
             bool scansioneABlocchiAnticipata = false,
-            int misureAnticipoScansione = 1)
+            int misureAnticipoScansione = 1,
+            double bpmIniziale = 120)
         {
             this.rilevatore = rilevatore ?? throw new ArgumentNullException(nameof(rilevatore));
             if (uscita == null)
@@ -69,7 +70,7 @@ namespace VisualMusicBlockLooper.App
             interprete = new InterpreteTavolo(new Griglia(config), Layout);
             if(esecuzioneDeterministica)
             {
-                Esecutore=new EsecutoreMidi(uscita,ingresso,mappatura,config,orologioMs);Motore=Esecutore;
+                Esecutore=new EsecutoreMidi(uscita,ingresso,mappatura,config,orologioMs,bpmIniziale);Motore=Esecutore;
                 Preparatore=new PreparatoreFoglio(Esecutore);
                 if(fonteVideo!=null)
                 {
@@ -84,7 +85,7 @@ namespace VisualMusicBlockLooper.App
                     cicloComandi=new CicloCattura(()=>ComandiRapidi.Passo(),20);
                 }
             }
-            else Motore = new MotoreMusicale(new Sequencer(config), uscita, ingresso, mappatura, 120, orologioMs);
+            else Motore = new MotoreMusicale(new Sequencer(config), uscita, ingresso, mappatura, bpmIniziale, orologioMs);
         }
 
         /// <summary>Zone speciali del tavolo usate per interpretare i cartoncini.</summary>

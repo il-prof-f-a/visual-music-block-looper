@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Newtonsoft.Json;
+using VisualMusicBlockLooper.Core;
 using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.App
@@ -91,6 +92,9 @@ namespace VisualMusicBlockLooper.App
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public int PulsazioniPerOsservazione { get; set; }
 
+        /// <summary>BPM Master iniziale, salvato anche dopo modifiche manuali o Tap Tempo (default applicativo 100).</summary>
+        public double BpmIniziale { get; set; } = 100;
+
         /// <summary>Usato solo quando la scansione a blocchi è disattivata: rileva le differenze o rilegge la scena intera.</summary>
         public bool AnalizzaSoloSeCambia { get; set; } = true;
 
@@ -149,6 +153,8 @@ namespace VisualMusicBlockLooper.App
             if(configurazione.AnalisiVariazioni==null)
                 configurazione.AnalisiVariazioni=new ParametriRilevatoreVariazioni();
             configurazione.AnalisiVariazioni=configurazione.AnalisiVariazioni.Normalizzati();
+            configurazione.BpmIniziale=double.IsNaN(configurazione.BpmIniziale)||double.IsInfinity(configurazione.BpmIniziale)
+                ?100:Tempo.Limita(configurazione.BpmIniziale);
             if(configurazione.MisureAnticipoScansione<1||configurazione.MisureAnticipoScansione>5)
                 configurazione.MisureAnticipoScansione=2;
             if(double.IsNaN(configurazione.TolleranzaQrCelle)||double.IsInfinity(configurazione.TolleranzaQrCelle)

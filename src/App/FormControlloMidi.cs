@@ -27,7 +27,14 @@ namespace VisualMusicBlockLooper.App
             var labelBpm=new Label{Text="BPM",Left=630,Top=194,Width=115,Height=18};
             campoBpm=new NumericUpDown{Name="campoBpm",AccessibleName="BPM",Left=630,Top=214,Width=115,Height=24,
                 Minimum=(decimal)Tempo.MinBpm,Maximum=(decimal)Tempo.MaxBpm,DecimalPlaces=1,Increment=1,Value=(decimal)compositore.Motore.Bpm,TabIndex=4};
-            campoBpm.ValueChanged+=(m,a)=>{if(!aggiornamentoBpm)compositore.Motore.ImpostaBpm((double)campoBpm.Value);};
+            campoBpm.ValueChanged+=(m,a)=>
+            {
+                if(aggiornamentoBpm)return;
+                double bpm=Tempo.Limita((double)campoBpm.Value);
+                configurazione.BpmIniziale=bpm;
+                compositore.Motore.ImpostaBpm(bpm);
+                Riavvia(timerSalvaConfigurazione);
+            };
             campoBpm.KeyDown+=(m,a)=>{if(a.KeyCode==Keys.Enter){SelectNextControl(campoBpm,true,true,true,true);a.Handled=true;a.SuppressKeyPress=true;}};
             suggerimentiDebug.SetToolTip(campoBpm,"Tempo Master: scrivi il valore e premi Invio. Durante Play cambia alla pulsazione successiva; in Slave segue il clock esterno.");
             Controls.AddRange(new Control[]{labelBpm,campoBpm});
@@ -56,6 +63,15 @@ namespace VisualMusicBlockLooper.App
         {
             var e=compositore.Esecutore;if(e==null||etichettaVersioniFoglio==null)return;
             campoBpm.Enabled=!inCalibrazione&&e.Modo==ModoSincronia.Master;
+            if(e.Modo==ModoSincronia.Master)
+            {
+                double bpmRichiesto=Tempo.Limita(e.Stato.BpmRichiesto);
+                if(Math.Abs(configurazione.BpmIniziale-bpmRichiesto)>0.0001)
+                {
+                    configurazione.BpmIniziale=bpmRichiesto;
+                    Riavvia(timerSalvaConfigurazione);
+                }
+            }
             if(!campoBpm.ContainsFocus)
             {
                 aggiornamentoBpm=true;

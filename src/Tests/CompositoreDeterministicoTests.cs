@@ -28,5 +28,17 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(u.Eventi.Take(3),Is.EqualTo(new[]{"Start","Clock","On:0:76"}));
             }
         }
+
+        [Test]
+        public void RuntimeDeterministicoAccettaBpmInizialeConfigurato()
+        {
+            var cfg = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+            using (var c = new Compositore(new Fonte(), new EsecutorePartituraTests.Uscita(), null,
+                new EsecutorePartituraTests.Mappa(), cfg, LayoutTavolo.Default, () => 0,
+                esecuzioneDeterministica: true, bpmIniziale: 137.5))
+            {
+                Assert.That(c.Esecutore.Bpm, Is.EqualTo(137.5));
+            }
+        }
     }
 }

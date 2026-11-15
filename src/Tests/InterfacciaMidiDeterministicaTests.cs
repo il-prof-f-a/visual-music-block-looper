@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -36,15 +37,24 @@ namespace VisualMusicBlockLooper.Tests
         public void StatoVersioniRiletturaETempiMidiSonoAccessibiliERidimensionabili()
         {
             var cfg=new ConfigGriglia();var fonte=new RilevatoreCommutabile();var configApp=new ConfigurazioneApplicazione();
+            string percorso=Path.Combine(Path.GetTempPath(),"vmbl-bpm-"+Guid.NewGuid().ToString("N")+".json");
+            try
+            {
             using(var c=new Compositore(fonte,new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,
                 orologioMs:()=>0,esecuzioneDeterministica:true))
             using(var f=new FormControllo(c,new FormProiettore(cfg),new GestoreWebcam(i=>null),fonte,
-                "calibrazione-test.txt",configApp,null,new List<InfoWebcam>(),()=>0,"MIDI",new List<string>(),new List<IDisposable>(),false))
+                "calibrazione-test.txt",configApp,percorso,new List<InfoWebcam>(),()=>0,"MIDI",new List<string>(),new List<IDisposable>(),false))
             {
                 Assert.That(f.Controls.Find("etichettaVersioniFoglio",true),Has.Length.EqualTo(1));
                 Assert.That(f.Controls.Find("pulsanteSalvaTempiMidi",true),Has.Length.EqualTo(1));
                 var bpm=(NumericUpDown)f.Controls.Find("campoBpm",true).Single();bpm.Value=137.5m;c.Esecutore.ElaboraPendenti();
                 Assert.That(c.Motore.Bpm,Is.EqualTo(137.5));
+                Assert.That(configApp.BpmIniziale,Is.EqualTo(137.5));
+                var timerSalvataggio=(System.Windows.Forms.Timer)typeof(FormControllo)
+                    .GetField("timerSalvaConfigurazione",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(f);
+                Assert.That(timerSalvataggio.Enabled,Is.True,"Il BPM modificato deve essere salvato con il debounce di configurazione.");
+                typeof(FormControllo).GetMethod("SalvaDaTimer",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(f,null);
+                Assert.That(ConfigurazioneApplicazione.Carica(percorso).BpmIniziale,Is.EqualTo(137.5));
                 c.Motore.CambiaModo();c.Esecutore.ElaboraPendenti();
                 typeof(FormControllo).GetMethod("AggiornaInterfaccia",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(f,null);
                 Assert.That(bpm.Enabled,Is.False);
@@ -53,6 +63,11 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(bottone.Width,Is.EqualTo(larghezza*2).Within(2));
                 var combo=(ComboBox)f.Controls.Find("comboOsservazione",true).Single();combo.SelectedIndex=2;
                 Assert.That(configApp.PulsazioniPerOsservazione,Is.EqualTo(2));
+            }
+            }
+            finally
+            {
+                if(File.Exists(percorso))File.Delete(percorso);
             }
         }
     }

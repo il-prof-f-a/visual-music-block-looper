@@ -36,6 +36,7 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(json["PulsazioniPerOsservazione"].Value<int>(),Is.EqualTo(2));
             Assert.That(json["Webcam"]["Indice"].Value<int>(),Is.EqualTo(1));
+            Assert.That(json["BpmIniziale"]?.Value<double>(),Is.EqualTo(100));
             Assert.That(json["AnalizzaSoloSeCambia"]?.Value<bool>(),Is.True);
             Assert.That(json["ScansioneABlocchiAnticipata"]?.Value<bool>(),Is.True);
             Assert.That(json["MisureAnticipoScansione"]?.Value<int>(),Is.EqualTo(2));
@@ -67,6 +68,7 @@ namespace VisualMusicBlockLooper.Tests
                   "MisureAnticipoScansione": 3,
                   "NumeroThreadOpenCv": 3,
                   "PulsazioniPerOsservazione": 4,
+                  "BpmIniziale": 137.5,
                   "AnalisiVariazioni": {
                     "LarghezzaAnalisi": 320,
                     "AltezzaAnalisi": 180,
@@ -88,6 +90,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(ricaricata.MisureAnticipoScansione,Is.EqualTo(3));
             Assert.That(ricaricata.NumeroThreadOpenCv,Is.EqualTo(3));
             Assert.That(ricaricata.PulsazioniPerOsservazione,Is.EqualTo(4));
+            Assert.That(ricaricata.BpmIniziale,Is.EqualTo(137.5));
             Assert.That(json["AnalisiVariazioni"]?["LarghezzaAnalisi"]?.Value<int>(),Is.EqualTo(320));
             Assert.That(json["AnalisiVariazioni"]?["AltezzaAnalisi"]?.Value<int>(),Is.EqualTo(180));
             Assert.That(json["AnalisiVariazioni"]?["PercentileSfondo"]?.Value<double>(),Is.EqualTo(.80));

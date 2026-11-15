@@ -60,6 +60,48 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void ScansioneAnticipataNonRileggeBlocchiGiaLettiNellaFinestraDelGiro()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,
+                    true,null,true,2))
+                {
+                    a.PulsazioniPerOsservazione=1;
+                    r.Pubblica(f,ora);a.Passo(true);
+                    long lettureIniziali=a.NumeroLettureZone;
+
+                    e.Avvia();e.TickInterno();
+                    ora+=25;r.Pubblica(f,ora);a.Passo(true);
+                    long primaFinestra=a.NumeroLettureZone-lettureIniziali;
+                    Assert.That(primaFinestra,Is.GreaterThan(0),"L'avvio deve scandire i blocchi attivi e anticipati.");
+
+                    ora+=25;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.NumeroLettureZone-lettureIniziali,Is.EqualTo(primaFinestra),
+                        "Una nuova cattura nella stessa misura non deve ridigitalizzare blocchi già confermati.");
+
+                    for(int i=0;i<96;i++){ora+=25;e.TickInterno();}
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.NumeroLettureZone-lettureIniziali-primaFinestra,Is.EqualTo(1),
+                        "Alla misura successiva va letto solo il nuovo blocco entrato nella finestra di anticipo.");
+
+                    for(int i=0;i<4*96;i++){ora+=25;e.TickInterno();}
+                    r.Pubblica(f,ora);a.Passo(true);
+                    long scansioneConfine=a.NumeroLettureZone;
+
+                    for(int i=0;i<96;i++){ora+=25;e.TickInterno();}
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.NumeroLettureZone-scansioneConfine,Is.EqualTo(4),
+                        "All'avvio del giro successivo vanno letti soltanto la nuova riga di anticipo e i tre vincoli del giro.");
+                }
+            }
+        }
+
+        [Test]
         public void ModalitaABlocchiFermiLeggeUnaSolaZonaPerOsservazione()
         {
             long ora = 0;

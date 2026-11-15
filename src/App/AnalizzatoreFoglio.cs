@@ -38,6 +38,10 @@ namespace VisualMusicBlockLooper.App
         private int conferme, tentativoBurst, forzaRilettura;
         private bool inizializzato;
         private readonly Dictionary<int, ConfermaBlocco> confermeBlocchi=new Dictionary<int, ConfermaBlocco>();
+        private readonly HashSet<ChiaveBloccoPianificato> blocchiScansionati=new HashSet<ChiaveBloccoPianificato>();
+        private readonly HashSet<int> blocchiIncompleti=new HashSet<int>();
+        private StrutturaTavolo strutturaScansione;
+        private bool esecuzionePrecedente;
         private IReadOnlyList<RettangoloTavolo> regioniDaVerificare=new RettangoloTavolo[0];
         private double primaPubblicazioneMs;
         private int prossimoBloccoFermo;
@@ -46,6 +50,8 @@ namespace VisualMusicBlockLooper.App
         {
             public string Firma;
             public long UltimoFrame;
+            public long Giro;
+            public int Misura;
             public int Numero;
             public IReadOnlyList<CartoncinoRilevato> Catalogo;
         }
@@ -56,6 +62,21 @@ namespace VisualMusicBlockLooper.App
             public int Id;
             public RettangoloTavolo Zona;
             public ZonaSpeciale Speciale;
+        }
+        private sealed class BloccoPianificato
+        {
+            public BloccoScansione Blocco;
+            public readonly List<ChiaveBloccoPianificato> Chiavi=new List<ChiaveBloccoPianificato>();
+        }
+        private readonly struct ChiaveBloccoPianificato : IEquatable<ChiaveBloccoPianificato>
+        {
+            public ChiaveBloccoPianificato(long giro,int misura,int id){Giro=giro;Misura=misura;Id=id;}
+            public long Giro { get; }
+            public int Misura { get; }
+            public int Id { get; }
+            public bool Equals(ChiaveBloccoPianificato altra)=>Giro==altra.Giro&&Misura==altra.Misura&&Id==altra.Id;
+            public override bool Equals(object obj)=>obj is ChiaveBloccoPianificato altra&&Equals(altra);
+            public override int GetHashCode(){unchecked{return ((Giro.GetHashCode()*397)^Misura)*397^Id;}}
         }
         public AnalizzatoreFoglio(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
             LayoutTavolo layout,PreparatoreFoglio preparatore,RegistroCatture registro,Func<long> orologio,
@@ -115,6 +136,7 @@ namespace VisualMusicBlockLooper.App
                     corrente=c;generazioneVideo=f.Generazione;generazione++;
                     preparatore.ImpostaGenerazione(generazione);catalogo=new CartoncinoRilevato[0];inizializzato=false;
                     confermeBlocchi.Clear();
+                    blocchiScansionati.Clear();blocchiIncompleti.Clear();strutturaScansione=null;esecuzionePrecedente=false;
                     ultimoFrameScansioneCompleta=long.MinValue;
                     RiavviaConfronto();lettore=new LettoreZone(c,config);
                 }
@@ -124,6 +146,7 @@ namespace VisualMusicBlockLooper.App
                     // incrementale può rifiutare il frame dopo una variazione globale di esposizione.
                     RiavviaConfronto();catalogo=new CartoncinoRilevato[0];inizializzato=false;
                     confermeBlocchi.Clear();
+                    blocchiScansionati.Clear();blocchiIncompleti.Clear();strutturaScansione=null;
                     firmaCandidata=null;conferme=0;regioniDaVerificare=new RettangoloTavolo[0];
                     Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
                     Volatile.Write(ref ultimoStato,new StatoTavolo(null,null,null));
@@ -145,7 +168,7 @@ namespace VisualMusicBlockLooper.App
                     }
                     if(scansioneABlocchiAnticipata)
                     {
-                        AnalizzaBlocchiAnticipati(f,c,traccia,motore.Struttura,motore.Posizione,motore.InEsecuzione);
+                        AnalizzaBlocchiAnticipati(f,c,traccia,motore.Struttura,motore.Posizione,motore.Giro,motore.InEsecuzione);
                         return true;
                     }
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))
@@ -319,37 +342,85 @@ namespace VisualMusicBlockLooper.App
         }
 
         private void AnalizzaBlocchiAnticipati(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia,
-            StrutturaTavolo struttura,PosizioneGiro posizione,bool inEsecuzione)
+            StrutturaTavolo struttura,PosizioneGiro posizione,long giro,bool inEsecuzione)
         {
-            var righe=inEsecuzione
-                ?new SortedSet<int>(RigheAnticipate(struttura,posizione,misureAnticipoScansione))
-                :new SortedSet<int>();
-            if(inEsecuzione)
-                for(int riga=0;riga<config.Tracce;riga++)
-                    if(regioniDaVerificare.Any(z=>GeometriaRegioni.Interseca(z,ZonaRiga(riga))))righe.Add(riga);
             var tuttiBlocchi=Enumerable.Range(0,config.Tracce).Select(r=>new BloccoScansione(r,ZonaRiga(r)))
                 .Concat(new[]
                 {
                     new BloccoScansione(-1,layout.Misura,ZonaSpeciale.Misura),
                     new BloccoScansione(-2,layout.Collegamento,ZonaSpeciale.Collegamento),
                     new BloccoScansione(-3,layout.Ab,ZonaSpeciale.Ab)
-                }).Where(b=>b.Zona.Larghezza>0&&b.Zona.Altezza>0).ToArray();
-            BloccoScansione[] blocchi;
+                }).Where(b=>b.Zona.Larghezza>0&&b.Zona.Altezza>0).ToDictionary(b=>b.Id);
+            var pianificati=new Dictionary<int,BloccoPianificato>();
+            void Aggiungi(BloccoScansione blocco,long giroDestinazione,int misuraDestinazione)
+            {
+                if(blocco==null)return;
+                if(!pianificati.TryGetValue(blocco.Id,out var pianificato))
+                {pianificato=new BloccoPianificato{Blocco=blocco};pianificati.Add(blocco.Id,pianificato);}
+                var chiave=new ChiaveBloccoPianificato(giroDestinazione,misuraDestinazione,blocco.Id);
+                if(!pianificato.Chiavi.Contains(chiave))pianificato.Chiavi.Add(chiave);
+            }
+
             if(inEsecuzione)
-                blocchi=righe.Select(r=>new BloccoScansione(r,ZonaRiga(r)))
-                    .Concat(tuttiBlocchi.Where(b=>b.Id<0)).ToArray();
+            {
+                if(!esecuzionePrecedente||strutturaScansione==null||!strutturaScansione.Equals(struttura))
+                {blocchiScansionati.Clear();confermeBlocchi.Clear();}
+                esecuzionePrecedente=true;strutturaScansione=struttura;
+                blocchiScansionati.RemoveWhere(k=>k.Giro<giro);
+
+                foreach(int riga in posizione.RigheAttive??new int[0])
+                    if(tuttiBlocchi.TryGetValue(riga,out var bloccoAttivo))Aggiungi(bloccoAttivo,giro,posizione.MisuraNelGiro);
+
+                long inizio=(struttura.AInizio-1L)*StrutturaTavolo.StepPerBattuta;
+                for(int anticipo=1;anticipo<=misureAnticipoScansione;anticipo++)
+                {
+                    long passo=(long)(posizione.MisuraNelGiro+anticipo)*struttura.StepPerMisura-inizio;
+                    long giriAnticipati=passo/struttura.StepGiro;
+                    var futura=struttura.Posizione(passo);
+                    foreach(int riga in futura.RigheAttive??new int[0])
+                        if(tuttiBlocchi.TryGetValue(riga,out var bloccoFuturo))
+                            Aggiungi(bloccoFuturo,giro+giriAnticipati,futura.MisuraNelGiro);
+                }
+
+                for(int riga=0;riga<config.Tracce;riga++)
+                    if(regioniDaVerificare.Any(z=>GeometriaRegioni.Interseca(z,ZonaRiga(riga)))
+                        &&tuttiBlocchi.TryGetValue(riga,out var bloccoDaVerificare))
+                        Aggiungi(bloccoDaVerificare,giro,posizione.MisuraNelGiro);
+
+                foreach(int id in new[]{-1,-2,-3})
+                    if(tuttiBlocchi.TryGetValue(id,out var vincolo))Aggiungi(vincolo,giro,-1);
+
+                foreach(int id in blocchiIncompleti)
+                    if(tuttiBlocchi.TryGetValue(id,out var bloccoIncompleto))
+                        Aggiungi(bloccoIncompleto,giro,posizione.MisuraNelGiro);
+
+                foreach(var conferma in confermeBlocchi)
+                    if(tuttiBlocchi.TryGetValue(conferma.Key,out var bloccoInConferma))
+                        Aggiungi(bloccoInConferma,conferma.Value.Giro,conferma.Value.Misura);
+            }
             else
             {
-                if(prossimoBloccoFermo>=tuttiBlocchi.Length)prossimoBloccoFermo=0;
-                blocchi=new[]{tuttiBlocchi[prossimoBloccoFermo++]};
+                esecuzionePrecedente=false;
+                if(prossimoBloccoFermo>=tuttiBlocchi.Count)prossimoBloccoFermo=0;
+                var bloccoFermo=tuttiBlocchi.Values.OrderBy(b=>b.Id>=0?b.Id:config.Tracce-b.Id-1)
+                    .ElementAt(prossimoBloccoFermo++);
+                Aggiungi(bloccoFermo,giro,posizione.MisuraNelGiro);
             }
-            Volatile.Write(ref ultimeRegioni,blocchi.Select(b=>b.Zona).ToArray());
+
+            var blocchi=pianificati.Values.Where(p=>!inEsecuzione
+                    ||p.Chiavi.Any(k=>!blocchiScansionati.Contains(k))
+                    ||confermeBlocchi.ContainsKey(p.Blocco.Id)
+                    ||regioniDaVerificare.Any(z=>GeometriaRegioni.Interseca(z,p.Blocco.Zona)))
+                .OrderBy(p=>p.Blocco.Id>=0?p.Blocco.Id:config.Tracce-p.Blocco.Id-1).ToArray();
+            int blocchiSaltati=inEsecuzione?pianificati.Count-blocchi.Length:0;
+            Volatile.Write(ref ultimeRegioni,blocchi.Select(p=>p.Blocco.Zona).ToArray());
 
             var lavoro=catalogo;
             bool catalogoAggiornato=false;
             int blocchiIncerti=0;
-            foreach(var blocco in blocchi)
+            foreach(var pianificato in blocchi)
             {
+                var blocco=pianificato.Blocco;
                 var lettura=lettore.Leggi(f.Immagine,blocco.Zona,lavoro,traccia,"blocco:"+blocco.Id);
                 Interlocked.Increment(ref letture);
                 if(vita.InChiusura||Sospesa())return;
@@ -361,7 +432,9 @@ namespace VisualMusicBlockLooper.App
                 if(!completa)
                 {
                     blocchiIncerti++;
+                    blocchiIncompleti.Add(blocco.Id);
                     confermeBlocchi.Remove(blocco.Id);
+                    if(inEsecuzione)blocchiScansionati.ExceptWith(pianificato.Chiavi);
                     var integrati=UnisciCatalogoParziale(correnti,letti);
                     if(FirmaCatalogoBlocco(integrati)!=firmaCorrente)
                     {
@@ -371,16 +444,20 @@ namespace VisualMusicBlockLooper.App
                     continue;
                 }
 
+                blocchiIncompleti.Remove(blocco.Id);
                 regioniDaVerificare=regioniDaVerificare.Where(z=>!GeometriaRegioni.Interseca(z,blocco.Zona)).ToArray();
                 if(firmaLettura==firmaCorrente)
                 {
                     confermeBlocchi.Remove(blocco.Id);
+                    if(inEsecuzione)blocchiScansionati.UnionWith(pianificato.Chiavi);
                     continue;
                 }
 
                 if(!confermeBlocchi.TryGetValue(blocco.Id,out var candidata)||candidata.Firma!=firmaLettura)
                 {
-                    candidata=new ConfermaBlocco{Firma=firmaLettura,UltimoFrame=f.Id,Numero=1,Catalogo=letti};
+                    var chiave=pianificato.Chiavi[0];
+                    candidata=new ConfermaBlocco{Firma=firmaLettura,UltimoFrame=f.Id,Giro=chiave.Giro,
+                        Misura=chiave.Misura,Numero=1,Catalogo=letti};
                     confermeBlocchi[blocco.Id]=candidata;
                 }
                 else if(candidata.UltimoFrame!=f.Id)
@@ -394,10 +471,12 @@ namespace VisualMusicBlockLooper.App
                     lavoro=SostituisciBlocco(lavoro,blocco,candidata.Catalogo);
                     catalogoAggiornato=true;
                     confermeBlocchi.Remove(blocco.Id);
+                    if(inEsecuzione)blocchiScansionati.UnionWith(pianificato.Chiavi);
                 }
+                else if(inEsecuzione)blocchiScansionati.ExceptWith(pianificato.Chiavi);
             }
 
-            Volatile.Write(ref ultimeRegioni,blocchi.Select(b=>b.Zona).ToArray());
+            Volatile.Write(ref ultimeRegioni,blocchi.Select(p=>p.Blocco.Zona).ToArray());
             if(catalogoAggiornato)
             {
                 if(!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
@@ -416,9 +495,10 @@ namespace VisualMusicBlockLooper.App
             Descrivi(traccia,esito,f);
             if(traccia!=null)traccia.Visione.Add(new EventoDiagnosticoCartoncino("Osservazione",
                 inEsecuzione?"BlocchiAnticipati":"BloccoFermo","RigheMusicali",
-                $"Blocchi={string.Join(",",blocchi.Select(b=>b.Id>=0?"riga"+b.Id:b.Speciale.ToString()))}; " +
-                $"vincoli MIDI={blocchi.Count(b=>b.Id<0)}; anticipo={misureAnticipoScansione} misure; " +
-                $"blocchi incerti={blocchiIncerti}; conferme in attesa={confermeBlocchi.Count}; frame={f.Id}."));
+                $"Blocchi={string.Join(",",blocchi.Select(p=>p.Blocco.Id>=0?"riga"+p.Blocco.Id:p.Blocco.Speciale.ToString()))}; " +
+                $"vincoli MIDI={blocchi.Count(p=>p.Blocco.Id<0)}; anticipati={misureAnticipoScansione} misure; " +
+                $"blocchi già confermati saltati={blocchiSaltati}; incerti={blocchiIncerti}; " +
+                $"conferme in attesa={confermeBlocchi.Count}; giro={giro}; frame={f.Id}."));
         }
 
         private bool IlluminazioneAffidabile(Mat frame,Rect regione)

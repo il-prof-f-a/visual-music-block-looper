@@ -91,14 +91,17 @@ namespace VisualMusicBlockLooper.App
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public int PulsazioniPerOsservazione { get; set; }
 
-        /// <summary>True usa le sole ROI cambiate; false legge l'intera scena a ogni osservazione programmata.</summary>
+        /// <summary>Usato solo quando la scansione a blocchi è disattivata: rileva le differenze o rilegge la scena intera.</summary>
         public bool AnalizzaSoloSeCambia { get; set; } = true;
 
-        /// <summary>Durante Play legge solo le righe musicali attive e quelle anticipate, senza confronto globale.</summary>
+        /// <summary>Legge blocchi anticipati durante il play e, a riproduzione ferma, una zona per fotogramma.</summary>
         public bool ScansioneABlocchiAnticipata { get; set; } = true;
 
-        /// <summary>Misure future incluse nella finestra di scansione, limitate a 1..5.</summary>
-        public int MisureAnticipoScansione { get; set; } = 1;
+        /// <summary>Misure future incluse nella finestra di scansione, limitate a 1..5 (default 2 per confermare prima dell'attacco).</summary>
+        public int MisureAnticipoScansione { get; set; } = 2;
+
+        /// <summary>Scarto massimo del QR dai bordi di griglia tollerato, come frazione di cella (0..0,49).</summary>
+        public double TolleranzaQrCelle { get; set; } = 0.15;
 
         /// <summary>Massimo di worker OpenCV paralleli; riduce la contesa CPU con il thread MIDI.</summary>
         public int NumeroThreadOpenCv { get; set; } = 2;
@@ -147,7 +150,10 @@ namespace VisualMusicBlockLooper.App
                 configurazione.AnalisiVariazioni=new ParametriRilevatoreVariazioni();
             configurazione.AnalisiVariazioni=configurazione.AnalisiVariazioni.Normalizzati();
             if(configurazione.MisureAnticipoScansione<1||configurazione.MisureAnticipoScansione>5)
-                configurazione.MisureAnticipoScansione=1;
+                configurazione.MisureAnticipoScansione=2;
+            if(double.IsNaN(configurazione.TolleranzaQrCelle)||double.IsInfinity(configurazione.TolleranzaQrCelle)
+                ||configurazione.TolleranzaQrCelle<0||configurazione.TolleranzaQrCelle>=0.5)
+                configurazione.TolleranzaQrCelle=0.15;
             if(configurazione.NumeroThreadOpenCv<1||configurazione.NumeroThreadOpenCv>4)
                 configurazione.NumeroThreadOpenCv=2;
 

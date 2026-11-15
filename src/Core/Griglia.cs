@@ -26,7 +26,7 @@ namespace VisualMusicBlockLooper.Core
             stepIniziale = 0;
             durataStep = 0;
 
-            if (!TrovaPosizione(area, out traccia, out stepIniziale))
+            if (!TrovaPosizione(area, out traccia, out stepIniziale, false))
             {
                 return false;
             }
@@ -50,7 +50,7 @@ namespace VisualMusicBlockLooper.Core
                 || config.Area.Larghezza <= 0 || config.Area.Altezza <= 0) return false;
             if (!nota.AreaQr.HasValue && !nota.FineEstensioneX.HasValue)
                 return TryCella(nota.Area, out traccia, out stepIniziale, out durataStep);
-            if (!TrovaPosizione(attacco, out traccia, out stepIniziale)) return false;
+            if (!TrovaPosizione(attacco, out traccia, out stepIniziale, nota.AreaQr.HasValue)) return false;
             double confine = Math.Round((fine - config.Area.X) / LarghezzaStep() + Epsilon, MidpointRounding.AwayFromZero);
             int finale = (int)Math.Min(config.Step, Math.Max(stepIniziale + 1, confine));
             durataStep = finale - stepIniziale;
@@ -62,10 +62,10 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>True quando la posizione dell'area non ricade nella griglia.</summary>
         public bool EsternoAllaGriglia(RettangoloTavolo area)
         {
-            return !TrovaPosizione(area, out _, out _);
+            return !TrovaPosizione(area, out _, out _, false);
         }
 
-        private bool TrovaPosizione(RettangoloTavolo area, out int traccia, out int stepIniziale)
+        private bool TrovaPosizione(RettangoloTavolo area, out int traccia, out int stepIniziale, bool tolleraQr)
         {
             RettangoloTavolo g = config.Area;
             double larghezzaStep = LarghezzaStep();
@@ -75,6 +75,12 @@ namespace VisualMusicBlockLooper.Core
             double centroY = area.Y + area.Altezza / 2.0;
             double posTraccia = (centroY - g.Y) / altezzaTraccia + Epsilon;
 
+            if (tolleraQr)
+            {
+                posStep = AllineaQrAlConfine(posStep);
+                posTraccia = AllineaQrAlConfine(posTraccia);
+            }
+
             stepIniziale = (int)Math.Floor(posStep);
             traccia = (int)Math.Floor(posTraccia);
 
@@ -82,6 +88,15 @@ namespace VisualMusicBlockLooper.Core
                 && stepIniziale < config.Step
                 && traccia >= 0
                 && traccia < config.Tracce;
+        }
+
+        private double AllineaQrAlConfine(double posizione)
+        {
+            double tolleranza = config.TolleranzaQrCelle;
+            if (double.IsNaN(tolleranza) || double.IsInfinity(tolleranza) || tolleranza < 0) tolleranza = 0;
+            tolleranza = Math.Min(0.49, tolleranza);
+            double confine = Math.Round(posizione, MidpointRounding.AwayFromZero);
+            return Math.Abs(posizione - confine) <= tolleranza ? confine : posizione;
         }
 
         private double LarghezzaStep()

@@ -38,7 +38,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(json["Webcam"]["Indice"].Value<int>(),Is.EqualTo(1));
             Assert.That(json["AnalizzaSoloSeCambia"]?.Value<bool>(),Is.True);
             Assert.That(json["ScansioneABlocchiAnticipata"]?.Value<bool>(),Is.True);
-            Assert.That(json["MisureAnticipoScansione"]?.Value<int>(),Is.EqualTo(1));
+            Assert.That(json["MisureAnticipoScansione"]?.Value<int>(),Is.EqualTo(2));
             Assert.That(json["NumeroThreadOpenCv"]?.Value<int>(),Is.EqualTo(2));
             Assert.That(json["AnalisiVariazioni"]?["LarghezzaAnalisi"]?.Value<int>(),Is.EqualTo(640));
             Assert.That(json["AnalisiVariazioni"]?["AltezzaAnalisi"]?.Value<int>(),Is.EqualTo(360));
@@ -96,8 +96,8 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(json["AnalisiVariazioni"]?["MargineRegione"]?.Value<int>(),Is.EqualTo(18));
         }
 
-        [TestCase(0,1)]
-        [TestCase(6,1)]
+        [TestCase(0,2)]
+        [TestCase(6,2)]
         [TestCase(4,4)]
         public void AnticipoBlocchiVieneLimitatoAllaFinestraConsentita(int richiesto,int atteso)
         {

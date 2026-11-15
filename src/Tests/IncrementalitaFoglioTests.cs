@@ -17,6 +17,8 @@ namespace VisualMusicBlockLooper.Tests
             var ultima=completa.Posizione(5*completa.StepPerMisura);
             Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,1),Is.EqualTo(new[]{0,5}),
                 "Dall'ultima riga del giro la scansione anticipata deve tornare alla prima.");
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,2),Is.EqualTo(new[]{0,1,5}),
+                "Due misure di anticipo includono anche il blocco della seconda misura futura.");
 
             Assert.That(StrutturaTavolo.TryCrea(4,2,1,8,out var collegate),Is.True);
             var prima=collegate.Posizione(0);
@@ -28,8 +30,9 @@ namespace VisualMusicBlockLooper.Tests
                 "La misura anticipata deve partire dal punto A anche quando A cade dentro il foglio.");
         }
 
-        [Test]
-        public void DuranteLaRiproduzioneLeggeSoloRigheAttiveAnticipateEVincoli()
+        [TestCase(true)]
+        [TestCase(false)]
+        public void DuranteLaRiproduzioneLeggeSoloRigheAttiveAnticipateEVincoli(bool analizzaSoloSeCambia)
         {
             long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
             using(var f=NoteContigueVisionTests.Scena(false))
@@ -38,7 +41,7 @@ namespace VisualMusicBlockLooper.Tests
             {
                 var p=new PreparatoreFoglio(e);
                 using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,
-                    true,null,true,1))
+                    analizzaSoloSeCambia,null,true,1))
                 {
                     a.PulsazioniPerOsservazione=1;
                     r.Pubblica(f,ora);a.Passo(true);
@@ -53,6 +56,36 @@ namespace VisualMusicBlockLooper.Tests
                         "Una scansione live legge le righe attive/anticipate, le incertezze iniziali e tre zone dei vincoli, senza scansione globale.");
                     Assert.That(a.UltimeRegioni,Has.Count.EqualTo(blocchiLetti));
                     Assert.That(a.UltimoEsito,Is.EqualTo("ScansioneBlocchiAnticipata"));
+                }
+            }
+        }
+
+        [Test]
+        public void ModalitaABlocchiFermiLeggeUnaSolaZonaPerOsservazione()
+        {
+            long ora = 0;
+            var cfg = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+            var cal = NoteContigueVisionTests.Calibra(false);
+            using (var f = NoteContigueVisionTests.Scena(false))
+            using (var r = new RegistroFotogrammi())
+            using (var e = new EsecutoreMidi(new EsecutorePartituraTests.Uscita(), null,
+                new EsecutorePartituraTests.Mappa(), cfg, () => ora))
+            {
+                var p = new PreparatoreFoglio(e);
+                using (var a = new AnalizzatoreFoglio(r, () => cal, cfg, LayoutTavolo.Default, p,
+                    new RegistroCatture(), () => ora, false, null, true, 2))
+                {
+                    r.Pubblica(f, ora);
+                    a.Passo(true); // La prima istantanea inizializza l'intero catalogo.
+                    long letture = a.NumeroLettureZone;
+
+                    ora += 250;
+                    r.Pubblica(f, ora);
+                    a.Passo(true);
+
+                    Assert.That(a.NumeroLettureZone - letture, Is.EqualTo(1));
+                    Assert.That(a.UltimeRegioni, Has.Count.EqualTo(1));
+                    Assert.That(a.UltimoEsito, Is.EqualTo("ScansioneBlocchiFermi"));
                 }
             }
         }

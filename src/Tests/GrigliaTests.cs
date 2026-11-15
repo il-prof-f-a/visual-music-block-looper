@@ -75,6 +75,42 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void QrLeggermenteSpostatoPrimaDelConfineRestaNellaCellaPrevista()
+        {
+            const int riga = 2, step = 3;
+            double larghezza = 1.0 / 16, altezza = 1.0 / 6;
+            var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
+            var nota = new CartoncinoRilevato
+            {
+                AreaQr = new RettangoloTavolo((step - 0.02) * larghezza,
+                    (riga + 0.3) * altezza, 0.55 * larghezza, 0.4 * altezza),
+                Area = new RettangoloTavolo((step - 0.02) * larghezza, riga * altezza,
+                    larghezza, altezza)
+            };
+
+            bool ok = griglia.TryCella(nota, out int traccia, out int stepIniziale, out _);
+
+            Assert.That(ok, Is.True);
+            Assert.That(traccia, Is.EqualTo(riga));
+            Assert.That(stepIniziale, Is.EqualTo(step));
+        }
+
+        [Test]
+        public void QrOltreLaTolleranzaRestaFuoriGriglia()
+        {
+            double larghezza = 1.0 / 16, altezza = 1.0 / 6;
+            var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
+            var nota = new CartoncinoRilevato
+            {
+                AreaQr = new RettangoloTavolo(-0.2 * larghezza, 0.4 * altezza,
+                    0.55 * larghezza, 0.4 * altezza),
+                Area = new RettangoloTavolo(-0.2 * larghezza, 0, larghezza, altezza)
+            };
+
+            Assert.That(griglia.TryCella(nota, out _, out _, out _), Is.False);
+        }
+
+        [Test]
         public void LarghezzaMinimaUnoStep()
         {
             Griglia griglia = CreaGriglia();

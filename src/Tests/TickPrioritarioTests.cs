@@ -63,8 +63,8 @@ namespace VisualMusicBlockLooper.Tests
                     Assert.That(e.InEsecuzione, Is.False);
                     Assert.That(e.UltimoErrore, Does.Contain("ritardo"));
                     Assert.That(t.RegistroTempi.Istantanea().Any(c =>
-                        (c.InizioInvio - c.Previsto) * 1000.0 / System.Diagnostics.Stopwatch.Frequency > 50), Is.True,
-                        "Il reset della scadenza non deve nascondere lo stallo già avvenuto.");
+                        (c.FineInvio - c.InizioInvio) * 1000.0 / System.Diagnostics.Stopwatch.Frequency > 50), Is.True,
+                        "La durata dell'invio deve conservare la traccia dello stallo del driver.");
                 }
                 finally { u.Libera.Set(); t.Ferma(); }
             }

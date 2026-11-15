@@ -87,7 +87,8 @@ namespace VisualMusicBlockLooper.App
                 if (adesso >= prossimoTick)
                 {
                     long previsto = (long)prossimoTick;
-                    double periodo = Tempo.IntervalloTickMs(motore.Bpm) * frequenzaMs;
+                    double periodoMs = Tempo.IntervalloTickMs(motore.Bpm);
+                    double periodo = periodoMs * frequenzaMs;
                     if (adesso - prossimoTick >= periodo)
                     {
                         if (proprietario != null && motore.InEsecuzione)
@@ -97,7 +98,13 @@ namespace VisualMusicBlockLooper.App
                     long inizio = Stopwatch.GetTimestamp(); motore.TickInterno(); long fine = Stopwatch.GetTimestamp();
                     long n = tickEmessi + 1;
                     RegistroTempi.Registra(n, previsto, inizio, fine); Volatile.Write(ref tickEmessi, n);
-                    prossimoTick += Tempo.IntervalloTickMs(motore.Bpm) * frequenzaMs;
+                    if (fine - prossimoTick >= periodo && proprietario != null && motore.InEsecuzione)
+                        proprietario.PerditaSincronia("Clock in ritardo: arresto controllato, premi Avvia per ripartire.");
+                    double intervalloMs = Tempo.IntervalloTickMs(motore.Bpm);
+                    prossimoTick = PianificatoreTick.Prossima(
+                        prossimoTick / frequenzaMs,
+                        fine / frequenzaMs,
+                        intervalloMs) * frequenzaMs;
                 }
                 if (prossimoTick - Stopwatch.GetTimestamp() > 2 * frequenzaMs) Thread.Sleep(1);
                 else Thread.SpinWait(50);

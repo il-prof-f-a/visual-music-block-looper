@@ -19,23 +19,34 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void Prossima_StallDiUnIntervallo_MantieneLaScadenzaSenzaPerderTick()
+        public void Prossima_RitardoDi23Ms_RiallineaDopoUnIntervalloCompleto()
         {
-            // Eseguito con un intervallo di ritardo: la scadenza successiva e' gia' scaduta (1 recupero).
-            double scadenza = PianificatoreTick.Prossima(100, 120, Intervallo);
-            Assert.That(scadenza, Is.EqualTo(120).Within(1e-9));
+            double scadenza = PianificatoreTick.Prossima(1000, 1023, 25);
+            Assert.That(scadenza, Is.EqualTo(1048).Within(1e-9));
         }
 
         [Test]
-        public void Prossima_StallDiDueIntervalli_RecuperaAlMassimoDueTick()
+        public void Prossima_RitardoInferioreA2Ms_ConservaLaScadenzaAssoluta()
         {
-            double scadenza = PianificatoreTick.Prossima(100, 140, Intervallo);
-            Assert.That(scadenza, Is.EqualTo(120).Within(1e-9));
-            Assert.That(140 - scadenza, Is.LessThanOrEqualTo(2 * Intervallo));
+            double scadenza = PianificatoreTick.Prossima(1000, 1001.999, 25);
+            Assert.That(scadenza, Is.EqualTo(1025).Within(1e-9));
         }
 
         [Test]
-        public void Prossima_StallDiCinqueIntervalli_AzzeraLaPianificazione()
+        public void Prossima_300Bpm_RiallineaAl20PercentoDellIntervallo()
+        {
+            double intervallo = Tempo.IntervalloTickMs(300);
+            double invio = 1000 + 1.8;
+
+            double scadenza = PianificatoreTick.Prossima(1000, invio, intervallo);
+
+            Assert.That(intervallo * 0.2, Is.LessThan(2));
+            Assert.That(scadenza, Is.EqualTo(invio + intervallo).Within(1e-9));
+            Assert.That(scadenza - invio, Is.GreaterThanOrEqualTo(intervallo * 0.8));
+        }
+
+        [Test]
+        public void Prossima_StallDiCinqueIntervalli_RiallineaUnaVolta()
         {
             double adesso = 100 + 5 * Intervallo;
             Assert.That(PianificatoreTick.Prossima(100, adesso, Intervallo), Is.EqualTo(adesso + Intervallo).Within(1e-9));
@@ -58,8 +69,8 @@ namespace VisualMusicBlockLooper.Tests
             Random casuale = new Random(1);
             for (int i = 0; i < 1000; i++)
             {
-                // Il tick viene eseguito con un piccolo ritardo variabile (< 1 intervallo).
-                double adesso = scadenza + casuale.NextDouble() * intervallo * 0.9;
+                // Il jitter resta sotto la soglia di riallineamento di 2 ms.
+                double adesso = scadenza + casuale.NextDouble() * 1.9;
                 scadenza = PianificatoreTick.Prossima(scadenza, adesso, intervallo);
             }
 

@@ -55,6 +55,12 @@ namespace VisualMusicBlockLooper.Tests
                         "Una scansione live legge le righe attive/anticipate, le incertezze iniziali e tre zone dei vincoli, senza scansione globale.");
                     Assert.That(a.UltimeRegioni,Has.Count.EqualTo(blocchiLetti));
                     Assert.That(a.UltimoEsito,Is.EqualTo("ScansioneBlocchiAnticipata"));
+                    double altezzaRiga=cfg.Area.Altezza/cfg.Tracce;
+                    var zoneRighe=a.UltimeRegioni.Where(z=>z.Larghezza>cfg.Area.Larghezza*.8
+                        &&z.Y>=cfg.Area.Y&&z.Y+z.Altezza<=cfg.Area.Y+cfg.Area.Altezza).ToArray();
+                    Assert.That(zoneRighe,Is.Not.Empty,"La scansione live deve includere almeno una ROI di riga.");
+                    Assert.That(zoneRighe.All(z=>Math.Abs(z.Altezza-altezzaRiga)<1e-9),Is.True,
+                        "Ogni ROI deve coprire solo la propria riga; allargarla ridigitalizza le righe adiacenti.");
                 }
             }
         }

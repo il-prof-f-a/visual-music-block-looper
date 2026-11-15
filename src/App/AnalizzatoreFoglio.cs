@@ -527,7 +527,9 @@ namespace VisualMusicBlockLooper.App
             if(double.IsNaN(tolleranza)||double.IsInfinity(tolleranza)||tolleranza<0)tolleranza=0;
             tolleranza=Math.Min(0.49,tolleranza);
             double margineX=config.Step>0?config.Area.Larghezza/config.Step*tolleranza:0;
-            double margineY=altezza*tolleranza;
+            // La ROI verticale coincide con la corsia: espanderla sovrappone i blocchi e
+            // fa ridigitalizzare i QR delle righe adiacenti a ogni scansione anticipata.
+            double margineY=0;
             double x=Math.Max(0,config.Area.X-margineX);
             double y=Math.Max(config.Area.Y,config.Area.Y+riga*altezza-margineY);
             double destra=Math.Min(Math.Min(config.Area.X+config.Area.Larghezza,layout.Comandi.X),

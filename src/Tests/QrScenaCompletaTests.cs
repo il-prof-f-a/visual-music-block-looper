@@ -11,9 +11,10 @@ namespace VisualMusicBlockLooper.Tests
 {
     public class QrScenaCompletaTests
     {
-        [TestCase(0, 0)]
-        [TestCase(3, 2)]
-        public void QuarantottoNoteSpostateInProspettiva_MantengonoPayloadRigheEStep(double erroreCalibrazioneX,double erroreCalibrazioneY)
+        [TestCase(0, 0, true, false)]
+        [TestCase(3, 2, true, true)]
+        public void QuarantottoNoteSpostateInProspettiva_MantengonoPayloadRigheEStep(
+            double erroreCalibrazioneX,double erroreCalibrazioneY,bool scansioneCompleta,bool scansioneABlocchi)
         {
             const int larghezza = 1920, altezza = 1080;
             var griglia = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
@@ -49,39 +50,57 @@ namespace VisualMusicBlockLooper.Tests
                 var calibrazione = Calibrazione.Calcola(riferimenti,
                     new[] { new PuntoTavolo(0, 0), new PuntoTavolo(1, 0),
                         new PuntoTavolo(1, 1), new PuntoTavolo(0, 1) }, larghezza, altezza);
-                var traccia = new TracciaCartoncini();
-                var lette = new RilevatoreCartoncini(new NoteContigueVisionTests.Fonte(frame), calibrazione)
-                    .Rileva(traccia);
-                Assert.That(lette.Select(n => n.Payload), Is.EquivalentTo(attesi),
-                    string.Join("; ", traccia.Visione.Select(e => e.Codice + ":" + e.Payload)));
-                Assert.That(lette.GroupBy(n => n.Payload).All(g => g.Count() == 1), Is.True);
-                var stato = new InterpreteTavolo(new Griglia(griglia), LayoutTavolo.Default).Interpreta(lette);
-                Assert.That(stato.Errori, Is.Empty);
-                Assert.That(stato.Note, Has.Count.EqualTo(48));
-                for (int riga = 0; riga < 6; riga++)
-                    Assert.That(stato.Note.Where(n => n.Riga == riga).Select(n => n.StepIniziale).OrderBy(s => s),
-                        Is.EqualTo(new[] { 0, 2, 4, 6, 8, 10, 12, 14 }), "Riga " + riga);
+                if (scansioneCompleta)
+                {
+                    var traccia = new TracciaCartoncini();
+                    var lette = new RilevatoreCartoncini(new NoteContigueVisionTests.Fonte(frame), calibrazione)
+                        .Rileva(traccia);
+                    Assert.That(lette.Select(n => n.Payload), Is.EquivalentTo(attesi),
+                        string.Join("; ", traccia.Visione.Select(e => e.Codice + ":" + e.Payload)));
+                    Assert.That(lette.GroupBy(n => n.Payload).All(g => g.Count() == 1), Is.True);
+                    var stato = new InterpreteTavolo(new Griglia(griglia), LayoutTavolo.Default).Interpreta(lette);
+                    VerificaPartitura(stato);
+                }
 
                 // Ripeti la lettura usando i blocchi per riga della scansione anticipata.
-                var lettore = new LettoreZone(calibrazione, griglia);
-                IReadOnlyList<CartoncinoRilevato> catalogo = new CartoncinoRilevato[0];
-                double altezzaRiga = griglia.Area.Altezza / griglia.Tracce;
-                double margineY = altezzaRiga * griglia.TolleranzaQrCelle;
-                double zonaX = Math.Max(0, griglia.Area.X - griglia.Area.Larghezza / griglia.Step * griglia.TolleranzaQrCelle);
-                double destra = Math.Min(griglia.Area.X + griglia.Area.Larghezza, LayoutTavolo.Default.Comandi.X);
-                for (int riga = 0; riga < griglia.Tracce; riga++)
+                if (scansioneABlocchi)
                 {
-                    double y = Math.Max(griglia.Area.Y, griglia.Area.Y + riga * altezzaRiga - margineY);
-                    double basso = Math.Min(griglia.Area.Y + griglia.Area.Altezza,
-                        griglia.Area.Y + (riga + 1) * altezzaRiga + margineY);
-                    var zona = new RettangoloTavolo(zonaX, y, destra - zonaX, basso - y);
-                    catalogo = lettore.Leggi(frame, zona, catalogo, null, "riga-" + riga).Catalogo;
+                    var lettore = new LettoreZone(calibrazione, griglia);
+                    IReadOnlyList<CartoncinoRilevato> catalogo = new CartoncinoRilevato[0];
+                    double altezzaRiga = griglia.Area.Altezza / griglia.Tracce;
+                    // Una ROI di riga deve restare centrata sulla propria corsia: il margine camera
+                    // del lettore conserva i bordi; espandere di 0,35 righe sovrappone le sei scansioni.
+                    double margineY = 0;
+                    double zonaX = Math.Max(0, griglia.Area.X - griglia.Area.Larghezza / griglia.Step * griglia.TolleranzaQrCelle);
+                    double destra = Math.Min(griglia.Area.X + griglia.Area.Larghezza, LayoutTavolo.Default.Comandi.X);
+                    for (int riga = 0; riga < griglia.Tracce; riga++)
+                    {
+                        double y = Math.Max(griglia.Area.Y, griglia.Area.Y + riga * altezzaRiga - margineY);
+                        double basso = Math.Min(griglia.Area.Y + griglia.Area.Altezza,
+                            griglia.Area.Y + (riga + 1) * altezzaRiga + margineY);
+                        var zona = new RettangoloTavolo(zonaX, y, destra - zonaX, basso - y);
+                        var letturaRiga = lettore.Leggi(frame, zona, catalogo, null, "riga-" + riga);
+                        Assert.That(letturaRiga.QrDecodificati, Is.EqualTo(8),
+                            "Ogni blocco deve decodificare le otto note della propria riga, senza ripetere quelle adiacenti.");
+                        Assert.That(letturaRiga.Completa, Is.True, "La riga " + riga + " deve risultare completa.");
+                        catalogo = letturaRiga.Catalogo;
+                    }
+                    Assert.That(catalogo.Select(n => n.Payload), Is.EquivalentTo(attesi),
+                        "La lettura anticipata a blocchi deve conservare tutti i payload nella scena prospettica.");
+                    Assert.That(catalogo.GroupBy(n => n.Payload).All(g => g.Count() == 1), Is.True,
+                        "Le ROI sovrapposte non devono duplicare i cartoncini.");
+                    VerificaPartitura(new InterpreteTavolo(new Griglia(griglia), LayoutTavolo.Default).Interpreta(catalogo));
                 }
-                Assert.That(catalogo.Select(n => n.Payload), Is.EquivalentTo(attesi),
-                    "La lettura anticipata a blocchi deve conservare tutti i payload nella scena prospettica.");
-                Assert.That(catalogo.GroupBy(n => n.Payload).All(g => g.Count() == 1), Is.True,
-                    "Le ROI sovrapposte non devono duplicare i cartoncini.");
             }
+        }
+
+        private static void VerificaPartitura(StatoTavolo stato)
+        {
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(48));
+            for (int riga = 0; riga < 6; riga++)
+                Assert.That(stato.Note.Where(n => n.Riga == riga).Select(n => n.StepIniziale).OrderBy(s => s),
+                    Is.EqualTo(new[] { 0, 2, 4, 6, 8, 10, 12, 14 }), "Riga " + riga);
         }
     }
 }

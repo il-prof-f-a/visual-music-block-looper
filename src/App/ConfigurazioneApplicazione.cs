@@ -105,7 +105,7 @@ namespace VisualMusicBlockLooper.App
         public int MisureAnticipoScansione { get; set; } = 2;
 
         /// <summary>Scarto massimo del QR dai riferimenti della griglia, come frazione di cella (0..0,49).</summary>
-        public double TolleranzaQrCelle { get; set; } = 0.25;
+        public double TolleranzaQrCelle { get; set; } = 0.35;
 
         /// <summary>Massimo di worker OpenCV paralleli; riduce la contesa CPU con il thread MIDI.</summary>
         public int NumeroThreadOpenCv { get; set; } = 2;
@@ -159,7 +159,7 @@ namespace VisualMusicBlockLooper.App
                 configurazione.MisureAnticipoScansione=2;
             if(double.IsNaN(configurazione.TolleranzaQrCelle)||double.IsInfinity(configurazione.TolleranzaQrCelle)
                 ||configurazione.TolleranzaQrCelle<0||configurazione.TolleranzaQrCelle>=0.5)
-                configurazione.TolleranzaQrCelle=0.25;
+                configurazione.TolleranzaQrCelle=0.35;
             if(configurazione.NumeroThreadOpenCv<1||configurazione.NumeroThreadOpenCv>4)
                 configurazione.NumeroThreadOpenCv=2;
 

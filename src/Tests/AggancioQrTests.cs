@@ -89,7 +89,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void QrOltreLaTolleranza_ConCorpoDentroRestaRifiutato()
         {
-            var n = Nota(2, -0.4, 2);
+            var n = Nota(2, -0.5, 2);
             n.Area = new RettangoloTavolo(0.16, 0.38, 0.1, 0.1);
             var stato = Interprete().Interpreta(new[] { n });
             Assert.That(stato.Note, Is.Empty);
@@ -99,7 +99,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void DueQrDistintiNellaStessaCella_RestanoCollisioneEsplicita()
         {
-            var stato = Interprete().Interpreta(new[] { Nota(2, 3.6, 6, 9), Nota(2, 3, 5, 4) });
+            var stato = Interprete().Interpreta(new[] { Nota(2, 3.3, 6, 9), Nota(2, 3, 5, 4) });
             Assert.That(stato.Note, Has.Count.EqualTo(1));
             Assert.That(stato.Note[0].IdClip, Is.EqualTo(4));
             Assert.That(stato.Errori.Single().Tipo, Is.EqualTo(TipoErrore.Sovrapposto));

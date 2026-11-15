@@ -13,6 +13,6 @@ namespace VisualMusicBlockLooper.Core
         public RettangoloTavolo Area { get; set; } = new RettangoloTavolo(0, 0, 1, 1);
 
         /// <summary>Scarto massimo del QR dai riferimenti della griglia, in frazioni di cella (0..0,49).</summary>
-        public double TolleranzaQrCelle { get; set; } = 0.25;
+        public double TolleranzaQrCelle { get; set; } = 0.35;
     }
 }

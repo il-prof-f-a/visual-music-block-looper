@@ -1,6 +1,7 @@
 using System.IO;
 using NUnit.Framework;
 using VisualMusicBlockLooper.App;
+using VisualMusicBlockLooper.Core;
 
 namespace VisualMusicBlockLooper.Tests
 {
@@ -12,9 +13,10 @@ namespace VisualMusicBlockLooper.Tests
         {
             var configurazione = new ConfigurazioneApplicazione();
 
+            Assert.That(new ConfigGriglia().TolleranzaQrCelle, Is.EqualTo(0.35).Within(1e-9));
             Assert.That(configurazione.BpmIniziale, Is.EqualTo(100));
             Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(2));
-            Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.25).Within(1e-9));
+            Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.35).Within(1e-9));
         }
 
         [Test]
@@ -28,7 +30,7 @@ namespace VisualMusicBlockLooper.Tests
                 var configurazione = ConfigurazioneApplicazione.Carica(percorso);
 
                 Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(2));
-                Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.25).Within(1e-9));
+                Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.35).Within(1e-9));
                 Assert.That(configurazione.BpmIniziale, Is.EqualTo(300));
             }
             finally

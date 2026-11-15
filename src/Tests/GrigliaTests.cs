@@ -75,16 +75,16 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void QrSpostatoDiUnQuintoCellaPrimaDelConfineVieneAgganciato()
+        public void QrSpostatoDiTreDecimiCellaPrimaDelConfineVieneAgganciato()
         {
             const int riga = 2, step = 3;
             double larghezza = 1.0 / 16, altezza = 1.0 / 6;
             var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
             var nota = new CartoncinoRilevato
             {
-                AreaQr = new RettangoloTavolo((step - 0.2) * larghezza,
+                AreaQr = new RettangoloTavolo((step - 0.3) * larghezza,
                     (riga + 0.3) * altezza, 0.55 * larghezza, 0.4 * altezza),
-                Area = new RettangoloTavolo((step - 0.2) * larghezza, riga * altezza,
+                Area = new RettangoloTavolo((step - 0.3) * larghezza, riga * altezza,
                     larghezza, altezza)
             };
 
@@ -138,9 +138,9 @@ namespace VisualMusicBlockLooper.Tests
             var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
             var nota = new CartoncinoRilevato
             {
-                AreaQr = new RettangoloTavolo(-0.3 * larghezza, 0.4 * altezza,
+                AreaQr = new RettangoloTavolo(-0.4 * larghezza, 0.4 * altezza,
                     0.55 * larghezza, 0.4 * altezza),
-                Area = new RettangoloTavolo(-0.3 * larghezza, 0, larghezza, altezza)
+                Area = new RettangoloTavolo(-0.4 * larghezza, 0, larghezza, altezza)
             };
 
             Assert.That(griglia.TryCella(nota, out _, out _, out _), Is.False);

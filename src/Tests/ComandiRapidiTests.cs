@@ -38,6 +38,34 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(e.Bpm,Is.EqualTo(100).Within(.01));
             }
         }
+
+        [Test]
+        public void MolteVariazioniSparseNellaCorsiaComandiProduconoUnaLetturaPerFrame()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var c=NoteContigueVisionTests.Calibra(false);
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var cambiato=vuoto.Clone())
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            using(var g=new GestoreComandiRapidi(r,()=>c,cfg,LayoutTavolo.Default,e,new RegistroCatture(),()=>ora))
+            {
+                r.Pubblica(vuoto,ora);g.Passo(true);
+                ora=100;r.Pubblica(vuoto,ora);g.Passo(true);
+                long letturePrima=g.NumeroLetture;
+
+                foreach(int y in new[]{160,300,440,580,720})
+                {
+                    Cv2.Rectangle(cambiato,new Rect(1390,y,24,24),Scalar.Black,-1);
+                    Cv2.Rectangle(cambiato,new Rect(1510,y,24,24),Scalar.Black,-1);
+                }
+                ora=200;r.Pubblica(cambiato,ora);g.Passo(true);
+
+                Assert.That(g.NumeroLetture-letturePrima,Is.EqualTo(1),
+                    "Più regioni cambiate nella corsia vanno riunite in una sola lettura QR del blocco.");
+            }
+        }
+
         [Test]
         public void DueApparizioniIsolateDiPlayNonAvvianoIlTrasporto()
         {

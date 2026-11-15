@@ -76,15 +76,17 @@ namespace VisualMusicBlockLooper.App
                     try
                     {
                         if(traccia!=null)traccia.Layout=layout;
-                        var lavoro=catalogo;bool completa=true;
-                        foreach(var r in v.Regioni)
-                        {
-                            var globale=new RettangoloTavolo(a.X+r.X*a.Larghezza,a.Y+r.Y*a.Altezza,r.Larghezza*a.Larghezza,r.Altezza*a.Altezza);
-                            var letta=lettore.Leggi(f.Immagine,globale,lavoro,traccia);Interlocked.Increment(ref letture);
-                            if(vita.InChiusura||Sospesa())return true;
-                            if(letta.Completa)lavoro=letta.Catalogo.Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)==ZonaSpeciale.Comandi).ToArray();
-                            else completa=false;
-                        }
+                        var lavoro=catalogo;
+                        // Molte variazioni locali (per esempio flicker o moiré della webcam)
+                        // possono produrre decine di ROI che tagliano il QR in moduli separati.
+                        // La corsia comandi è piccola: una lettura unica conserva il codice intero
+                        // e limita il lavoro del decoder a un solo passaggio per frame.
+                        var letta=lettore.Leggi(f.Immagine,a,lavoro,traccia,"corsia-comandi");
+                        Interlocked.Increment(ref letture);
+                        if(vita.InChiusura||Sospesa())return true;
+                        bool completa=letta.Completa;
+                        if(completa)lavoro=letta.Catalogo
+                            .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)==ZonaSpeciale.Comandi).ToArray();
                         if(!completa||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
                         {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();Volatile.Write(ref ultimoEsito,"Comandi da rileggere");return true;}
                         var grezzo=interprete.Interpreta(lavoro,traccia);

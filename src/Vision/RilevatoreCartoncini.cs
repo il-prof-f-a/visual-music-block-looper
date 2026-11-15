@@ -343,7 +343,9 @@ namespace VisualMusicBlockLooper.Vision
                 // Il QR sta a un'estremita' del cartoncino (a sinistra, o a destra con camera capovolta):
                 // si include un margine laterale pari all'altezza e uno verticale ridotto.
                 int h = corpo.Height;
-                int margineY = (int)Math.Round(h * 0.3);
+                // Il corpo colorato può essere rilevato solo sotto il riquadro bianco del QR.
+                // Un margine di 0,3h taglia i moduli superiori quando il QR è spostato verticalmente.
+                int margineY = (int)Math.Round(h * 0.8);
                 Rect regione = new Rect(corpo.X - h, corpo.Y - margineY, corpo.Width + 2 * h, corpo.Height + 2 * margineY)
                     & new Rect(0, 0, bgr.Cols, bgr.Rows);
                 if (regione.Width < 8 || regione.Height < 8)

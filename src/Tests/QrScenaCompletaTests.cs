@@ -11,10 +11,12 @@ namespace VisualMusicBlockLooper.Tests
 {
     public class QrScenaCompletaTests
     {
-        [TestCase(0, 0, true, false)]
-        [TestCase(3, 2, true, true)]
+        [TestCase(0, 0, -0.30, 0.30, true, false)]
+        [TestCase(3, 2, -0.30, 0.30, true, true)]
+        [TestCase(-3, -2, 0.30, -0.30, true, true)]
         public void QuarantottoNoteSpostateInProspettiva_MantengonoPayloadRigheEStep(
-            double erroreCalibrazioneX,double erroreCalibrazioneY,bool scansioneCompleta,bool scansioneABlocchi)
+            double erroreCalibrazioneX,double erroreCalibrazioneY,double spostamentoQrCelle,double spostamentoQrRighe,
+            bool scansioneCompleta,bool scansioneABlocchi)
         {
             const int larghezza = 1920, altezza = 1080;
             var griglia = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
@@ -37,8 +39,8 @@ namespace VisualMusicBlockLooper.Tests
                         const int w = 150, h = 100;
                         Cv2.Resize(originale, carta, new Size(w, h));
                         // Il bordo nero del QR nei PNG parte a x=75/709; il centro e' a y=235.5/473.
-                        double xQr = griglia.Area.X + (2 * (i % 8) - .30) * griglia.Area.Larghezza / 16;
-                        double yQr = griglia.Area.Y + (i / 8 + .5 + .20) * griglia.Area.Altezza / 6;
+                        double xQr = griglia.Area.X + (2 * (i % 8) + spostamentoQrCelle) * griglia.Area.Larghezza / 16;
+                        double yQr = griglia.Area.Y + (i / 8 + .5 + spostamentoQrRighe) * griglia.Area.Altezza / 6;
                         int x = (int)Math.Round(xQr * larghezza - w * 75.0 / 709);
                         int y = (int)Math.Round(yQr * altezza - h * 235.5 / 473);
                         using (var zona = new Mat(tavolo, new Rect(x, y, w, h))) carta.CopyTo(zona);
@@ -56,7 +58,10 @@ namespace VisualMusicBlockLooper.Tests
                     var lette = new RilevatoreCartoncini(new NoteContigueVisionTests.Fonte(frame), calibrazione)
                         .Rileva(traccia);
                     Assert.That(lette.Select(n => n.Payload), Is.EquivalentTo(attesi),
-                        string.Join("; ", traccia.Visione.Select(e => e.Codice + ":" + e.Payload)));
+                        string.Join("; ", traccia.Visione.Where(e => e.Codice == "QrLocalizzatoNonDecodificato"
+                            || e.Codice == "CorpoSenzaQrDecodificato").Select(e => e.Codice + ":" + e.Dettaglio + ":" +
+                                (e.AreaCamera.HasValue ? $"{e.AreaCamera.Value.X:0.0000},{e.AreaCamera.Value.Y:0.0000}," +
+                                    $"{e.AreaCamera.Value.Larghezza:0.0000},{e.AreaCamera.Value.Altezza:0.0000}" : "senza-area"))));
                     Assert.That(lette.GroupBy(n => n.Payload).All(g => g.Count() == 1), Is.True);
                     var stato = new InterpreteTavolo(new Griglia(griglia), LayoutTavolo.Default).Interpreta(lette);
                     VerificaPartitura(stato);
@@ -80,10 +85,15 @@ namespace VisualMusicBlockLooper.Tests
                             griglia.Area.Y + (riga + 1) * altezzaRiga + margineY);
                         var zona = new RettangoloTavolo(zonaX, y, destra - zonaX, basso - y);
                         var letturaRiga = lettore.Leggi(frame, zona, catalogo, null, "riga-" + riga);
-                        Assert.That(letturaRiga.QrDecodificati, Is.EqualTo(8),
-                            "Ogni blocco deve decodificare le otto note della propria riga, senza ripetere quelle adiacenti.");
+                        Assert.That(letturaRiga.QrDecodificati, Is.InRange(8, 10),
+                            $"Riga {riga}, calibrazione {erroreCalibrazioneX}/{erroreCalibrazioneY}px, " +
+                            $"QR {spostamentoQrCelle}/{spostamentoQrRighe} celle/righe: la ROI può includere " +
+                            $"fino a due QR vicini nel margine camera, conteggio {letturaRiga.QrDecodificati}; " +
+                            $"payload visti: {string.Join(", ", letturaRiga.Catalogo.Select(n => n.Payload))}");
                         Assert.That(letturaRiga.Completa, Is.True, "La riga " + riga + " deve risultare completa.");
                         catalogo = letturaRiga.Catalogo;
+                        Assert.That(catalogo.Select(n => n.Payload), Is.EquivalentTo(attesi.Take((riga + 1) * 8)),
+                            $"La riga {riga} deve aggiungere solo le sue otto note, senza anticipare o duplicare note vicine.");
                     }
                     Assert.That(catalogo.Select(n => n.Payload), Is.EquivalentTo(attesi),
                         "La lettura anticipata a blocchi deve conservare tutti i payload nella scena prospettica.");

@@ -174,6 +174,20 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(lista[0].Payload, Is.EqualTo("VMBL1;N;3"));
             }
         }
+
+        [Test]
+        public void LetturaIstantaneaRecuperaQrPiccoloSfocatoConBagliore()
+        {
+            using (Mat mat = Frame(0.15, 0.7, 0.7, true))
+            {
+                var calibrazione = CalibrazioneSuFrame();
+                var config = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+                var letta = new LettoreIstantanea(calibrazione, config).Leggi(mat);
+
+                Assert.That(letta.Cartoncini.Select(c => c.Payload), Is.EqualTo(new[] { "VMBL1;N;3" }));
+            }
+        }
+
         // Camera capovolta, schermo con cornice scura, cartoncino speciale a ridosso del bordo dell'area calibrata:
         // la cornice non deve fondersi con il corpo e il QR piccolo va letto comunque.
         [Test]

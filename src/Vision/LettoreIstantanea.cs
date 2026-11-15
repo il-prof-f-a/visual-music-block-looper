@@ -33,11 +33,14 @@ namespace VisualMusicBlockLooper.Vision
                 Mat bgr=frame;
                 if(frame.Channels()!=3){Cv2.CvtColor(frame,colore,frame.Channels()==4?ColorConversionCodes.BGRA2BGR:ColorConversionCodes.GRAY2BGR);bgr=colore;}
                 Cv2.CvtColor(bgr,grigio,ColorConversionCodes.BGR2GRAY);
-                var qr=DecodificaConZxing(grigio,null,"IstantaneaZXing").ToList();
-                double tempoQr=tempo.Elapsed.TotalMilliseconds;
+                sequenzaFrame++;
+                var qr=DecodificaQr(bgr,traccia,out List<QrTrovato> localizzati);
+                double tempoDecodifica=tempo.Elapsed.TotalMilliseconds;
                 using(var maschera=MascheraCorpo(bgr,calibrazione,out Rect[] corpi))
                 {
                     double tempoMaschera=tempo.Elapsed.TotalMilliseconds;
+                    qr.AddRange(RecuperaQrMancanti(bgr,qr,localizzati,corpi,traccia));
+                    double tempoRecupero=tempo.Elapsed.TotalMilliseconds;
                     var candidati=qr.Select(q=>Analizza(corpi,q)).Where(c=>c!=null).ToList();
                     var letti=candidati.Select(c=>new{C=c,R=Converti(c,candidati,maschera,out _)})
                         .Where(x=>x.R!=null).OrderBy(x=>RigoIstantanea(x.R)).ThenBy(x=>(x.R.AreaQr??x.R.Area).X).ToArray();
@@ -55,10 +58,11 @@ namespace VisualMusicBlockLooper.Vision
                     if(traccia!=null)
                     {
                         foreach(var x in letti)
-                            RegistraVisione(traccia,"QrIstantanea","QR letto nella singola istantanea, in ordine di rigo e X.",x.R.Payload,x.C.Riquadro,"IstantaneaZXing",x.R.AreaQr);
+                            RegistraVisione(traccia,"QrIstantanea","QR letto nella singola istantanea, in ordine di rigo e X.",x.R.Payload,x.C.Riquadro,x.C.Origine,x.R.AreaQr);
                         traccia.EsitoVisione="IstantaneaRapida";
                         traccia.Visione.Add(new EventoDiagnosticoCartoncino("Avvio","TempiIstantanea","TempiIstantanea",
-                            $"QR={tempoQr:0.0}ms; maschera={tempoMaschera-tempoQr:0.0}ms; geometria={tempo.Elapsed.TotalMilliseconds-tempoMaschera:0.0}ms; QR letti={qr.Count}."));
+                            $"decodifica={tempoDecodifica:0.0}ms; maschera={tempoMaschera-tempoDecodifica:0.0}ms; " +
+                            $"recupero locale={tempoRecupero-tempoMaschera:0.0}ms; geometria={tempo.Elapsed.TotalMilliseconds-tempoRecupero:0.0}ms; QR letti={qr.Count}."));
                     }
                     return new LetturaIstantanea(letti.Select(x=>x.R),incerte,qr.Count==0&&incerte.Count==0&&Cv2.Mean(grigio).Val0>=80,tempo.Elapsed.TotalMilliseconds);
                 }

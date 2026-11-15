@@ -249,6 +249,7 @@ namespace VisualMusicBlockLooper.Vision
         private sealed class Candidato
         {
             public string Testo;
+            public string Origine;
             public Point2f[] AngoliQr;
             public Rect Riquadro;   // bounding box del quadrilatero QR
             public Rect Zona;       // riquadro QR + zona quieta
@@ -780,7 +781,7 @@ namespace VisualMusicBlockLooper.Vision
             Rect zona = Gonfia(riquadro, margine);
             Rect zonaContatto = Gonfia(zona, TolleranzaContatto);
 
-            var c = new Candidato { Testo = qr.Testo, AngoliQr = qr.Angoli, Riquadro = riquadro, Zona = zona };
+            var c = new Candidato { Testo = qr.Testo, Origine = qr.Origine, AngoliQr = qr.Angoli, Riquadro = riquadro, Zona = zona };
             Rect migliore = default(Rect);
             int areaMigliore = 0;
             foreach (Rect r in corpi)

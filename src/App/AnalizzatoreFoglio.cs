@@ -138,14 +138,14 @@ namespace VisualMusicBlockLooper.App
                 {
                     if(traccia!=null){traccia.Layout=layout;traccia.CalibrazionePresente=true;traccia.LarghezzaFrame=f.Immagine.Cols;traccia.AltezzaFrame=f.Immagine.Rows;}
                     if(!inizializzato)return PrimaIstantanea(f,c,traccia);
-                    if(scansioneABlocchiAnticipata)
-                    {
-                        AnalizzaBlocchiAnticipati(f,c,traccia,motore.Struttura,motore.Posizione,motore.InEsecuzione);
-                        return true;
-                    }
                     if(!analizzaSoloSeCambia)
                     {
                         AnalizzaScenaCompleta(f,c,traccia);
+                        return true;
+                    }
+                    if(scansioneABlocchiAnticipata)
+                    {
+                        AnalizzaBlocchiAnticipati(f,c,traccia,motore.Struttura,motore.Posizione,motore.InEsecuzione);
                         return true;
                     }
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))

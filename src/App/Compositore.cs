@@ -80,7 +80,8 @@ namespace VisualMusicBlockLooper.App
                     Analizzatore=new AnalizzatoreFoglio(Video.Registro,calibrazione,config,Layout,Preparatore,
                         RegistroDiagnostica,orologioMs,analizzaSoloSeCambia,parametriVariazioni,
                         scansioneABlocchiAnticipata,misureAnticipoScansione);
-                    ComandiRapidi=new GestoreComandiRapidi(Video.Registro,calibrazione,config,Layout,Esecutore,RegistroDiagnostica,orologioMs);
+                    ComandiRapidi=new GestoreComandiRapidi(Video.Registro,calibrazione,config,Layout,Esecutore,
+                        RegistroDiagnostica,orologioMs,parametriVariazioni);
                     Analizzatore.Sospesa=()=>osservazioneSospesa;ComandiRapidi.Sospesa=()=>osservazioneSospesa;
                     cicloComandi=new CicloCattura(()=>ComandiRapidi.Passo(),20);
                 }

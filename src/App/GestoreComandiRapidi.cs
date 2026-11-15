@@ -18,10 +18,11 @@ namespace VisualMusicBlockLooper.App
         private readonly EsecutoreMidi esecutore;
         private readonly RegistroCatture registro;
         private readonly Func<long> orologio;
+        private readonly ParametriRilevatoreVariazioni parametriVariazioni;
         private readonly InterpreteTavolo interprete;
         private readonly StabilizzatoreTavolo stabilizzatore=new StabilizzatoreTavolo(2,2);
         private readonly RilascioDifferito vita;
-        private RilevatoreVariazioni differenze=new RilevatoreVariazioni();
+        private RilevatoreVariazioni differenze;
         private Calibrazione corrente;
         private LettoreZone lettore;
         private IReadOnlyList<CartoncinoRilevato> catalogo=new CartoncinoRilevato[0];
@@ -30,10 +31,13 @@ namespace VisualMusicBlockLooper.App
         private int conferme,forzaRilettura;
         private string candidata,ultimoEsito;
         public GestoreComandiRapidi(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
-            LayoutTavolo layout,EsecutoreMidi esecutore,RegistroCatture registro,Func<long> orologio)
+            LayoutTavolo layout,EsecutoreMidi esecutore,RegistroCatture registro,Func<long> orologio,
+            ParametriRilevatoreVariazioni parametriVariazioni=null)
         {
             this.immagini=immagini;this.calibrazione=calibrazione;this.config=config;this.layout=layout;
             this.esecutore=esecutore;this.registro=registro;this.orologio=orologio;
+            this.parametriVariazioni=(parametriVariazioni??new ParametriRilevatoreVariazioni()).Normalizzati();
+            differenze=new RilevatoreVariazioni(this.parametriVariazioni);
             interprete=new InterpreteTavolo(new Griglia(config),layout);vita=new RilascioDifferito(()=>differenze.Dispose());
         }
         public long NumeroLetture=>Volatile.Read(ref letture);
@@ -61,12 +65,12 @@ namespace VisualMusicBlockLooper.App
                 if(rileggi)rileggi=Interlocked.Exchange(ref forzaRilettura,0)!=0;
                 if(!ReferenceEquals(c,corrente)||video!=f.Generazione)
                 {
-                    corrente=c;video=f.Generazione;differenze.Dispose();differenze=new RilevatoreVariazioni();
+                    corrente=c;video=f.Generazione;differenze.Dispose();differenze=new RilevatoreVariazioni(parametriVariazioni);
                     catalogo=new CartoncinoRilevato[0];lettore=new LettoreZone(c,config);candidata=null;conferme=0;istanteFramePrecedente=null;
                 }
                 if(rileggi)
                 {
-                    differenze.Dispose();differenze=new RilevatoreVariazioni();
+                    differenze.Dispose();differenze=new RilevatoreVariazioni(parametriVariazioni);
                     catalogo=new CartoncinoRilevato[0];candidata=null;conferme=0;istanteFramePrecedente=null;
                     stabilizzatore.InterrompiConfermeComandi();
                 }

@@ -4,12 +4,18 @@ using NUnit.Framework;
 using OpenCvSharp;
 using VisualMusicBlockLooper.App;
 using VisualMusicBlockLooper.Core;
+using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.Tests
 {
     [TestFixture]
     public class ComandiRapidiTests
     {
+        private sealed class FonteVideoVuota : IFonteImmagini
+        {
+            public Mat Frame() => null;
+        }
+
         private static Mat ScenaTap(string nome="tap")
         {
             var f=new Mat(900,1600,MatType.CV_8UC3,Scalar.White);
@@ -26,6 +32,33 @@ namespace VisualMusicBlockLooper.Tests
             Cv2.Rectangle(f,new Rect(1380,120,180,120),new Scalar(0,0,255),-1);
             return f;
         }
+
+        [Test]
+        public void ParametriVariazioniConfiguratiSiApplicanoAllaCorsiaComandi()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var calibrazione=NoteContigueVisionTests.Calibra(false);
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var cambiato=vuoto.Clone())
+            using(var compositore=new Compositore(new RilevatoreCartoncini(null,calibrazione,cfg),
+                new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,
+                LayoutTavolo.Default,()=>ora,esecuzioneDeterministica:true,fonteVideo:new FonteVideoVuota(),
+                parametriVariazioni:new ParametriRilevatoreVariazioni{SogliaGrigioRelativa=.8}))
+            {
+                var immagini=compositore.Video.Registro;
+                immagini.Pubblica(vuoto,ora);compositore.ComandiRapidi.Passo(true);
+                ora=100;immagini.Pubblica(vuoto,ora);compositore.ComandiRapidi.Passo(true);
+                long lettureIniziali=compositore.ComandiRapidi.NumeroLetture;
+
+                Cv2.Rectangle(cambiato,new Rect(1390,160,60,35),new Scalar(170,170,170),-1);
+                ora=200;immagini.Pubblica(cambiato,ora);compositore.ComandiRapidi.Passo(true);
+                ora=300;immagini.Pubblica(cambiato,ora);compositore.ComandiRapidi.Passo(true);
+
+                Assert.That(compositore.ComandiRapidi.NumeroLetture,Is.GreaterThan(lettureIniziali),
+                    "La soglia grigia configurata deve far rilevare una variazione che i valori predefiniti ignorano.");
+            }
+        }
+
         [Test]
         public void TapUsaIlPrimoFrameEIlCartoncinoFermoNonVieneRidecodificato()
         {

@@ -14,7 +14,7 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(configurazione.BpmIniziale, Is.EqualTo(100));
             Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(2));
-            Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.15).Within(1e-9));
+            Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.25).Within(1e-9));
         }
 
         [Test]
@@ -28,7 +28,7 @@ namespace VisualMusicBlockLooper.Tests
                 var configurazione = ConfigurazioneApplicazione.Carica(percorso);
 
                 Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(2));
-                Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.15).Within(1e-9));
+                Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.25).Within(1e-9));
                 Assert.That(configurazione.BpmIniziale, Is.EqualTo(300));
             }
             finally

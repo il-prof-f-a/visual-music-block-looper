@@ -12,7 +12,7 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Area normalizzata del tavolo coperta dalla griglia.</summary>
         public RettangoloTavolo Area { get; set; } = new RettangoloTavolo(0, 0, 1, 1);
 
-        /// <summary>Scarto massimo dal bordo di cella, in frazioni di cella, corretto per l'aggancio dei QR.</summary>
-        public double TolleranzaQrCelle { get; set; } = 0.15;
+        /// <summary>Scarto massimo del QR dai riferimenti della griglia, in frazioni di cella (0..0,49).</summary>
+        public double TolleranzaQrCelle { get; set; } = 0.25;
     }
 }

@@ -75,16 +75,16 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void QrLeggermenteSpostatoPrimaDelConfineRestaNellaCellaPrevista()
+        public void QrSpostatoDiUnQuintoCellaPrimaDelConfineVieneAgganciato()
         {
             const int riga = 2, step = 3;
             double larghezza = 1.0 / 16, altezza = 1.0 / 6;
             var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
             var nota = new CartoncinoRilevato
             {
-                AreaQr = new RettangoloTavolo((step - 0.02) * larghezza,
+                AreaQr = new RettangoloTavolo((step - 0.2) * larghezza,
                     (riga + 0.3) * altezza, 0.55 * larghezza, 0.4 * altezza),
-                Area = new RettangoloTavolo((step - 0.02) * larghezza, riga * altezza,
+                Area = new RettangoloTavolo((step - 0.2) * larghezza, riga * altezza,
                     larghezza, altezza)
             };
 
@@ -96,15 +96,51 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void QrSpostatoDiUnQuintoCellaFuoriDalTavoloVieneAgganciatoAlPrimoConfine()
+        {
+            const double larghezza = 1.0 / 16, altezza = 1.0 / 6;
+            var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
+            var nota = new CartoncinoRilevato
+            {
+                AreaQr = new RettangoloTavolo(-0.2 * larghezza, 0.3 * altezza, 0.55 * larghezza, 0.4 * altezza),
+                Area = new RettangoloTavolo(-0.2 * larghezza, 0.1 * altezza, larghezza, 0.8 * altezza)
+            };
+
+            Assert.That(griglia.TryCella(nota, out int traccia, out int step, out _), Is.True);
+            Assert.That(traccia, Is.EqualTo(0));
+            Assert.That(step, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void QrVicinoAlConfineNonVieneAgganciatoAllaRigaSuccessiva()
+        {
+            const int riga = 2;
+            const double larghezza = 1.0 / 16, altezza = 1.0 / 6;
+            var griglia = new Griglia(new ConfigGriglia
+            {
+                Area = new RettangoloTavolo(0, 0, 1, 1),
+                TolleranzaQrCelle = 0.25
+            });
+            var nota = new CartoncinoRilevato
+            {
+                AreaQr = new RettangoloTavolo(3 * larghezza, (riga + 0.7) * altezza, 0.55 * larghezza, 0.2 * altezza),
+                Area = new RettangoloTavolo(3 * larghezza, riga * altezza, larghezza, altezza)
+            };
+
+            Assert.That(griglia.TryCella(nota, out int traccia, out _, out _), Is.True);
+            Assert.That(traccia, Is.EqualTo(riga));
+        }
+
+        [Test]
         public void QrOltreLaTolleranzaRestaFuoriGriglia()
         {
             double larghezza = 1.0 / 16, altezza = 1.0 / 6;
             var griglia = new Griglia(new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 1) });
             var nota = new CartoncinoRilevato
             {
-                AreaQr = new RettangoloTavolo(-0.2 * larghezza, 0.4 * altezza,
+                AreaQr = new RettangoloTavolo(-0.3 * larghezza, 0.4 * altezza,
                     0.55 * larghezza, 0.4 * altezza),
-                Area = new RettangoloTavolo(-0.2 * larghezza, 0, larghezza, altezza)
+                Area = new RettangoloTavolo(-0.3 * larghezza, 0, larghezza, altezza)
             };
 
             Assert.That(griglia.TryCella(nota, out _, out _, out _), Is.False);

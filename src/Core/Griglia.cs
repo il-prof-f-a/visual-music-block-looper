@@ -78,7 +78,7 @@ namespace VisualMusicBlockLooper.Core
             if (tolleraQr)
             {
                 posStep = AllineaQrAlConfine(posStep);
-                posTraccia = AllineaQrAlConfine(posTraccia);
+                posTraccia = AllineaQrAlCentroRiga(posTraccia);
             }
 
             stepIniziale = (int)Math.Floor(posStep);
@@ -97,6 +97,16 @@ namespace VisualMusicBlockLooper.Core
             tolleranza = Math.Min(0.49, tolleranza);
             double confine = Math.Round(posizione, MidpointRounding.AwayFromZero);
             return Math.Abs(posizione - confine) <= tolleranza ? confine : posizione;
+        }
+
+        private double AllineaQrAlCentroRiga(double posizione)
+        {
+            double tolleranza = config.TolleranzaQrCelle;
+            if (double.IsNaN(tolleranza) || double.IsInfinity(tolleranza) || tolleranza < 0) tolleranza = 0;
+            tolleranza = Math.Min(0.49, tolleranza);
+            // Il centro del QR si aggancia al centro della riga, mai al confine che separa due righe.
+            double centro = Math.Floor(posizione) + 0.5;
+            return Math.Abs(posizione - centro) <= tolleranza ? centro : posizione;
         }
 
         private double LarghezzaStep()

@@ -75,9 +75,21 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void QrFuoriCorpoDentro_Rifiutato()
+        public void QrSpostatoEntroLaTolleranza_ConCorpoDentroVieneAgganciatoAlBordo()
         {
             var n = Nota(2, -0.3, 2);
+            n.Area = new RettangoloTavolo(0.16, 0.38, 0.1, 0.1);
+            var stato = Interprete().Interpreta(new[] { n });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note.Single().StepIniziale, Is.EqualTo(0));
+            Assert.That(stato.Note.Single().Riga, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void QrOltreLaTolleranza_ConCorpoDentroRestaRifiutato()
+        {
+            var n = Nota(2, -0.4, 2);
             n.Area = new RettangoloTavolo(0.16, 0.38, 0.1, 0.1);
             var stato = Interprete().Interpreta(new[] { n });
             Assert.That(stato.Note, Is.Empty);

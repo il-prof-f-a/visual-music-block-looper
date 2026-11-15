@@ -95,17 +95,17 @@ namespace VisualMusicBlockLooper.App
         /// <summary>BPM Master iniziale, salvato anche dopo modifiche manuali o Tap Tempo (default applicativo 100).</summary>
         public double BpmIniziale { get; set; } = 100;
 
-        /// <summary>Usato solo quando la scansione a blocchi è disattivata: rileva le differenze o rilegge la scena intera.</summary>
+        /// <summary>Se false legge tutta la scena a ogni osservazione; se true usa blocchi anticipati o differenze, secondo la modalità selezionata.</summary>
         public bool AnalizzaSoloSeCambia { get; set; } = true;
 
-        /// <summary>Legge blocchi anticipati durante il play e, a riproduzione ferma, una zona per fotogramma.</summary>
+        /// <summary>Con AnalizzaSoloSeCambia attiva, legge blocchi anticipati durante il play e, a riproduzione ferma, una zona per fotogramma.</summary>
         public bool ScansioneABlocchiAnticipata { get; set; } = true;
 
         /// <summary>Misure future incluse nella finestra di scansione, limitate a 1..5 (default 2 per confermare prima dell'attacco).</summary>
         public int MisureAnticipoScansione { get; set; } = 2;
 
-        /// <summary>Scarto massimo del QR dai bordi di griglia tollerato, come frazione di cella (0..0,49).</summary>
-        public double TolleranzaQrCelle { get; set; } = 0.15;
+        /// <summary>Scarto massimo del QR dai riferimenti della griglia, come frazione di cella (0..0,49).</summary>
+        public double TolleranzaQrCelle { get; set; } = 0.25;
 
         /// <summary>Massimo di worker OpenCV paralleli; riduce la contesa CPU con il thread MIDI.</summary>
         public int NumeroThreadOpenCv { get; set; } = 2;
@@ -159,7 +159,7 @@ namespace VisualMusicBlockLooper.App
                 configurazione.MisureAnticipoScansione=2;
             if(double.IsNaN(configurazione.TolleranzaQrCelle)||double.IsInfinity(configurazione.TolleranzaQrCelle)
                 ||configurazione.TolleranzaQrCelle<0||configurazione.TolleranzaQrCelle>=0.5)
-                configurazione.TolleranzaQrCelle=0.15;
+                configurazione.TolleranzaQrCelle=0.25;
             if(configurazione.NumeroThreadOpenCv<1||configurazione.NumeroThreadOpenCv>4)
                 configurazione.NumeroThreadOpenCv=2;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -10,8 +11,9 @@ namespace VisualMusicBlockLooper.Tests
 {
     public class QrScenaCompletaTests
     {
-        [Test]
-        public void QuarantottoNoteSpostateInProspettiva_MantengonoPayloadRigheEStep()
+        [TestCase(0, 0)]
+        [TestCase(3, 2)]
+        public void QuarantottoNoteSpostateInProspettiva_MantengonoPayloadRigheEStep(double erroreCalibrazioneX,double erroreCalibrazioneY)
         {
             const int larghezza = 1920, altezza = 1080;
             var griglia = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
@@ -42,7 +44,9 @@ namespace VisualMusicBlockLooper.Tests
                     }
                 Cv2.WarpPerspective(tavolo, frame, prospettiva, new Size(larghezza, altezza),
                     InterpolationFlags.Linear, BorderTypes.Constant, Scalar.White);
-                var calibrazione = Calibrazione.Calcola(camera.Select(p => new PuntoImmagine(p.X, p.Y)).ToArray(),
+                // Simula una piccola imprecisione nel posizionamento dei riferimenti di calibrazione.
+                var riferimenti = camera.Select(p => new PuntoImmagine(p.X + erroreCalibrazioneX, p.Y + erroreCalibrazioneY)).ToArray();
+                var calibrazione = Calibrazione.Calcola(riferimenti,
                     new[] { new PuntoTavolo(0, 0), new PuntoTavolo(1, 0),
                         new PuntoTavolo(1, 1), new PuntoTavolo(0, 1) }, larghezza, altezza);
                 var traccia = new TracciaCartoncini();
@@ -57,6 +61,26 @@ namespace VisualMusicBlockLooper.Tests
                 for (int riga = 0; riga < 6; riga++)
                     Assert.That(stato.Note.Where(n => n.Riga == riga).Select(n => n.StepIniziale).OrderBy(s => s),
                         Is.EqualTo(new[] { 0, 2, 4, 6, 8, 10, 12, 14 }), "Riga " + riga);
+
+                // Ripeti la lettura usando i blocchi per riga della scansione anticipata.
+                var lettore = new LettoreZone(calibrazione, griglia);
+                IReadOnlyList<CartoncinoRilevato> catalogo = new CartoncinoRilevato[0];
+                double altezzaRiga = griglia.Area.Altezza / griglia.Tracce;
+                double margineY = altezzaRiga * griglia.TolleranzaQrCelle;
+                double zonaX = Math.Max(0, griglia.Area.X - griglia.Area.Larghezza / griglia.Step * griglia.TolleranzaQrCelle);
+                double destra = Math.Min(griglia.Area.X + griglia.Area.Larghezza, LayoutTavolo.Default.Comandi.X);
+                for (int riga = 0; riga < griglia.Tracce; riga++)
+                {
+                    double y = Math.Max(griglia.Area.Y, griglia.Area.Y + riga * altezzaRiga - margineY);
+                    double basso = Math.Min(griglia.Area.Y + griglia.Area.Altezza,
+                        griglia.Area.Y + (riga + 1) * altezzaRiga + margineY);
+                    var zona = new RettangoloTavolo(zonaX, y, destra - zonaX, basso - y);
+                    catalogo = lettore.Leggi(frame, zona, catalogo, null, "riga-" + riga).Catalogo;
+                }
+                Assert.That(catalogo.Select(n => n.Payload), Is.EquivalentTo(attesi),
+                    "La lettura anticipata a blocchi deve conservare tutti i payload nella scena prospettica.");
+                Assert.That(catalogo.GroupBy(n => n.Payload).All(g => g.Count() == 1), Is.True,
+                    "Le ROI sovrapposte non devono duplicare i cartoncini.");
             }
         }
     }

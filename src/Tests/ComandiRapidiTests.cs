@@ -41,6 +41,31 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void TapNonUsaLIstanteDiUnaVariazioneSostituitaDirettamente()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var c=NoteContigueVisionTests.Calibra(false);
+            using(var tap=ScenaTap())
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var rosso=vuoto.Clone())
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            using(var g=new GestoreComandiRapidi(r,()=>c,cfg,LayoutTavolo.Default,e,new RegistroCatture(),()=>ora))
+            {
+                Cv2.Rectangle(rosso,new Rect(1380,120,180,120),new Scalar(0,0,255),-1);
+                r.Pubblica(tap,0);g.Passo(true);ora=100;r.Pubblica(tap,ora);g.Passo(true);e.ElaboraPendenti();
+                foreach(long t in new long[]{200,300,400}){ora=t;r.Pubblica(vuoto,ora);g.Passo(true);}
+                long letturePrima=g.NumeroLetture;
+                ora=500;r.Pubblica(rosso,ora);g.Passo(true);
+                ora=600;r.Pubblica(tap,ora);g.Passo(true);
+                Assert.That(g.NumeroLetture,Is.EqualTo(letturePrima),"Nessuna firma cambiata persiste prima del secondo frame Tap.");
+                ora=700;r.Pubblica(tap,ora);g.Passo(true);
+                ora=800;r.Pubblica(tap,ora);g.Passo(true);e.ElaboraPendenti();
+                Assert.That(e.Bpm,Is.EqualTo(100).Within(.01),"Il Tap appare a 600 ms; il rosso scartato a 500 ms non ne anticipa il timestamp.");
+            }
+        }
+
+        [Test]
         public void VariazioneDiUnSoloFrameNonAvviaLaLetturaDellaCorsia()
         {
             long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};

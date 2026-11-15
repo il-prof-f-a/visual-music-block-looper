@@ -27,7 +27,7 @@ namespace VisualMusicBlockLooper.App
         private IReadOnlyList<CartoncinoRilevato> catalogo=new CartoncinoRilevato[0];
         private long ultimoFrame,video,ultimaOsservazione=-1000,letture,istanteCandidato;
         private long? istanteFramePrecedente;
-        private int conferme;
+        private int conferme,forzaRilettura;
         private string candidata,ultimoEsito;
         public GestoreComandiRapidi(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
             LayoutTavolo layout,EsecutoreMidi esecutore,RegistroCatture registro,Func<long> orologio)
@@ -39,6 +39,11 @@ namespace VisualMusicBlockLooper.App
         public long NumeroLetture=>Volatile.Read(ref letture);
         public string UltimoEsito=>Volatile.Read(ref ultimoEsito);
         public Func<bool> Sospesa {get;set;}=()=>false;
+        public void RichiediRilettura()
+        {
+            Interlocked.Exchange(ref forzaRilettura,1);
+            Volatile.Write(ref ultimoEsito,"Rilettura corsia comandi in attesa del prossimo frame");
+        }
         public bool Passo(bool forza=false)
         {
             if(!vita.ProvaEntra())return false;
@@ -47,15 +52,23 @@ namespace VisualMusicBlockLooper.App
         private bool PassoInterno(bool forza)
         {
             if(Sospesa())return false;
-            long ora=orologio();if(!forza&&ora-ultimaOsservazione<100)return false;
+            bool rileggi=Volatile.Read(ref forzaRilettura)!=0;
+            long ora=orologio();if(!forza&&!rileggi&&ora-ultimaOsservazione<100)return false;
             using(var f=immagini.Copia())
             {
                 if(f==null||f.Id==ultimoFrame)return false;
                 var c=calibrazione();if(c==null||c.VerificaRisoluzione(f.Immagine.Cols,f.Immagine.Rows)==EsitoRisoluzione.Diversa)return false;
+                if(rileggi)rileggi=Interlocked.Exchange(ref forzaRilettura,0)!=0;
                 if(!ReferenceEquals(c,corrente)||video!=f.Generazione)
                 {
                     corrente=c;video=f.Generazione;differenze.Dispose();differenze=new RilevatoreVariazioni();
                     catalogo=new CartoncinoRilevato[0];lettore=new LettoreZone(c,config);candidata=null;conferme=0;istanteFramePrecedente=null;
+                }
+                if(rileggi)
+                {
+                    differenze.Dispose();differenze=new RilevatoreVariazioni();
+                    catalogo=new CartoncinoRilevato[0];candidata=null;conferme=0;istanteFramePrecedente=null;
+                    stabilizzatore.InterrompiConfermeComandi();
                 }
                 ultimoFrame=f.Id;ultimaOsservazione=ora;
                 var a=layout.Comandi;
@@ -88,11 +101,25 @@ namespace VisualMusicBlockLooper.App
                         var letta=lettore.Leggi(f.Immagine,a,lavoro,traccia,"corsia-comandi");
                         Interlocked.Increment(ref letture);
                         if(vita.InChiusura||Sospesa())return true;
-                        bool completa=letta.Completa;
-                        if(completa)lavoro=letta.Catalogo
+                        if(!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
+                        {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();Volatile.Write(ref ultimoEsito,"Frame cambiato durante la lettura dei comandi");return true;}
+                        if(!letta.Completa)
+                        {
+                            // Un QR non leggibile resta una modifica visiva valida: memorizzala,
+                            // così la scena ferma non rilancia la scansione completa ogni 100 ms.
+                            differenze.Conferma(v.Regioni);
+                            candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();
+                            Volatile.Write(ref ultimoEsito,$"Corsia comandi incompleta ({letta.QrDecodificati} QR); attendo una variazione o Rileggi foglio");
+                            if(traccia!=null)
+                            {
+                                traccia.EsitoVisione="CorsiaComandiIncompleta";
+                                traccia.Visione.Add(new EventoDiagnosticoCartoncino("Elaborazione","LetturaSospesaPerScenaStabile",
+                                    "LetturaSospesaPerScenaStabile","QR non completamente leggibili; la scena è memorizzata e sarà riletta dopo una variazione o una richiesta manuale."));
+                            }
+                            return true;
+                        }
+                        lavoro=letta.Catalogo
                             .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)==ZonaSpeciale.Comandi).ToArray();
-                        if(!completa||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
-                        {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();Volatile.Write(ref ultimoEsito,"Comandi da rileggere");return true;}
                         var grezzo=interprete.Interpreta(lavoro,traccia);
                         string firma=string.Join(";",grezzo.Comandi.Select(k=>k.Tipo+":"+k.Parametro).OrderBy(k=>k));
                         if(firma!=candidata){candidata=firma;conferme=1;istanteCandidato=inizioVariazione;}else conferme=Math.Min(2,conferme+1);

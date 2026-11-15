@@ -108,7 +108,11 @@ namespace VisualMusicBlockLooper.App
             if(Interlocked.Exchange(ref avviato,1)!=0)return;
             Video?.Avvia();cicloComandi?.Avvia();
         }
-        public void RileggiFoglio()=>Analizzatore?.Rileggi();
+        public void RileggiFoglio()
+        {
+            Analizzatore?.Rileggi();
+            ComandiRapidi?.RichiediRilettura();
+        }
 
         public RegistroCatture RegistroDiagnostica { get; } = new RegistroCatture();
 

@@ -19,6 +19,13 @@ namespace VisualMusicBlockLooper.Tests
             {Cv2.Resize(card,piccolo,new Size(180,120));piccolo.CopyTo(destinazione);}
             return f;
         }
+
+        private static Mat ScenaCorpoSenzaQr()
+        {
+            var f=new Mat(900,1600,MatType.CV_8UC3,Scalar.White);
+            Cv2.Rectangle(f,new Rect(1380,120,180,120),new Scalar(0,0,255),-1);
+            return f;
+        }
         [Test]
         public void TapUsaIlPrimoFrameEIlCartoncinoFermoNonVieneRidecodificato()
         {
@@ -113,6 +120,47 @@ namespace VisualMusicBlockLooper.Tests
 
                 Assert.That(g.NumeroLetture-letturePrima,Is.EqualTo(1),
                     "Più regioni cambiate nella corsia vanno riunite in una sola lettura QR del blocco.");
+            }
+        }
+
+        [Test]
+        public void UnaCorsiaIncompletaNonRivieneDecodificataFincheLaScenaRestaUguale()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var c=NoteContigueVisionTests.Calibra(false);
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var corpo=ScenaCorpoSenzaQr())
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            using(var g=new GestoreComandiRapidi(r,()=>c,cfg,LayoutTavolo.Default,e,new RegistroCatture(),()=>ora))
+            {
+                r.Pubblica(vuoto,ora);g.Passo(true);
+                ora=100;r.Pubblica(vuoto,ora);g.Passo(true);
+                long letturePrima=g.NumeroLetture;
+
+                ora=200;r.Pubblica(corpo,ora);g.Passo(true);
+                ora=300;r.Pubblica(corpo,ora);g.Passo(true);
+                long dopoPrimoTentativo=g.NumeroLetture;
+                Assert.That(dopoPrimoTentativo,Is.GreaterThan(letturePrima),
+                    "Il corpo senza QR deve produrre almeno un tentativo di lettura della corsia.");
+
+                foreach(long t in new long[]{400,500,600,700})
+                {ora=t;r.Pubblica(corpo,ora);g.Passo(true);}
+
+                Assert.That(g.NumeroLetture,Is.EqualTo(dopoPrimoTentativo),
+                    "Una zona ancora illeggibile va riarmata da un nuovo cambiamento, non scandita ogni 100 ms.");
+
+                g.RichiediRilettura();
+                g.Passo(true); // la richiesta resta pendente finché non arriva un frame nuovo
+                ora=800;r.Pubblica(corpo,ora);g.Passo(true);
+                Assert.That(g.NumeroLetture,Is.EqualTo(dopoPrimoTentativo+1),
+                    "Rileggi foglio deve riarmare la corsia anche quando la scena non è cambiata.");
+
+                ora=900;r.Pubblica(vuoto,ora);g.Passo(true);
+                ora=1000;r.Pubblica(vuoto,ora);g.Passo(true);
+                ora=1100;r.Pubblica(vuoto,ora);g.Passo(true);
+                Assert.That(g.NumeroLetture,Is.EqualTo(dopoPrimoTentativo+3),
+                    "Un nuovo cambiamento visivo deve riattivare la lettura anche dopo un QR illeggibile.");
             }
         }
 

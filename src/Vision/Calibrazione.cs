@@ -285,6 +285,46 @@ namespace VisualMusicBlockLooper.Vision
             }
         }
 
+        /// <summary>Raddrizza solo un rettangolo dell'uscita, mantenendo le coordinate della scena completa.</summary>
+        public Mat RaddrizzaZona(Mat sorgente, int larghezza, int altezza, Rect area)
+        {
+            if (sorgente == null || sorgente.Empty())
+                throw new ArgumentException("Il frame da raddrizzare è nullo o vuoto.", nameof(sorgente));
+            if (larghezza <= 0) throw new ArgumentOutOfRangeException(nameof(larghezza), "La larghezza deve essere positiva.");
+            if (altezza <= 0) throw new ArgumentOutOfRangeException(nameof(altezza), "L'altezza deve essere positiva.");
+            if (area.Width <= 0 || area.Height <= 0 || area.X < 0 || area.Y < 0
+                || (long)area.X + area.Width > larghezza || (long)area.Y + area.Height > altezza)
+                throw new ArgumentOutOfRangeException(nameof(area), "La zona deve ricadere nell'uscita raddrizzata.");
+            if (area.X == 0 && area.Y == 0 && area.Width == larghezza && area.Height == altezza)
+                return Raddrizza(sorgente, larghezza, altezza);
+            if (Curva) return RaddrizzaCurvaZona(sorgente, larghezza, altezza, area);
+
+            double[] riga0 = { matrice[0] * larghezza, matrice[1] * larghezza, matrice[2] * larghezza };
+            double[] riga1 = { matrice[3] * altezza, matrice[4] * altezza, matrice[5] * altezza };
+            double[] riga2 = { matrice[6], matrice[7], matrice[8] };
+            using (Mat trasformazione = new Mat(3, 3, MatType.CV_64FC1))
+            {
+                for (int c = 0; c < 3; c++)
+                {
+                    trasformazione.Set(0, c, riga0[c] - area.X * riga2[c]);
+                    trasformazione.Set(1, c, riga1[c] - area.Y * riga2[c]);
+                    trasformazione.Set(2, c, riga2[c]);
+                }
+                Mat uscita = new Mat();
+                try
+                {
+                    Cv2.WarpPerspective(sorgente, uscita, trasformazione,
+                        new Size(area.Width, area.Height), InterpolationFlags.Linear, BorderTypes.Constant, Scalar.All(0));
+                    return uscita;
+                }
+                catch
+                {
+                    uscita.Dispose();
+                    throw;
+                }
+            }
+        }
+
         public void Salva(string percorso)
         {
             if (percorso == null)

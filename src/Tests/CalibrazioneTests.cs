@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using NUnit.Framework;
+using OpenCvSharp;
 using VisualMusicBlockLooper.Vision;
 
 namespace VisualMusicBlockLooper.Tests
@@ -124,6 +125,40 @@ namespace VisualMusicBlockLooper.Tests
 
             AsseriPunto(new PuntoTavolo(0.5, 0.5), calibrazione.DaCameraATavolo(new PuntoImmagine(0.5, 0.5)));
             AsseriPunto(new PuntoTavolo(0.2, 0.8), calibrazione.DaCameraATavolo(new PuntoImmagine(0.2, 0.8)));
+        }
+
+        [Test]
+        public void RaddrizzaZonaOmografia_CoincideConIlRitaglioDellaScenaCompleta()
+        {
+            PuntoImmagine[] camera =
+            {
+                new PuntoImmagine(110, 70), new PuntoImmagine(1170, 45),
+                new PuntoImmagine(1230, 650), new PuntoImmagine(65, 690)
+            };
+            PuntoTavolo[] tavolo =
+            {
+                new PuntoTavolo(0, 0), new PuntoTavolo(1, 0),
+                new PuntoTavolo(1, 1), new PuntoTavolo(0, 1)
+            };
+            var calibrazione = Calibrazione.Calcola(camera, tavolo, 1280, 720);
+            var area = new Rect(500, 20, 91, 331);
+
+            using (var frame = new Mat(720, 1280, MatType.CV_8UC1, Scalar.All(17)))
+            {
+                Cv2.Rectangle(frame, new Rect(230, 80, 810, 520), Scalar.All(211), -1);
+                Cv2.Line(frame, new Point(100, 600), new Point(1180, 120), Scalar.All(95), 7);
+                using (var completa = calibrazione.Raddrizza(frame, 640, 360))
+                using (var attesa = new Mat(completa, area))
+                using (var ottenuta = calibrazione.RaddrizzaZona(frame, 640, 360, area))
+                {
+                    Assert.That(ottenuta.Size(), Is.EqualTo(attesa.Size()));
+                    int massimo = 0;
+                    for (int y = 0; y < area.Height; y++)
+                        for (int x = 0; x < area.Width; x++)
+                            massimo = Math.Max(massimo, Math.Abs(attesa.At<byte>(y, x) - ottenuta.At<byte>(y, x)));
+                    Assert.That(massimo, Is.LessThanOrEqualTo(1));
+                }
+            }
         }
 
         [Test]

@@ -16,12 +16,20 @@ namespace VisualMusicBlockLooper.Vision
         private readonly object sincronizzazioneMappe = new object();
         private MappaAnteprima mappaAnteprima;
         private MappaAnteprima altraMappaAnteprima;
+        private MappaZona mappaZona;
         private byte[] mascheraCurva;
         private int larghezzaMaschera, altezzaMaschera, restringimentoMaschera;
 
         private sealed class MappaAnteprima
         {
             public int Larghezza, Altezza;
+            public float[] X, Y;
+        }
+
+        private sealed class MappaZona
+        {
+            public int Larghezza, Altezza;
+            public Rect Area;
             public float[] X, Y;
         }
 
@@ -121,6 +129,56 @@ namespace VisualMusicBlockLooper.Vision
                 var uscita = new Mat();
                 try { Cv2.Remap(sorgente, uscita, mx, my, InterpolationFlags.Linear, BorderTypes.Constant, Scalar.All(0)); return uscita; }
                 catch { uscita.Dispose(); throw; }
+            }
+        }
+
+        private Mat RaddrizzaCurvaZona(Mat sorgente, int larghezza, int altezza, Rect area)
+        {
+            MappaZona mappa;
+            lock (sincronizzazioneMappe)
+            {
+                if (mappaZona == null || mappaZona.Larghezza != larghezza || mappaZona.Altezza != altezza
+                    || mappaZona.Area.X != area.X || mappaZona.Area.Y != area.Y
+                    || mappaZona.Area.Width != area.Width || mappaZona.Area.Height != area.Height)
+                {
+                    int numero = checked(area.Width * area.Height);
+                    var nuova = new MappaZona
+                    {
+                        Larghezza = larghezza,
+                        Altezza = altezza,
+                        Area = area,
+                        X = new float[numero],
+                        Y = new float[numero]
+                    };
+                    for (int y = 0; y < area.Height; y++)
+                        for (int x = 0; x < area.Width; x++)
+                        {
+                            var p = DaTavoloACamera(new PuntoTavolo((double)(area.X + x) / larghezza,
+                                (double)(area.Y + y) / altezza));
+                            nuova.X[y * area.Width + x] = (float)p.X;
+                            nuova.Y[y * area.Width + x] = (float)p.Y;
+                        }
+                    mappaZona = nuova;
+                }
+                mappa = mappaZona;
+            }
+            using (var mx = new Mat(area.Height, area.Width, MatType.CV_32FC1))
+            using (var my = new Mat(area.Height, area.Width, MatType.CV_32FC1))
+            {
+                Marshal.Copy(mappa.X, 0, mx.Data, mappa.X.Length);
+                Marshal.Copy(mappa.Y, 0, my.Data, mappa.Y.Length);
+                var uscita = new Mat();
+                try
+                {
+                    Cv2.Remap(sorgente, uscita, mx, my, InterpolationFlags.Linear,
+                        BorderTypes.Constant, Scalar.All(0));
+                    return uscita;
+                }
+                catch
+                {
+                    uscita.Dispose();
+                    throw;
+                }
             }
         }
 

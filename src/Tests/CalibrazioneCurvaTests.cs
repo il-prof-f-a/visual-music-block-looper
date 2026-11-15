@@ -124,6 +124,47 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void RaddrizzaZonaCurva_CoincideConIlRitaglioDellaScenaCompleta()
+        {
+            var curva = SchemaCalibrazione.Calcola(
+                SchemaCalibrazione.Punti.Select(p => Camera(p)).ToArray(), 1280, 720, out _);
+            var area = new Rect(500, 20, 91, 331);
+            using (var frame = new Mat(720, 1280, MatType.CV_8UC1, Scalar.All(17)))
+            {
+                Cv2.Rectangle(frame, new Rect(230, 80, 810, 520), Scalar.All(211), -1);
+                Cv2.Line(frame, new Point(100, 600), new Point(1180, 120), Scalar.All(95), 7);
+                using (var completa = curva.Raddrizza(frame, 640, 360))
+                using (var attesa = new Mat(completa, area))
+                using (var ottenuta = curva.RaddrizzaZona(frame, 640, 360, area))
+                {
+                    Assert.That(ottenuta.Size(), Is.EqualTo(attesa.Size()));
+                    int massimo = 0;
+                    for (int y = 0; y < area.Height; y++)
+                        for (int x = 0; x < area.Width; x++)
+                            massimo = System.Math.Max(massimo,
+                                System.Math.Abs(attesa.At<byte>(y, x) - ottenuta.At<byte>(y, x)));
+                    Assert.That(massimo, Is.LessThanOrEqualTo(1));
+                }
+
+                for (int i = 0; i < 3; i++)
+                {
+                    using (curva.Raddrizza(frame, 640, 360)) { }
+                    using (curva.RaddrizzaZona(frame, 640, 360, area)) { }
+                }
+                const int iterazioni = 12;
+                var cronometro = Stopwatch.StartNew();
+                for (int i = 0; i < iterazioni; i++)
+                    using (curva.Raddrizza(frame, 640, 360)) { }
+                double scenaMs = cronometro.Elapsed.TotalMilliseconds;
+                cronometro.Restart();
+                for (int i = 0; i < iterazioni; i++)
+                    using (curva.RaddrizzaZona(frame, 640, 360, area)) { }
+                double zonaMs = cronometro.Elapsed.TotalMilliseconds;
+                TestContext.WriteLine($"Raddrizzamento curvo {iterazioni}x: scena intera={scenaMs:0.00} ms, sola zona={zonaMs:0.00} ms, rapporto={scenaMs / Math.Max(zonaMs, 0.01):0.0}x.");
+            }
+        }
+
+        [Test]
         public void AnteprimaEAnalizzatoreAlternatiNonRicostruisconoLaMappaOgniVolta()
         {
             var c=Crea();

@@ -26,6 +26,7 @@ namespace VisualMusicBlockLooper.App
         private LettoreZone lettore;
         private IReadOnlyList<CartoncinoRilevato> catalogo=new CartoncinoRilevato[0];
         private long ultimoFrame,video,ultimaOsservazione=-1000,letture,istanteCandidato;
+        private long? inizioVariazione;
         private int conferme;
         private string candidata,ultimoEsito;
         public GestoreComandiRapidi(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
@@ -54,7 +55,7 @@ namespace VisualMusicBlockLooper.App
                 if(!ReferenceEquals(c,corrente)||video!=f.Generazione)
                 {
                     corrente=c;video=f.Generazione;differenze.Dispose();differenze=new RilevatoreVariazioni();
-                    catalogo=new CartoncinoRilevato[0];lettore=new LettoreZone(c,config);candidata=null;conferme=0;
+                    catalogo=new CartoncinoRilevato[0];lettore=new LettoreZone(c,config);candidata=null;conferme=0;inizioVariazione=null;
                 }
                 ultimoFrame=f.Id;ultimaOsservazione=ora;
                 var a=layout.Comandi;
@@ -62,12 +63,15 @@ namespace VisualMusicBlockLooper.App
                 if(area.Width<2||area.Height<2)return false;
                 using(var zona=c.RaddrizzaZona(f.Immagine,640,360,area))
                 {
-                    var v=differenze.Confronta(zona);
+                    var v=differenze.ConfrontaStabile(zona);
                     if(!v.Affidabile)
-                    {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();return true;}
+                    {candidata=null;conferme=0;inizioVariazione=null;stabilizzatore.InterrompiConfermeComandi();return true;}
+                    // Conserva l'onset anche quando il primo frame non raggiunge ancora il decoder.
+                    if(v.FrazioneCambiata==0)inizioVariazione=null;
+                    else if(!inizioVariazione.HasValue)inizioVariazione=f.IstanteMs;
                     if(v.Regioni.Count==0)
                     {
-                        // Il riferimento è già confermato: interrompe le presenze candidate senza nuova decodifica.
+                        // Nessuna differenza stabile: interrompe le presenze candidate senza nuova decodifica.
                         candidata=null;conferme=0;
                         stabilizzatore.Aggiorna(interprete.Interpreta(catalogo));
                         return true;
@@ -91,7 +95,7 @@ namespace VisualMusicBlockLooper.App
                         {candidata=null;conferme=0;stabilizzatore.InterrompiConfermeComandi();Volatile.Write(ref ultimoEsito,"Comandi da rileggere");return true;}
                         var grezzo=interprete.Interpreta(lavoro,traccia);
                         string firma=string.Join(";",grezzo.Comandi.Select(k=>k.Tipo+":"+k.Parametro).OrderBy(k=>k));
-                        if(firma!=candidata){candidata=firma;conferme=1;istanteCandidato=f.IstanteMs;}else conferme=Math.Min(2,conferme+1);
+                        if(firma!=candidata){candidata=firma;conferme=1;istanteCandidato=inizioVariazione??f.IstanteMs;}else conferme=Math.Min(2,conferme+1);
                         var stabile=stabilizzatore.Aggiorna(grezzo,traccia);
                         if(conferme>=2){catalogo=lavoro;differenze.Conferma(v.Regioni);}
                         esecutore.InviaComandi(stabile.Comandi,istanteCandidato);
@@ -104,7 +108,7 @@ namespace VisualMusicBlockLooper.App
                         }
                     }
                     catch(Exception e){Volatile.Write(ref ultimoEsito,e.Message);if(traccia!=null)traccia.Errore=e.GetType().Name+": "+e.Message;}
-                    finally{registro.CompletaCattura(cattura);}
+                    finally{inizioVariazione=null;registro.CompletaCattura(cattura);}
                 }
                 return true;
             }

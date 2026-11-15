@@ -22,6 +22,41 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
         [Test]
+        public void ConfrontoStabileAttendeDueFirmeUgualiPerApparizioneERimozione()
+        {
+            using(var f=new Mat(360,640,MatType.CV_8UC3,Scalar.White))
+            using(var d=new RilevatoreVariazioni())
+            {
+                d.Conferma(d.ConfrontaStabile(f).Regioni);
+                Cv2.Rectangle(f,new Rect(250,140,60,35),Scalar.Black,-1);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Empty);
+                var apparsa=d.ConfrontaStabile(f);
+                Assert.That(apparsa.Regioni,Is.Not.Empty);
+                d.Conferma(apparsa.Regioni);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Empty);
+                f.SetTo(Scalar.White);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Empty);
+                var rimossa=d.ConfrontaStabile(f);
+                Assert.That(rimossa.Regioni,Is.Not.Empty);
+                d.Conferma(rimossa.Regioni);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Empty);
+            }
+        }
+        [Test]
+        public void ConfrontoStabileRichiedeLaStessaFirmaNonSoloLaStessaArea()
+        {
+            using(var f=new Mat(360,640,MatType.CV_8UC3,Scalar.White))
+            using(var d=new RilevatoreVariazioni())
+            {
+                d.Conferma(d.ConfrontaStabile(f).Regioni);
+                Cv2.Rectangle(f,new Rect(250,140,60,35),new Scalar(0,0,255),-1);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Empty);
+                Cv2.Rectangle(f,new Rect(250,140,60,35),new Scalar(255,0,0),-1);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Empty);
+                Assert.That(d.ConfrontaStabile(f).Regioni,Is.Not.Empty);
+            }
+        }
+        [Test]
         public void UnaModificaLocaleNonInvadeIlRestoDelFoglioENonSparisceSenzaConferma()
         {
             using (var f = new Mat(360, 640, MatType.CV_8UC3, Scalar.White))

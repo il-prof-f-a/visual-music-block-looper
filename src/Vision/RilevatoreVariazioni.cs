@@ -44,7 +44,12 @@ namespace VisualMusicBlockLooper.Vision
             maschera = new Mat(altezza, larghezza, MatType.CV_8UC1);
         }
 
-        public EsitoVariazioni Confronta(Mat fotogramma)
+        /// <summary>Confronta solo i pixel cambiati che conservano la firma del frame precedente.</summary>
+        public EsitoVariazioni ConfrontaStabile(Mat fotogramma) => Confronta(fotogramma, true);
+
+        public EsitoVariazioni Confronta(Mat fotogramma) => Confronta(fotogramma, false);
+
+        private EsitoVariazioni Confronta(Mat fotogramma, bool stabile)
         {
             if (fotogramma == null || fotogramma.Empty())
                 return new EsitoVariazioni(false, new RettangoloTavolo[0], 0, 0);
@@ -66,7 +71,7 @@ namespace VisualMusicBlockLooper.Vision
             for (int i = 0; i < 256; i++)
             { somma += istogramma[i]; if (somma >= obiettivoSfondo) { bianco = i; break; } }
 
-            int cambiati = 0, fraOsservazioni = 0;
+            int cambiati = 0, candidati = 0, fraOsservazioni = 0;
             for (int i = 0; i < pixel; i++)
             {
                 int b = bgr[i * 3], g = bgr[i * 3 + 1], r = bgr[i * 3 + 2];
@@ -82,8 +87,10 @@ namespace VisualMusicBlockLooper.Vision
                 if (firma != precedente[i]) fraOsservazioni++;
                 attuale[i] = firma;
                 bool cambiato = riferimento != null && firma != riferimento[i];
-                differenze[i] = cambiato ? (byte)255 : (byte)0;
+                bool candidato = cambiato && (!stabile || (haPrecedente && firma == precedente[i]));
+                differenze[i] = candidato ? (byte)255 : (byte)0;
                 if (cambiato) cambiati++;
+                if (candidato) candidati++;
             }
 
             bool globaleInstabile = riferimento != null
@@ -96,8 +103,8 @@ namespace VisualMusicBlockLooper.Vision
                 return new EsitoVariazioni(false, new RettangoloTavolo[0], (double)cambiati / pixel, bianco);
             if (riferimento == null)
                 return new EsitoVariazioni(true, new[] { new RettangoloTavolo(0, 0, 1, 1) }, 1, bianco);
-            if (cambiati == 0)
-                return new EsitoVariazioni(true, new RettangoloTavolo[0], 0, bianco);
+            if (candidati == 0)
+                return new EsitoVariazioni(true, new RettangoloTavolo[0], (double)cambiati / pixel, bianco);
 
             Marshal.Copy(differenze, 0, maschera.Data, differenze.Length);
             using (var nucleo = Cv2.GetStructuringElement(MorphShapes.Rect,

@@ -267,8 +267,8 @@ namespace VisualMusicBlockLooper.App
                         continue;
                     }
 
-                    // Durata troncata a fine griglia: oltre il bordo la nota non viene disegnata.
-                    int durata = Math.Min(Math.Max(nota.DurataStep, 1), Math.Min(config.Step, struttura.StepPerMisura) - nota.StepIniziale);
+                    // La sagoma può attraversare una battuta, ma la guida resta dentro la griglia visibile.
+                    int durata = Math.Min(Math.Max(nota.DurataStep, 1), config.Step - nota.StepIniziale);
                     var area = Rectangle.FromLTRB(
                         BordoX(griglia, nota.StepIniziale),
                         BordoY(griglia, nota.Riga),

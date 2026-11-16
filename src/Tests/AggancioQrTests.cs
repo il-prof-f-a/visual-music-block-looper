@@ -106,11 +106,47 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void ColoreLungo_TroncatoAllaMisura()
+        public void ColoreLungo_TroncatoAlBordoGriglia()
         {
             var stato = Interprete().Interpreta(new[] { Nota(3, 13, 25) });
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note.Single().DurataStep, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void ColoreLungo_AttraversaDueMisure_RestaUnaNota()
+        {
+            var misura = new CartoncinoRilevato
+            {
+                Payload = "VMBL1;S;MISURA;2",
+                Area = LayoutTavolo.Default.Misura
+            };
+
+            var stato = Interprete().Interpreta(new[] { Nota(2, 1, 16), misura });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Struttura.BattitiPerMisura, Is.EqualTo(2));
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            Assert.That(stato.Note.Single().StepIniziale, Is.EqualTo(1));
+            Assert.That(stato.Note.Single().DurataStep, Is.EqualTo(15));
+        }
+
+        [Test]
+        public void QrSuccessivo_TroncaLaNotaLunga()
+        {
+            var misura = new CartoncinoRilevato
+            {
+                Payload = "VMBL1;S;MISURA;2",
+                Area = LayoutTavolo.Default.Misura
+            };
+
+            var stato = Interprete().Interpreta(new[] { Nota(2, 1, 16), Nota(2, 5, 8, 9), misura });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(2));
+            var note = stato.Note.OrderBy(n => n.StepIniziale).ToArray();
+            Assert.That(note.Select(n => n.StepIniziale), Is.EqualTo(new[] { 1, 5 }));
+            Assert.That(note.Select(n => n.DurataStep), Is.EqualTo(new[] { 4, 3 }));
         }
 
         [Test]

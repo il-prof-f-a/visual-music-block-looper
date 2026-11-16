@@ -445,15 +445,15 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void NotaLungaTroncataAFineMisura()
+        public void NotaLungaOltreLaMisuraDisegnataFinoAllaFineDelColore()
         {
-            // Misura 3/4 = 12 step: la nota dallo step 10 lunga 6 arriva al massimo allo step 11.
+            // Misura 3/4 = 12 step: il colore prosegue oltre la misura fino allo step 16.
             Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 18, out StrutturaTavolo s), Is.True);
             using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 10, 6)))
             {
-                Point ultimo = new Point((int)(GrigliaX + 12 * CellaL) - 3, CentroTavolo(1, 11).Y), oltre = CentroTavolo(1, 12);
+                Point ultimo = new Point((int)(GrigliaX + 16 * CellaL) - 3, CentroTavolo(1, 15).Y), oltre = CentroTavolo(1, 16);
                 Assert.That(EVerde(bmp.GetPixel(ultimo.X, ultimo.Y)), Is.True);
-                Assert.That(bmp.GetPixel(oltre.X, oltre.Y).ToArgb(), Is.EqualTo(Color.FromArgb(255, 215, 215, 215).ToArgb()));
+                Assert.That(EVerde(bmp.GetPixel(oltre.X, oltre.Y)), Is.False);
             }
         }
 

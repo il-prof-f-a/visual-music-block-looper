@@ -29,6 +29,16 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void NotaLunga_AttraversaLaMisura()
+        {
+            var partitura = Compila(new[] { Nota(0, 1, 15) }, Struttura(2, 2, 1, 4));
+
+            Assert.That(partitura.TickGiro, Is.EqualTo(96));
+            Assert.That(partitura.Eventi.Select(e => $"{e.Tick}:{e.NoteOn}"),
+                Is.EqualTo(new[] { "6:True", "96:False" }));
+        }
+
+        [Test]
         public void MutareNoteOriginaliNonCambiaPartituraOAnteprima()
         {
             var n = Nota(0, 0, 1); var lista = new List<CartoncinoNota> { n };

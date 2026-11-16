@@ -13,6 +13,17 @@ namespace VisualMusicBlockLooper.Tests
     public class LetturaParzialeFoglioTests
     {
         [Test]
+        public void StessaPosizioneQr_TolleraSpostamentoERotazione()
+        {
+            var originale = new RettangoloTavolo(.40, .40, .04, .04);
+            var spostatoERuotato = new RettangoloTavolo(.397, .394, .052, .052);
+            var distinto = new RettangoloTavolo(.47, .40, .04, .04);
+
+            Assert.That(GeometriaRegioni.StessaPosizioneQr(originale, spostatoERuotato), Is.True);
+            Assert.That(GeometriaRegioni.StessaPosizioneQr(originale, distinto), Is.False);
+        }
+
+        [Test]
         public void ImpostazioneUsaLAncoraQrQuandoIlCorpoEsceDallaZona()
         {
             var cartoncino=new CartoncinoRilevato

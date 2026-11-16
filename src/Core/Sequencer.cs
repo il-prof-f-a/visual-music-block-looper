@@ -89,7 +89,9 @@ namespace VisualMusicBlockLooper.Core
                     continue;
                 }
 
-                int durataClampata = Math.Min(Math.Max(nota.DurataStep, 1), struttura.StepPerMisura - nota.StepIniziale);
+                int passoNelGiro = passoAssoluto % struttura.StepGiro;
+                int durataRimanenteGiro = struttura.StepGiro - passoNelGiro;
+                int durataClampata = Math.Min(Math.Max(nota.DurataStep, 1), durataRimanenteGiro);
                 suonanti.Add(new NotaInCorso(nota.Chiave, nota.Traccia, nota.IdClip, passoAssoluto + durataClampata));
                 eventi.Add(new EventoNota(nota.Traccia, nota.IdClip, true));
             }

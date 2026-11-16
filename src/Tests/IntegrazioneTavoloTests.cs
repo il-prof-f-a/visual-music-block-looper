@@ -356,7 +356,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void Misura34_TroncaLeNoteLunghe()
+        public void Misura34_NotaLungaAttraversaLaBattuta()
         {
             var rilevatore = new RilevatoreFisso
             {
@@ -372,11 +372,11 @@ namespace VisualMusicBlockLooper.Tests
             banco.Passi(4);
             banco.Tick(100);
 
-            // 3/4 = 12 step = 72 tick: la nota di 16 step (dall'inizio) finisce alla fine della misura.
+            // La nota di 16 step resta tenuta oltre la misura e termina alla fine del corpo colorato.
             var attesi = new List<string>
             {
                 "0 NotaOn:0:36:100",
-                "72 NotaOff:0:36",
+                "96 NotaOff:0:36",
             };
             Assert.That(banco.Eventi, Is.EqualTo(attesi));
         }

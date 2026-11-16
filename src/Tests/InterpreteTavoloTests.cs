@@ -159,7 +159,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void MisuraTreQuarti_DurataTroncata()
+        public void MisuraTreQuarti_DurataAttraversaLaBattuta()
         {
             StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
             {
@@ -170,7 +170,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Errori, Is.Empty);
             Assert.That(stato.Note, Has.Count.EqualTo(1));
             Assert.That(stato.Note[0].StepIniziale, Is.EqualTo(8));
-            Assert.That(stato.Note[0].DurataStep, Is.EqualTo(4));
+            Assert.That(stato.Note[0].DurataStep, Is.EqualTo(6));
         }
 
         [Test]

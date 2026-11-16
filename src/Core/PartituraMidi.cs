@@ -21,9 +21,11 @@ namespace VisualMusicBlockLooper.Core
         private readonly CartoncinoNota[] note;
         private readonly PosizioneGiro[] posizioni;
         internal PartituraMidi(StatoTavolo stato, long versione, long generazione, long primaFrontiera,
+            long primaMisuraAssoluta,
             IEnumerable<EventoMidiProgrammato> eventi)
         {
             VersioneFoglio = versione; Generazione = generazione; PrimaFrontiera = primaFrontiera;
+            PrimaMisuraAssoluta = primaMisuraAssoluta;
             Struttura = stato.Struttura;
             note = stato.Note.Where(n => n != null).Select(CopiaNota).ToArray();
             Eventi = Array.AsReadOnly(eventi.ToArray());
@@ -37,6 +39,8 @@ namespace VisualMusicBlockLooper.Core
         public long VersioneFoglio { get; }
         public long Generazione { get; }
         public long PrimaFrontiera { get; }
+        /// <summary>-1 per una partitura al confine A-B; altrimenti indice assoluto della misura di adozione.</summary>
+        public long PrimaMisuraAssoluta { get; }
         public StrutturaTavolo Struttura { get; }
         public int TickGiro => Struttura.StepGiro * Sequencer.TickPerStep;
         public IReadOnlyList<EventoMidiProgrammato> Eventi { get; }

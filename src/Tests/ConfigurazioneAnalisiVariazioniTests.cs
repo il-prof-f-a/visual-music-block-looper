@@ -39,7 +39,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(json["BpmIniziale"]?.Value<double>(),Is.EqualTo(100));
             Assert.That(json["AnalizzaSoloSeCambia"]?.Value<bool>(),Is.True);
             Assert.That(json["ScansioneABlocchiAnticipata"]?.Value<bool>(),Is.True);
-            Assert.That(json["MisureAnticipoScansione"]?.Value<int>(),Is.EqualTo(2));
+            Assert.That(json["MisureAnticipoScansione"]?.Value<int>(),Is.EqualTo(4));
             Assert.That(json["NumeroThreadOpenCv"]?.Value<int>(),Is.EqualTo(2));
             Assert.That(json["AnalisiVariazioni"]?["LarghezzaAnalisi"]?.Value<int>(),Is.EqualTo(640));
             Assert.That(json["AnalisiVariazioni"]?["AltezzaAnalisi"]?.Value<int>(),Is.EqualTo(360));
@@ -65,7 +65,7 @@ namespace VisualMusicBlockLooper.Tests
                 {
                   "AnalizzaSoloSeCambia": false,
                   "ScansioneABlocchiAnticipata": false,
-                  "MisureAnticipoScansione": 3,
+                  "MisureAnticipoScansione": 8,
                   "NumeroThreadOpenCv": 3,
                   "PulsazioniPerOsservazione": 4,
                   "BpmIniziale": 137.5,
@@ -87,7 +87,7 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(json["AnalizzaSoloSeCambia"]?.Value<bool>(),Is.False);
             Assert.That(ricaricata.ScansioneABlocchiAnticipata,Is.False);
-            Assert.That(ricaricata.MisureAnticipoScansione,Is.EqualTo(3));
+            Assert.That(ricaricata.MisureAnticipoScansione,Is.EqualTo(8));
             Assert.That(ricaricata.NumeroThreadOpenCv,Is.EqualTo(3));
             Assert.That(ricaricata.PulsazioniPerOsservazione,Is.EqualTo(4));
             Assert.That(ricaricata.BpmIniziale,Is.EqualTo(137.5));
@@ -99,9 +99,11 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(json["AnalisiVariazioni"]?["MargineRegione"]?.Value<int>(),Is.EqualTo(18));
         }
 
-        [TestCase(0,2)]
-        [TestCase(6,2)]
+        [TestCase(0,4)]
+        [TestCase(2,4)]
+        [TestCase(9,4)]
         [TestCase(4,4)]
+        [TestCase(8,8)]
         public void AnticipoBlocchiVieneLimitatoAllaFinestraConsentita(int richiesto,int atteso)
         {
             string percorso=Path.Combine(cartella,ConfigurazioneApplicazione.NomeFile);

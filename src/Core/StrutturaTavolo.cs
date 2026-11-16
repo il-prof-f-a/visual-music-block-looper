@@ -34,6 +34,8 @@ namespace VisualMusicBlockLooper.Core
 
         private static readonly int[] BattitiAmmessi = { 2, 3, 4 };
         private static readonly int[] RigheCollegateAmmesse = { 1, 2, 3, 6 };
+        private readonly int misurePerGiro;
+        private readonly PosizioneGiro[] posizioniMisuraGiro;
 
         private StrutturaTavolo(int battiti, int righeCollegate, int aInizio, int aFine)
         {
@@ -41,6 +43,16 @@ namespace VisualMusicBlockLooper.Core
             RigheCollegate = righeCollegate;
             AInizio = aInizio;
             AFine = aFine;
+            var posizioni=new System.Collections.Generic.List<PosizioneGiro>();
+            for (int step = 0; step < StepGiro; step++)
+            {
+                var posizione=Posizione(step);
+                if(step==0||posizione.StepInMisura==0)
+                    posizioni.Add(new PosizioneGiro(posizione.StepInMisura,posizione.MisuraNelGiro,
+                        Array.AsReadOnly(new List<int>(posizione.RigheAttive).ToArray())));
+            }
+            posizioniMisuraGiro=posizioni.ToArray();
+            misurePerGiro=posizioniMisuraGiro.Length;
         }
 
         /// <summary>Step (sedicesimi) in una battuta.</summary>
@@ -91,6 +103,16 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Numero di gruppi di righe collegate.</summary>
         public int NumeroGruppi => RigheTotali / RigheCollegate;
+
+        /// <summary>Numero di frontiere di misura/inizio A-B contate dal clock in un giro.</summary>
+        public int MisurePerGiro => misurePerGiro;
+
+        /// <summary>Posizione all'indice di frontiera di misura del giro A-B, 0-based.</summary>
+        public PosizioneGiro PosizioneMisuraGiro(int indice)
+        {
+            if(indice<0||indice>=posizioniMisuraGiro.Length)throw new ArgumentOutOfRangeException(nameof(indice));
+            return posizioniMisuraGiro[indice];
+        }
 
         /// <summary>Lunghezza del giro in step: le battute di A-B per 4 step.</summary>
         public int StepGiro => (AFine - AInizio + 1) * StepPerBattuta;

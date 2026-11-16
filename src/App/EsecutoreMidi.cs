@@ -67,10 +67,12 @@ namespace VisualMusicBlockLooper.App
         public void Tap(long istante) => Richiedi(Tipo.Tap, 0, istante);
         public void ImpostaBpm(double bpm)=>Richiedi(Tipo.Bpm,bpm:Tempo.Limita(bpm));
         public void OneShot(int nota) => Richiedi(Tipo.OneShot, nota);
-        public PartituraMidiPreparata Prepara(StatoTavolo foglio, long versioneFoglio, long generazione, long frontiera)
-            => PartituraMidiPreparata.Prepara(compilatore.Compila(foglio, versioneFoglio, generazione, frontiera), uscita);
-        public PartituraMidiPreparata PreparaProgressiva(StatoTavolo foglio,long versioneFoglio,long generazione,long frontiera,Action<PartituraMidiPreparata> primoGruppo)
-            =>PartituraMidiPreparata.PreparaProgressiva(compilatore.Compila(foglio,versioneFoglio,generazione,frontiera),uscita,primoGruppo);
+        public PartituraMidiPreparata Prepara(StatoTavolo foglio, long versioneFoglio, long generazione, long frontiera,
+            long primaMisuraAssoluta = -1)
+            => PartituraMidiPreparata.Prepara(compilatore.Compila(foglio, versioneFoglio, generazione, frontiera, primaMisuraAssoluta), uscita);
+        public PartituraMidiPreparata PreparaProgressiva(StatoTavolo foglio,long versioneFoglio,long generazione,long frontiera,
+            Action<PartituraMidiPreparata> primoGruppo,long primaMisuraAssoluta=-1)
+            =>PartituraMidiPreparata.PreparaProgressiva(compilatore.Compila(foglio,versioneFoglio,generazione,frontiera,primaMisuraAssoluta),uscita,primoGruppo);
         public bool Pubblica(PartituraMidiPreparata p) => Volatile.Read(ref eliminato) == 0 && Stato.Pubblica(p);
         public void AggiornaTavolo(StatoTavolo foglio)
         {

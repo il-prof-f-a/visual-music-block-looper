@@ -9,13 +9,13 @@ namespace VisualMusicBlockLooper.Tests
     public class ConfigurazioneRobustaTests
     {
         [Test]
-        public void DefaultUsaDueMisureDiAnticipoETolleranzaQrConfigurata()
+        public void DefaultUsaQuattroMisureDiAnticipoETolleranzaQrConfigurata()
         {
             var configurazione = new ConfigurazioneApplicazione();
 
             Assert.That(new ConfigGriglia().TolleranzaQrCelle, Is.EqualTo(0.35).Within(1e-9));
             Assert.That(configurazione.BpmIniziale, Is.EqualTo(100));
-            Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(2));
+            Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(4));
             Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.35).Within(1e-9));
         }
 
@@ -29,7 +29,7 @@ namespace VisualMusicBlockLooper.Tests
                     "{\"MisureAnticipoScansione\":0,\"TolleranzaQrCelle\":0.8,\"BpmIniziale\":999}");
                 var configurazione = ConfigurazioneApplicazione.Carica(percorso);
 
-                Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(2));
+                Assert.That(configurazione.MisureAnticipoScansione, Is.EqualTo(4));
                 Assert.That(configurazione.TolleranzaQrCelle, Is.EqualTo(0.35).Within(1e-9));
                 Assert.That(configurazione.BpmIniziale, Is.EqualTo(300));
             }

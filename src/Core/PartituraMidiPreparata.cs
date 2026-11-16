@@ -18,10 +18,11 @@ namespace VisualMusicBlockLooper.Core
     {
         internal readonly struct EventoPronto
         {
-            public EventoPronto(EventoMidiProgrammato dati, Action invio, Action off)
-            { Dati = dati; Invio = invio; Off = off; }
+            public EventoPronto(EventoMidiProgrammato dati, Action invio, Action off, int fineTick)
+            { Dati = dati; Invio = invio; Off = off; FineTick = fineTick; }
             public readonly EventoMidiProgrammato Dati;
             public readonly Action Invio, Off;
+            public readonly int FineTick;
         }
         private PartituraMidiPreparata(PartituraMidi dati, EventoPronto[] eventi)
         { Dati = dati; Eventi = eventi; }
@@ -29,8 +30,11 @@ namespace VisualMusicBlockLooper.Core
         internal EventoPronto[] Eventi { get; }
         private int pubblicati;
         private string errore;
+        private int consumato;
         public int EventiPubblicati=>Volatile.Read(ref pubblicati);
         public string Errore=>Volatile.Read(ref errore);
+        internal bool Consumato=>Volatile.Read(ref consumato)!=0;
+        internal void MarcaConsumato()=>Interlocked.Exchange(ref consumato,1);
         public static PartituraMidiPreparata Prepara(PartituraMidi dati, IUscitaMidi uscita)
             =>PreparaProgressiva(dati,uscita,null);
         public static PartituraMidiPreparata PreparaProgressiva(PartituraMidi dati,IUscitaMidi uscita,Action<PartituraMidiPreparata> primoGruppo)
@@ -38,6 +42,19 @@ namespace VisualMusicBlockLooper.Core
             if (dati == null) throw new ArgumentNullException(nameof(dati));
             if (uscita == null) throw new ArgumentNullException(nameof(uscita));
             var eventi = new EventoPronto[dati.Eventi.Count];
+            var fini = new int[eventi.Length];
+            for(int i=0;i<fini.Length;i++)fini[i]=dati.TickGiro;
+            var aperti=new System.Collections.Generic.Dictionary<int,System.Collections.Generic.Queue<int>>();
+            for(int i=0;i<dati.Eventi.Count;i++)
+            {
+                var e=dati.Eventi[i];int chiave=e.Canale*128+e.Nota;
+                if(e.NoteOn)
+                {
+                    if(!aperti.TryGetValue(chiave,out var coda)){coda=new System.Collections.Generic.Queue<int>();aperti.Add(chiave,coda);}
+                    coda.Enqueue(i);
+                }
+                else if(aperti.TryGetValue(chiave,out var codaOff)&&codaOff.Count>0)fini[codaOff.Dequeue()]=e.Tick;
+            }
             var pronta=new PartituraMidiPreparata(dati,eventi);bool notificato=false;
             try
             {
@@ -47,7 +64,7 @@ namespace VisualMusicBlockLooper.Core
                     do
                     {
                         var e=dati.Eventi[i];Action off=PreparaOff(uscita,e.Canale,e.Nota);
-                        eventi[i]=new EventoPronto(e,e.NoteOn?PreparaOn(uscita,e.Canale,e.Nota,e.Velocity):off,off);i++;
+                        eventi[i]=new EventoPronto(e,e.NoteOn?PreparaOn(uscita,e.Canale,e.Nota,e.Velocity):off,off,fini[i]);i++;
                     }while(i<eventi.Length&&dati.Eventi[i].Tick==tick);
                     Volatile.Write(ref pronta.pubblicati,i);
                     if(!notificato){notificato=true;primoGruppo?.Invoke(pronta);}

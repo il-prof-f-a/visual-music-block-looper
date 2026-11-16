@@ -15,19 +15,25 @@ namespace VisualMusicBlockLooper.Tests
         {
             var completa=StrutturaTavolo.Default;
             var ultima=completa.Posizione(5*completa.StepPerMisura);
-            Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,1),Is.EqualTo(new[]{0,5}),
-                "Dall'ultima riga del giro la scansione anticipata deve tornare alla prima.");
-            Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,2),Is.EqualTo(new[]{0,1,5}),
-                "Due misure di anticipo includono anche il blocco della seconda misura futura.");
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,1),Is.EqualTo(new[]{0}),
+                "L'offset esatto dalla sesta misura deve puntare alla prima riga del giro successivo.");
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(completa,ultima,2),Is.EqualTo(new[]{1}),
+                "Due misure di anticipo devono puntare soltanto alla seconda riga futura.");
 
             Assert.That(StrutturaTavolo.TryCrea(4,2,1,8,out var collegate),Is.True);
             var prima=collegate.Posizione(0);
-            Assert.That(AnalizzatoreFoglio.RigheAnticipate(collegate,prima,1),Is.EqualTo(new[]{0,1,2,3,4,5}),
-                "Per due gruppi collegati vanno lette le righe attive e quelle della misura successiva.");
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(collegate,prima,1),Is.EqualTo(new[]{1,3,5}),
+                "L'offset esatto conserva i tre gruppi collegati senza includere la misura corrente.");
 
             Assert.That(StrutturaTavolo.TryCrea(4,6,5,24,out var daA),Is.True);
-            Assert.That(AnalizzatoreFoglio.RigheAnticipate(daA,daA.Posizione(0),1),Is.EqualTo(new[]{1,2}),
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(daA,daA.Posizione(0),1),Is.EqualTo(new[]{2}),
                 "La misura anticipata deve partire dal punto A anche quando A cade dentro il foglio.");
+
+            Assert.That(StrutturaTavolo.TryCrea(4,2,2,6,out var daMezzaBattuta),Is.True);
+            Assert.That(daMezzaBattuta.MisurePerGiro,Is.EqualTo(2));
+            Assert.That(AnalizzatoreFoglio.RigheAnticipate(daMezzaBattuta,daMezzaBattuta.Posizione(0),1),
+                Is.EqualTo(new[]{1,3,5}),
+                "Le frontiere devono seguire la misura reale anche quando A-B inizia a metà battuta.");
         }
 
         [Test]
@@ -220,6 +226,45 @@ namespace VisualMusicBlockLooper.Tests
                     ora+=21;r.Pubblica(f,ora);a.Passo(true);
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9),
                         "La stessa riga, osservata nella misura successiva, conferma la rimozione.");
+                }
+            }
+        }
+
+        [Test]
+        public void RimozioneScansionataQuattroMisurePrimaSiAttivaAllaMisuraDestinazione()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,
+                    true,null,true,4))
+                {
+                    a.PulsazioniPerOsservazione=4;
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
+                    e.Avvia();e.TickInterno();
+                    for(int i=0;i<4*96;i++){ora+=21;e.TickInterno();}
+                    Assert.That(e.Stato.MisuraAssoluta,Is.EqualTo(4));
+
+                    Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
+                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),"La prima cattura crea il candidato ma non cancella la nota.");
+                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+
+                    Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9));
+                    Assert.That(e.Stato.VersioneAttiva,Is.EqualTo(1));
+                    Assert.That(e.Stato.VersionePronta,Is.GreaterThan(e.Stato.VersioneAttiva),
+                        "La versione rimossa è pronta per la misura assoluta 8, quattro misure avanti.");
+                    Assert.That(e.Stato.PartituraAttiva.CopiaStato().Note,Has.Count.EqualTo(10));
+
+                    for(int i=0;i<4*96;i++){ora+=21;e.TickInterno();}
+
+                    Assert.That(e.Stato.MisuraAssoluta,Is.EqualTo(8));
+                    Assert.That(e.Stato.VersioneAttiva,Is.GreaterThan(1));
+                    Assert.That(e.Stato.PartituraAttiva.CopiaStato().Note,Has.Count.EqualTo(9));
                 }
             }
         }

@@ -27,6 +27,13 @@ namespace VisualMusicBlockLooper.Tests
             var p = new CompilatorePartitura(new ConfigGriglia(), new Mappa()).Compila(new StatoTavolo(new[] { n }, null, null, s), versione, generazione, primaFrontiera);
             return PartituraMidiPreparata.Prepara(p, u);
         }
+        private static PartituraMidiPreparata PartituraConNote(Uscita u,long versione,IEnumerable<CartoncinoNota> note,
+            StrutturaTavolo struttura,long primaMisuraAssoluta=-1)
+        {
+            var stato=new StatoTavolo(note,null,null,struttura);
+            var p=new CompilatorePartitura(new ConfigGriglia(),new Mappa()).Compila(stato,versione,1,0,primaMisuraAssoluta);
+            return PartituraMidiPreparata.Prepara(p,u);
+        }
         private static void Tick(MotorePartitura m, int n) { for (int i = 0; i < n; i++) m.TickInterno(); }
 
         [Test]
@@ -81,6 +88,107 @@ namespace VisualMusicBlockLooper.Tests
             m.Pubblica(Partitura(u, 2, 41, primaFrontiera: 2)); Tick(m, 48);
             Assert.That(m.VersioneAttiva, Is.EqualTo(1)); Tick(m, 48);
             Assert.That(m.VersioneAttiva, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void PartituraFuturaSiAttivaAllaMisuraAssolutaSenzaRipetereEventiPrecedenti()
+        {
+            StrutturaTavolo.TryCrea(2,2,1,4,out var struttura);
+            var u=new Uscita();var m=new MotorePartitura(u,new Mappa());
+            var iniziale=PartituraConNote(u,1,new[]{new CartoncinoNota{Riga=1,Traccia=0,IdClip=40,StepIniziale=0,DurataStep=1}},struttura);
+            var aggiornamento=PartituraConNote(u,2,Array.Empty<CartoncinoNota>(),struttura,3);
+            Assert.That(m.Pubblica(iniziale),Is.True);
+            m.Avvia();m.TickInterno();
+            Assert.That(m.MisuraAssoluta,Is.EqualTo(0));
+            Assert.That(m.Pubblica(aggiornamento),Is.True);
+
+            Tick(m,143); // la prima occorrenza della riga suona al tick assoluto 48
+            Assert.That(u.Eventi.Count(e=>e=="On:0:76"),Is.EqualTo(1));
+            Assert.That(m.VersioneAttiva,Is.EqualTo(1));
+            m.TickInterno(); // misura assoluta 3, punto esatto di adozione
+
+            Assert.That(m.MisuraAssoluta,Is.EqualTo(3));
+            Assert.That(m.VersioneAttiva,Is.EqualTo(2));
+            Assert.That(m.UltimaMisuraDestinazione,Is.EqualTo(3));
+            Assert.That(m.UltimaMisuraApplicazione,Is.EqualTo(3));
+            Assert.That(m.UltimoAggiornamentoRinviato,Is.False);
+            Assert.That(u.Eventi.Count(e=>e=="On:0:76"),Is.EqualTo(1),
+                "La misura più vicina resta invariata e l'attacco rimosso non si ripete alla destinazione.");
+            Tick(m,48);
+            Assert.That(m.VersioneAttiva,Is.EqualTo(2),"La partitura aggiornata resta attiva dopo il confine A-B.");
+            m.Arresta();m.Avvia();m.TickInterno();
+            Assert.That(m.VersioneAttiva,Is.EqualTo(2),"Un nuovo avvio riparte dall'ultima scena attivata.");
+        }
+
+        [Test]
+        public void AggiornamentoMisuraPreservaIlNoteOffDellaNotaGiaPartita()
+        {
+            StrutturaTavolo.TryCrea(2,2,1,4,out var struttura);
+            var u=new Uscita();var m=new MotorePartitura(u,new Mappa());
+            var iniziale=PartituraConNote(u,1,new[]{new CartoncinoNota{Riga=0,Traccia=0,IdClip=40,StepIniziale=0,DurataStep=12}},struttura);
+            var aggiornamento=PartituraConNote(u,2,Array.Empty<CartoncinoNota>(),struttura,1);
+            m.Pubblica(iniziale);m.Avvia();m.TickInterno();
+            m.Pubblica(aggiornamento);
+
+            Tick(m,71); // include il confine di misura 1, ma non il NoteOff al tick 72
+            Assert.That(m.VersioneAttiva,Is.EqualTo(2));
+            Assert.That(u.Eventi.Count(e=>e=="Off:0:76"),Is.Zero);
+            m.TickInterno();
+
+            Assert.That(u.Eventi.Count(e=>e=="Off:0:76"),Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AggiornamentoPreparatoInRitardoAspettaLaRicorrenzaDellaStessaMisura()
+        {
+            StrutturaTavolo.TryCrea(2,2,1,4,out var struttura);
+            var u=new Uscita();var m=new MotorePartitura(u,new Mappa());
+            m.Pubblica(PartituraConNote(u,1,Array.Empty<CartoncinoNota>(),struttura));
+            m.Avvia();m.TickInterno();
+            Tick(m,48); // tick 48: prima misura assoluta 1
+            Assert.That(m.MisuraAssoluta,Is.EqualTo(1));
+            m.Pubblica(PartituraConNote(u,2,new[]{new CartoncinoNota{Riga=1,Traccia=0,IdClip=41,StepIniziale=0,DurataStep=1}},struttura,1));
+
+            Tick(m,95); // il giro riparte, ma non è ancora la stessa misura
+            Assert.That(m.VersioneAttiva,Is.EqualTo(1));
+            m.TickInterno(); // misura assoluta 3, ricorrenza della frontiera 1
+            Assert.That(m.MisuraAssoluta,Is.EqualTo(3));
+            Assert.That(m.VersioneAttiva,Is.EqualTo(2));
+            Assert.That(m.UltimaMisuraDestinazione,Is.EqualTo(1));
+            Assert.That(m.UltimaMisuraApplicazione,Is.EqualTo(3));
+            Assert.That(m.UltimoAggiornamentoRinviato,Is.True);
+        }
+
+        [Test]
+        public void AggiornamentoRitardatoPiuRecentePrevaleSuSnapshotFuturoPiuVecchio()
+        {
+            StrutturaTavolo.TryCrea(2,2,1,4,out var struttura);
+            var u=new Uscita();var m=new MotorePartitura(u,new Mappa());
+            m.Pubblica(PartituraConNote(u,1,Array.Empty<CartoncinoNota>(),struttura));
+            m.Avvia();m.TickInterno();
+            Tick(m,143);m.TickInterno(); // oltre la misura 3
+            Assert.That(m.MisuraAssoluta,Is.EqualTo(3));
+
+            Assert.That(m.Pubblica(PartituraConNote(u,3,Array.Empty<CartoncinoNota>(),struttura,3)),Is.True);
+            Assert.That(m.Pubblica(PartituraConNote(u,2,Array.Empty<CartoncinoNota>(),struttura,7)),Is.True);
+            Tick(m,3*48+47);
+            m.TickInterno(); // misura 7: entrambe sono eleggibili, ma la versione 3 contiene lo snapshot più recente
+
+            Assert.That(m.MisuraAssoluta,Is.EqualTo(7));
+            Assert.That(m.VersioneAttiva,Is.EqualTo(3));
+            Assert.That(m.UltimaMisuraDestinazione,Is.EqualTo(3));
+            Assert.That(m.UltimoAggiornamentoRinviato,Is.True);
+        }
+
+        [Test]
+        public void PosizioneDopoMisureRestituisceLaRigaAssolutaAncheOltreIlGiro()
+        {
+            var u=new Uscita();var m=new MotorePartitura(u,new Mappa());
+            m.Pubblica(PartituraConNote(u,1,Array.Empty<CartoncinoNota>(),StrutturaTavolo.Default));m.Avvia();m.TickInterno();
+            var futura=m.PosizioneDopoMisure(8,out long misura);
+            Assert.That(misura,Is.EqualTo(8));
+            Assert.That(futura.RigheAttive,Is.EqualTo(new[]{2}),
+                "Il giro predefinito dura sei misure; l'ottava misura futura ricade sulla terza riga.");
         }
 
         [Test]

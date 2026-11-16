@@ -101,8 +101,8 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Con AnalizzaSoloSeCambia attiva, legge blocchi anticipati durante il play e, a riproduzione ferma, una zona per fotogramma.</summary>
         public bool ScansioneABlocchiAnticipata { get; set; } = true;
 
-        /// <summary>Misure future incluse nella finestra di scansione, limitate a 1..5 (default 2 per confermare prima dell'attacco).</summary>
-        public int MisureAnticipoScansione { get; set; } = 2;
+        /// <summary>Misura di destinazione della scansione live, limitata a 4..8 (default 4).</summary>
+        public int MisureAnticipoScansione { get; set; } = 4;
 
         /// <summary>Scarto massimo del QR dai riferimenti della griglia, come frazione di cella (0..0,49).</summary>
         public double TolleranzaQrCelle { get; set; } = 0.35;
@@ -155,8 +155,8 @@ namespace VisualMusicBlockLooper.App
             configurazione.AnalisiVariazioni=configurazione.AnalisiVariazioni.Normalizzati();
             configurazione.BpmIniziale=double.IsNaN(configurazione.BpmIniziale)||double.IsInfinity(configurazione.BpmIniziale)
                 ?100:Tempo.Limita(configurazione.BpmIniziale);
-            if(configurazione.MisureAnticipoScansione<1||configurazione.MisureAnticipoScansione>5)
-                configurazione.MisureAnticipoScansione=2;
+            if(configurazione.MisureAnticipoScansione<4||configurazione.MisureAnticipoScansione>8)
+                configurazione.MisureAnticipoScansione=4;
             if(double.IsNaN(configurazione.TolleranzaQrCelle)||double.IsInfinity(configurazione.TolleranzaQrCelle)
                 ||configurazione.TolleranzaQrCelle<0||configurazione.TolleranzaQrCelle>=0.5)
                 configurazione.TolleranzaQrCelle=0.35;

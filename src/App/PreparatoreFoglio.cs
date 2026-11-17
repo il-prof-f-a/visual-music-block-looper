@@ -48,6 +48,22 @@ namespace VisualMusicBlockLooper.App
             }
             catch(Exception e){Volatile.Write(ref ultimoErrore,"Partitura futura non preparata: "+e.Message);return false;}
         }
+        public bool AggiornaPerCella(StatoTavolo stato,bool confermata,long generazione,long istante,long stepAssoluto)
+        {
+            if(generazione!=Generazione||stepAssoluto<0)return false;
+            bool cambiato=Foglio.Aggiorna(stato,confermata,generazione,istante);
+            if(!cambiato)return false;
+            var f=Foglio.Ultima;
+            if(!esecutore.InEsecuzione){PreparaUltima(0);return false;}
+            ultimaTentata=f.Versione;
+            try
+            {
+                var p=esecutore.Prepara(f.CopiaStato(),f.Versione,f.Generazione,0);
+                if(!esecutore.PubblicaCella(p,stepAssoluto))throw new InvalidOperationException("Coda di celle future piena o versione superata.");
+                Interlocked.Increment(ref numeroCompilazioni);Volatile.Write(ref ultimoErrore,null);return true;
+            }
+            catch(Exception e){Volatile.Write(ref ultimoErrore,"Cella futura non preparata: "+e.Message);return false;}
+        }
         public void ControllaScadenza()
         {
             long segnale = esecutore.Stato.SegnalePreparazione;

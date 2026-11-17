@@ -13,13 +13,84 @@ namespace VisualMusicBlockLooper.Core
         private readonly int[] sonanti = new int[16 * 128], shotRimanenti = new int[128];
         private readonly struct NoteOffPendente
         {
-            public NoteOffPendente(long tick,int indice,Action invio){Tick=tick;Indice=indice;Invio=invio;}
+            public NoteOffPendente(long tick,int indice,Action invio,int inizio,int ordine,long origine,string identita)
+            {Tick=tick;Indice=indice;Invio=invio;Inizio=inizio;Ordine=ordine;Origine=origine;Identita=identita;}
+            public readonly string Identita;
+            public readonly int Inizio,Ordine;
+            public readonly long Origine;
             public readonly long Tick;
             public readonly int Indice;
             public readonly Action Invio;
         }
         private readonly NoteOffPendente[] noteOffPendenti=new NoteOffPendente[4096];
         private int numeroNoteOffPendenti;
+        private sealed class AggiornamentoCella
+        {
+            public PartituraMidiPreparata Partitura;
+            public long Step;
+            public int Consumato;
+        }
+        private AggiornamentoCella[] celle=new AggiornamentoCella[0];
+        public bool PubblicaCella(PartituraMidiPreparata p,long stepAssoluto)
+        {
+            if(p==null)throw new ArgumentNullException(nameof(p));
+            if(stepAssoluto<0)throw new ArgumentOutOfRangeException(nameof(stepAssoluto));
+            while(p.Dati.Generazione==scambio.Generazione)
+            {
+                var prima=Volatile.Read(ref celle);
+                var lista=new System.Collections.Generic.List<AggiornamentoCella>();
+                foreach(var c in prima)
+                {
+                    if(Volatile.Read(ref c.Consumato)!=0||c.Partitura.Dati.Generazione!=scambio.Generazione)continue;
+                    if(c.Step==stepAssoluto){if(c.Partitura.Dati.VersioneFoglio>=p.Dati.VersioneFoglio)return false;continue;}
+                    lista.Add(c);
+                }
+                if(lista.Count>=64)return false;
+                lista.Add(new AggiornamentoCella{Partitura=p,Step=stepAssoluto});
+                if(Interlocked.CompareExchange(ref celle,lista.ToArray(),prima)==prima)return p.Dati.Generazione==scambio.Generazione;
+            }
+            return false;
+        }
+        private void AdottaCella()
+        {
+            long step=tickTempo/6;AggiornamentoCella scelta=null;
+            foreach(var c in Volatile.Read(ref celle))
+            {
+                var p=c.Partitura;
+                if(Volatile.Read(ref c.Consumato)!=0||p.Dati.Generazione!=scambio.Generazione
+                    ||!p.Dati.Struttura.Equals(attiva.Dati.Struttura)||p.Errore!=null||p.EventiPubblicati!=p.Eventi.Length)continue;
+                if(step<c.Step||(step-c.Step)%p.Dati.Struttura.StepGiro!=0)continue;
+                Interlocked.Exchange(ref c.Consumato,1);
+                if(p.Dati.VersioneFoglio>attiva.Dati.VersioneFoglio&&(scelta==null||p.Dati.VersioneFoglio>scelta.Partitura.Dati.VersioneFoglio))scelta=c;
+            }
+            if(scelta==null)return;
+            var nuova=scelta.Partitura;
+            for(int i=0;i<numeroNoteOffPendenti;i++)
+            {
+                var off=noteOffPendenti[i];int ordine=0;
+                foreach(var e in nuova.Eventi)
+                {
+                    if(!e.Dati.NoteOn||e.Dati.Tick!=off.Inizio||e.Dati.Canale*128+e.Dati.Nota!=off.Indice)continue;
+                    if(off.Identita!=null?e.Dati.Identita!=off.Identita:ordine++!=off.Ordine)continue;
+                    noteOffPendenti[i]=new NoteOffPendente(off.Origine+e.FineTick-off.Inizio,off.Indice,off.Invio,off.Inizio,off.Ordine,off.Origine,off.Identita);break;
+                }
+            }
+            // Restore the heap after changing live deadlines, without allocating on the clock thread.
+            for(int i=numeroNoteOffPendenti/2-1;i>=0;i--)
+            {
+                int j=i;var valore=noteOffPendenti[j];
+                while(j*2+1<numeroNoteOffPendenti)
+                {
+                    int f=j*2+1;
+                    if(f+1<numeroNoteOffPendenti&&noteOffPendenti[f+1].Tick<noteOffPendenti[f].Tick)f++;
+                    if(noteOffPendenti[f].Tick>=valore.Tick)break;
+                    noteOffPendenti[j]=noteOffPendenti[f];j=f;
+                }
+                noteOffPendenti[j]=valore;
+            }
+            scambio.Pubblica(nuova);
+            Volatile.Write(ref attiva,nuova);indiceEvento=PrimoEventoAlTick(nuova.Eventi,tickNelGiro);
+        }
         private readonly int canaleShot;
         private readonly Func<long> orologioMs;
         private readonly TapTempo tap = new TapTempo();
@@ -60,7 +131,18 @@ namespace VisualMusicBlockLooper.Core
         public double Bpm => Volatile.Read(ref bpm);
         public PartituraMidi PartituraAttiva => Volatile.Read(ref attiva)?.Dati;
         public long VersioneAttiva => PartituraAttiva?.VersioneFoglio ?? 0;
-        public long VersionePronta => scambio.VersionePronta;
+        public long VersionePronta
+        {
+            get
+            {
+                long versione=scambio.VersionePronta;
+                foreach(var c in Volatile.Read(ref celle))
+                    if(Volatile.Read(ref c.Consumato)==0&&c.Partitura.Dati.Generazione==scambio.Generazione
+                        &&c.Partitura.Errore==null&&c.Partitura.EventiPubblicati==c.Partitura.Eventi.Length)
+                        versione=Math.Max(versione,c.Partitura.Dati.VersioneFoglio);
+                return versione;
+            }
+        }
         public long Giro => Volatile.Read(ref giro);
         public long TickTempo => Volatile.Read(ref tickTempo);
         public long SegnaleOsservazione => Volatile.Read(ref segnaleOsservazione);
@@ -162,6 +244,7 @@ namespace VisualMusicBlockLooper.Core
                 int inizio = (attiva.Dati.Struttura.AInizio - 1) * 4;
                 int ultimoInizioMisura = ((attiva.Dati.Struttura.AFine - 1) * 4 / attiva.Dati.Struttura.StepPerMisura) * attiva.Dati.Struttura.StepPerMisura;
                 if (tickNelGiro == (Math.Max(inizio, ultimoInizioMisura) - inizio) * 6) Interlocked.Increment(ref segnalePreparazione);
+                if(tickNelGiro%6==0)AdottaCella();
                 if(!EseguiEventi())return;
                 PubblicaTrasporto(new IstantaneaTrasporto(attiva.Dati.Struttura,esecuzione,attiva.Dati.Generazione,true,
                     Math.Max(0,segnaleOsservazione-1),attiva.Dati.Struttura.IndiceMisuraAlTick(tickNelGiro),tickNelGiro,istante,periodoTickMs,attiva.Dati));
@@ -184,7 +267,10 @@ namespace VisualMusicBlockLooper.Core
                 if (e.Dati.NoteOn)
                 {
                     long distanza=Math.Max(1,e.FineTick-tickNelGiro);
-                    if(!InserisciNoteOff(tickTempo+distanza,indice,e.Off))
+                    int ordine=0;
+                    for(int j=indiceEvento-2;j>=0&&eventi[j].Dati.Tick==tickNelGiro;j--)
+                        if(eventi[j].Dati.NoteOn&&eventi[j].Dati.Canale*128+eventi[j].Dati.Nota==indice)ordine++;
+                    if(!InserisciNoteOff(tickTempo+distanza,indice,e.Off,tickNelGiro,ordine,tickTempo,e.Dati.Identita))
                     {
                         Volatile.Write(ref ultimoErrore,"Numero massimo di NoteOff pendenti raggiunto.");
                         Arresta();return false;
@@ -196,7 +282,7 @@ namespace VisualMusicBlockLooper.Core
             }
             return true;
         }
-        private bool InserisciNoteOff(long tick,int indice,Action invio)
+        private bool InserisciNoteOff(long tick,int indice,Action invio,int inizio,int ordine,long origine,string identita)
         {
             if(numeroNoteOffPendenti>=noteOffPendenti.Length)return false;
             int i=numeroNoteOffPendenti++;
@@ -206,7 +292,7 @@ namespace VisualMusicBlockLooper.Core
                 if(noteOffPendenti[padre].Tick<=tick)break;
                 noteOffPendenti[i]=noteOffPendenti[padre];i=padre;
             }
-            noteOffPendenti[i]=new NoteOffPendente(tick,indice,invio);return true;
+            noteOffPendenti[i]=new NoteOffPendente(tick,indice,invio,inizio,ordine,origine,identita);return true;
         }
         private void ScaricaNoteOffScadute()
         {
@@ -295,6 +381,7 @@ namespace VisualMusicBlockLooper.Core
         public void Silenzia()
         {
             inEsecuzione = false; richiestaPlay = false;
+            Interlocked.Exchange(ref celle,new AggiornamentoCella[0]);
             var t=trasporto;
             PubblicaTrasporto(new IstantaneaTrasporto(t.Struttura,t.Esecuzione,t.Generazione,false,
                 t.MisuraAssoluta,t.IndiceMisura,t.TickNelGiro,t.IstanteMs,0,t.Partitura));

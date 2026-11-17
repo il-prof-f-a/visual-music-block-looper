@@ -7,11 +7,13 @@ namespace VisualMusicBlockLooper.Core
         /// <param name="traccia">Traccia della griglia (indice 0-based).</param>
         /// <param name="idClip">Identificativo del clip associato alla nota.</param>
         /// <param name="noteOn">True per note-on, false per note-off.</param>
-        public EventoNota(int traccia, int idClip, bool noteOn)
+        public EventoNota(int traccia, int idClip, bool noteOn,int durataStep=0,string identita=null)
         {
             Traccia = traccia;
             IdClip = idClip;
             NoteOn = noteOn;
+            DurataStep = durataStep;
+            Identita = identita;
         }
 
         /// <summary>Traccia della nota.</summary>
@@ -22,5 +24,7 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>True se l'evento è un note-on, false se è un note-off.</summary>
         public bool NoteOn { get; }
+        public int DurataStep { get; }
+        public string Identita { get; }
     }
 }

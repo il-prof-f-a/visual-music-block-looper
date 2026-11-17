@@ -64,7 +64,7 @@ namespace VisualMusicBlockLooper.Core
                     do
                     {
                         var e=dati.Eventi[i];Action off=PreparaOff(uscita,e.Canale,e.Nota);
-                        eventi[i]=new EventoPronto(e,e.NoteOn?PreparaOn(uscita,e.Canale,e.Nota,e.Velocity):off,off,fini[i]);i++;
+                        eventi[i]=new EventoPronto(e,e.NoteOn?PreparaOn(uscita,e.Canale,e.Nota,e.Velocity):off,off,e.FineTick>=0?e.FineTick:fini[i]);i++;
                     }while(i<eventi.Length&&dati.Eventi[i].Tick==tick);
                     Volatile.Write(ref pronta.pubblicati,i);
                     if(!notificato){notificato=true;primoGruppo?.Invoke(pronta);}

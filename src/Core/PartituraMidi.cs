@@ -6,8 +6,10 @@ namespace VisualMusicBlockLooper.Core
 {
     public readonly struct EventoMidiProgrammato
     {
-        public EventoMidiProgrammato(int tick, int canale, int nota, int velocity, bool noteOn)
-        { Tick = tick; Canale = canale; Nota = nota; Velocity = velocity; NoteOn = noteOn; }
+        public EventoMidiProgrammato(int tick, int canale, int nota, int velocity, bool noteOn, int fineTick = -1,string identita=null)
+        { Tick = tick; Canale = canale; Nota = nota; Velocity = velocity; NoteOn = noteOn; FineTick = fineTick; Identita=identita; }
+        public string Identita { get; }
+        public int FineTick { get; }
         public int Tick { get; }
         public int Canale { get; }
         public int Nota { get; }

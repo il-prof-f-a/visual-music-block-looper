@@ -74,6 +74,8 @@ namespace VisualMusicBlockLooper.App
             Action<PartituraMidiPreparata> primoGruppo,long primaMisuraAssoluta=-1)
             =>PartituraMidiPreparata.PreparaProgressiva(compilatore.Compila(foglio,versioneFoglio,generazione,frontiera,primaMisuraAssoluta),uscita,primoGruppo);
         public bool Pubblica(PartituraMidiPreparata p) => Volatile.Read(ref eliminato) == 0 && Stato.Pubblica(p);
+        public bool PubblicaCella(PartituraMidiPreparata p,long stepAssoluto)
+            =>Volatile.Read(ref eliminato)==0&&Stato.PubblicaCella(p,stepAssoluto);
         public void AggiornaTavolo(StatoTavolo foglio)
         {
             if (foglio == null) return;

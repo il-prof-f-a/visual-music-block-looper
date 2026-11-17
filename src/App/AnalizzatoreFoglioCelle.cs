@@ -60,8 +60,8 @@ namespace VisualMusicBlockLooper.App
             var piano=candidataCelle;
             if(piano==null)
             {
-                var p=t.PosizioneLineare(orologio(),anticipo);
-                int indice=(t.IndiceMisura+anticipo)%s.MisurePerGiro;
+                var p=t.PosizioneLineareCelle(orologio(),anticipo);
+                int indice=(int)(p.MisuraAssoluta%s.MisurePerGiro);
                 int cella=Math.Min(s.StepPerMisura-1,(int)Math.Floor(p.Step));
                 var inizio=s.PosizioneMisuraGiro(indice);
                 double durata=s.TickFineMisura(indice)-s.TickInizioMisura(indice);
@@ -111,7 +111,13 @@ namespace VisualMusicBlockLooper.App
             {
                 var stato=interprete.Interpreta(lavoro,traccia);
                 if(!stato.Struttura.Equals(s))preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
-                else preparatore.AggiornaPerCella(stato,true,generazione,f.IstanteMs,piano.StepAssoluto);
+                else
+                {
+                    // Con +1 cella il contesto sinistro e gia trascorso: aggiornare la prossima
+                    // frontiera utile senza riattaccare eventi del passato o aspettare un giro intero.
+                    long pubblicazione=Math.Max(piano.StepAssoluto,motore.TickTempo/6+1);
+                    preparatore.AggiornaPerCella(stato,true,generazione,f.IstanteMs,pubblicazione);
+                }
                 if(preparatore.UltimoErrore!=null)
                 {
                     // Non dichiarare completata una modifica che il consumatore non ha ricevuto.

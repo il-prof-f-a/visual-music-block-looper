@@ -46,5 +46,20 @@ namespace VisualMusicBlockLooper.Core
             double step=p.StepInMisura+fase*(s.TickFineMisura(indice)-s.TickInizioMisura(indice))/Sequencer.TickPerStep;
             return new PosizioneIndicatore(step,p.RigheAttive,MisuraAssoluta+anticipo);
         }
+
+        /// <summary>Anticipo in sedicesimi visibili, attraverso i righi e il giro A-B.</summary>
+        public PosizioneIndicatore PosizioneLineareCelle(long ora,int celle=0)
+        {
+            if(celle<0)throw new ArgumentOutOfRangeException(nameof(celle));
+            var s=Struttura??StrutturaTavolo.Default;
+            long tickGiro=s.StepGiro*Sequencer.TickPerStep;
+            double futuro=TickNelGiro+FrazioneTick(ora)+(long)celle*Sequencer.TickPerStep;
+            long giri=(long)Math.Floor(futuro/tickGiro);
+            double tick=futuro-giri*tickGiro;
+            int indice=s.IndiceMisuraAlTick((int)Math.Floor(tick));
+            var p=s.Posizione((long)(tick/Sequencer.TickPerStep));
+            double step=p.StepInMisura+(tick%Sequencer.TickPerStep)/Sequencer.TickPerStep;
+            return new PosizioneIndicatore(step,p.RigheAttive,MisuraAssoluta-IndiceMisura+giri*s.MisurePerGiro+indice);
+        }
     }
 }

@@ -8,6 +8,27 @@ namespace VisualMusicBlockLooper.Tests
     [TestFixture]
     public class TrasportoLineareTests
     {
+        [Test]
+        public void SediciCelleAnticipanoUnRigoSuDueCollegatiAncheInSlave()
+        {
+            StrutturaTavolo.TryCrea(4,2,1,8,out var s);
+            var t=new IstantaneaTrasporto(s,1,1,true,0,0,12,100,20);
+            var futura=t.PosizioneLineareCelle(110,16);
+            Assert.That(futura.Step,Is.EqualTo(2.0+1.0/12).Within(1e-8));
+            Assert.That(futura.RigheAttive,Is.EqualTo(new[]{1,3,5}));
+            Assert.That(futura.MisuraAssoluta,Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AnticipoInCelleAttraversaIlGiroABParzialeSenzaCambiareUnita()
+        {
+            StrutturaTavolo.TryCrea(4,2,2,6,out var s);
+            var t=new IstantaneaTrasporto(s,1,1,true,1,1,114,100,20);
+            var futura=t.PosizioneLineareCelle(100,2);
+            Assert.That(futura.Step,Is.EqualTo(5));
+            Assert.That(futura.RigheAttive,Is.EqualTo(new[]{0,2,4}));
+            Assert.That(futura.MisuraAssoluta,Is.EqualTo(2));
+        }
         private sealed class UscitaNulla : IUscitaMidi
         {
             public void Clock(){}public void Start(){}public void Stop(){}public void Continue(){}

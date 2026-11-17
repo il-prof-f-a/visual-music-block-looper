@@ -66,7 +66,7 @@ namespace VisualMusicBlockLooper.Tests
 
                 Assert.That(colonna.ToArgb(), Is.Not.EqualTo(Color.White.ToArgb()));
                 Assert.That(colonna.R, Is.GreaterThan(200));
-                Assert.That(colonna.B, Is.LessThan(230));
+                Assert.That(colonna.B, Is.GreaterThan(colonna.R));
                 Assert.That(successiva.ToArgb(), Is.EqualTo(Color.White.ToArgb()));
             }
         }
@@ -474,8 +474,8 @@ namespace VisualMusicBlockLooper.Tests
                 {
                     Point p = CentroTavolo(riga, 3);
                     Color c = bmp.GetPixel(p.X, p.Y);
-                    Assert.That(c.R, Is.EqualTo(255), "riga " + riga);
-                    Assert.That(c.B, Is.LessThan(200), "riga " + riga);
+                    Assert.That(c.B, Is.GreaterThan(c.R), "riga " + riga);
+                    Assert.That(c.R, Is.GreaterThan(c.G), "riga " + riga);
                 }
 
                 foreach (int riga in new[] { 0, 2, 4 })

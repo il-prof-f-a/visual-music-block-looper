@@ -6,13 +6,14 @@ namespace VisualMusicBlockLooper.App
     public readonly struct IndicatoriScansione
     {
         public IndicatoriScansione(bool visibili,PosizioneIndicatore esecuzione,PosizioneIndicatore prevista,
-            PosizioneIndicatore? completata,bool inLettura)
-        {Visibili=visibili;Esecuzione=esecuzione;Prevista=prevista;Completata=completata;InLettura=inLettura;}
+            PosizioneIndicatore? completata,bool inLettura,int anticipoCelle=0)
+        {Visibili=visibili;Esecuzione=esecuzione;Prevista=prevista;Completata=completata;InLettura=inLettura;AnticipoCelle=anticipoCelle;}
         public bool Visibili { get; }
         public PosizioneIndicatore Esecuzione { get; }
         public PosizioneIndicatore Prevista { get; }
         public PosizioneIndicatore? Completata { get; }
         public bool InLettura { get; }
+        public int AnticipoCelle { get; }
     }
 
     /// <summary>Solo UI: transizione conservativa fra due risultati acquisiti, senza prevedere il lavoro del decoder.</summary>
@@ -27,7 +28,7 @@ namespace VisualMusicBlockLooper.App
         private static bool Compatibile(LetturaScansione l,IstantaneaTrasporto t)=>l!=null
             &&l.Trasporto.Esecuzione==t.Esecuzione&&l.Trasporto.Generazione==t.Generazione
             &&l.Trasporto.Struttura.Equals(t.Struttura);
-        public IndicatoriScansione Leggi(IstantaneaTrasporto t,StatoScansione scansione,int anticipo,long ora,bool attivi=true)
+        public IndicatoriScansione Leggi(IstantaneaTrasporto t,StatoScansione scansione,int anticipo,long ora,bool attivi=true,bool anticipoInCelle=false)
         {
             if(!attivi||!t.InEsecuzione||t.Struttura==null)
             {ultima=null;return default;}
@@ -47,8 +48,8 @@ namespace VisualMusicBlockLooper.App
             }
             PosizioneIndicatore? completata=ultima==null?(PosizioneIndicatore?)null:
                 ultima.PosizioneAllaCoordinata(Coordinata(ora));
-            return new IndicatoriScansione(true,t.PosizioneLineare(ora),t.PosizioneLineare(ora,anticipo),
-                completata,Compatibile(scansione.InCorso,t));
+            return new IndicatoriScansione(true,t.PosizioneLineare(ora),anticipoInCelle?t.PosizioneLineareCelle(ora,anticipo):t.PosizioneLineare(ora,anticipo),
+                completata,Compatibile(scansione.InCorso,t),anticipoInCelle?anticipo:0);
         }
     }
 }

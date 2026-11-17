@@ -102,7 +102,7 @@ namespace VisualMusicBlockLooper.App
         public bool ScansioneABlocchiAnticipata { get; set; } = true;
 
         public static bool AnticipoScansioneValido(int valore)=>valore==1||valore==2||valore==4||valore==8||valore==16;
-        /// <summary>Anticipo live: 1, 2, 4, 8 o 16 misure (default 4).</summary>
+        /// <summary>Anticipo live dell’app in celle: 1, 2, 4, 8 o 16 (default 4). Nome JSON storico conservato.</summary>
         public int MisureAnticipoScansione { get; set; } = 4;
 
         /// <summary>Scarto massimo del QR dai riferimenti della griglia, come frazione di cella (0..0,49).</summary>

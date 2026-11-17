@@ -11,6 +11,38 @@ namespace VisualMusicBlockLooper.Tests
     [TestFixture]
     public class IndicatoriScansioneTests
     {
+        [Test]
+        public void IndicatoreAppAnticipaSediciCelleInveceDiSediciRighi()
+        {
+            StrutturaTavolo.TryCrea(4,2,1,8,out var s);
+            var t=new IstantaneaTrasporto(s,1,1,true,0,0,12,100,20);
+            var i=new PresentatoreScansione().Leggi(t,StatoScansione.Vuoto,16,100,anticipoInCelle:true);
+            Assert.That(i.Esecuzione.RigheAttive,Is.EqualTo(new[]{0,2,4}));
+            Assert.That(i.Prevista.RigheAttive,Is.EqualTo(new[]{1,3,5}));
+            Assert.That(i.AnticipoCelle,Is.EqualTo(16));
+            Assert.That(i.Prevista.Step,Is.EqualTo(i.Esecuzione.Step));
+        }
+
+        [Test]
+        public void RenderDistingueFasciaDiRiproduzioneArancioFuturoEBluConfermato()
+        {
+            StrutturaTavolo.TryCrea(4,2,1,8,out var s);
+            var cfg=new ConfigGriglia();var t=new IstantaneaTrasporto(s,1,1,true,0,0,12,100,20);
+            var letta=new LetturaScansione(t,1,1,1,100,100,120,3.0/16);
+            var i=new PresentatoreScansione().Leggi(t,new StatoScansione(null,letta,letta,"ok"),16,120,anticipoInCelle:true);
+            using(var b=new Bitmap(1280,720))using(var g=Graphics.FromImage(b))
+            {
+                g.Clear(Color.White);var r=new RenderGuida(cfg);
+                r.Disegna(g,b.Size,new StatoTavolo(null,null,null,s),s.Posizione(2),true);
+                r.DisegnaIndicatori(g,b.Size,i);
+                var fascia=b.GetPixel(200,60);
+                Assert.That(fascia.B,Is.GreaterThan(fascia.R),"La riproduzione non deve piu avere una fascia arancio.");
+                int x=(int)System.Math.Round(i.Prevista.Step*1280/16);
+                Assert.That(b.GetPixel(x,180).ToArgb(),Is.EqualTo(Color.DarkOrange.ToArgb()));
+                Assert.That(b.GetPixel(240,180).ToArgb(),Is.EqualTo(RenderGuida.ColoreScansioneCompletata.ToArgb()));
+                b.Save(Path.Combine(Path.GetTempPath(),"VMBL-offset-celle.png"));
+            }
+        }
         private sealed class Proiettore : FormProiettore
         {
             public Proiettore(ConfigGriglia cfg):base(cfg,LayoutTavolo.Default){}

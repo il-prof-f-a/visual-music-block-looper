@@ -44,8 +44,8 @@ namespace VisualMusicBlockLooper.App
             rileggi.Click+=(m,a)=>compositore.RileggiFoglio();
             pulsanteSalvaTempiMidi=new Button {Name="pulsanteSalvaTempiMidi",Text="Salva tempi MIDI",Left=200,Top=714,Width=145,Height=28,TabIndex=33};
             pulsanteSalvaTempiMidi.Click+=async(m,a)=>await SalvaTempiMidi();
-            var combo=new ComboBox {Name="comboOsservazione",AccessibleName="Misure in anticipo per analisi",Left=360,Top=716,Width=385,DropDownStyle=ComboBoxStyle.DropDownList,TabIndex=34};
-            combo.Items.AddRange(new object[]{"1 misura in anticipo","2 misure in anticipo","4 misure in anticipo","8 misure in anticipo","16 misure in anticipo"});
+            var combo=new ComboBox {Name="comboOsservazione",AccessibleName="Celle in anticipo per analisi",Left=360,Top=716,Width=385,DropDownStyle=ComboBoxStyle.DropDownList,TabIndex=34};
+            combo.Items.AddRange(new object[]{"1 cella in anticipo","2 celle in anticipo","4 celle in anticipo","8 celle in anticipo","16 celle in anticipo"});
             if(compositore.Analizzatore!=null)compositore.Analizzatore.PulsazioniPerOsservazione=configurazione.PulsazioniPerOsservazione;
             int[] anticipi={1,2,4,8,16};
             int indice=Array.IndexOf(anticipi,configurazione.MisureAnticipoScansione);
@@ -60,7 +60,7 @@ namespace VisualMusicBlockLooper.App
             };
             etichettaVersioniFoglio=new Label {Name="etichettaVersioniFoglio",Left=10,Top=750,Width=735,Height=70,AutoEllipsis=true,ForeColor=Color.DarkBlue};
             suggerimentiDebug.SetToolTip(rileggi,"Forza una nuova scansione completa del foglio. Durante l'esecuzione la nuova partitura entrerà alla prossima frontiera del giro.");
-            suggerimentiDebug.SetToolTip(combo,"Scegli 1, 2, 4, 8 o 16 misure in anticipo anche durante Play. Arancio: posizione prevista; si leggono tre celle vicine per ogni voce parallela. Azzurro: ultima cella confermata da tutte le voci. Il salto riparte sul primo frame nuovo.");
+            suggerimentiDebug.SetToolTip(combo,"Scegli 1, 2, 4, 8 o 16 celle in anticipo anche durante Play. Arancio: posizione prevista; si leggono tre celle vicine per ogni voce parallela. Azzurro: ultima cella confermata da tutte le voci. Il salto riparte sul primo frame nuovo.");
             Controls.AddRange(new Control[]{rileggi,pulsanteSalvaTempiMidi,combo,etichettaVersioniFoglio});
         }
         private void AggiornaStatoMidi()
@@ -91,7 +91,7 @@ namespace VisualMusicBlockLooper.App
             if(analisi?.IndicatoriScansioneAttivi==true)
             {
                 var scansione=analisi.Scansione;var letta=scansione.UltimaCompletata;
-                testo+=Environment.NewLine+"Arancio: scansione prevista +"+analisi.MisureAnticipoScansione+" misure | Azzurro: ";
+                testo+=Environment.NewLine+"Arancio: scansione prevista +"+analisi.MisureAnticipoScansione+" celle | Azzurro: ";
                 testo+=letta==null?scansione.Esito:
                     $"letta m{letta.MisuraAssoluta+1}, frame {letta.FrameId}, {letta.FineMs-letta.InizioMs} ms (età frame {Math.Max(0,orologioMs()-letta.IstanteFrameMs)} ms) | {scansione.Esito}";
             }
@@ -113,7 +113,8 @@ namespace VisualMusicBlockLooper.App
             var posizione=attiva?.PosizioneAlTick(trasporto.TickNelGiro)??e.Posizione;
             var analisi=compositore.Analizzatore;
             proiettore.AggiornaIndicatori(presentatoreScansione.Leggi(trasporto,analisi?.Scansione,
-                analisi?.MisureAnticipoScansione??4,orologioMs(),analisi?.IndicatoriScansioneAttivi==true));
+                analisi?.MisureAnticipoScansione??4,orologioMs(),analisi?.IndicatoriScansioneAttivi==true,
+                anticipoInCelle:analisi?.ScansioneCelleAttiva==true));
             var osservato=compositore.UltimoStato;
             if(!ReferenceEquals(attiva,partituraDisegnata)||!ReferenceEquals(osservato,osservatoDisegnato))
             {

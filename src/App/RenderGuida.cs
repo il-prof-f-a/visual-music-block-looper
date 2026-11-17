@@ -12,10 +12,10 @@ namespace VisualMusicBlockLooper.App
     public class RenderGuida
     {
         private static readonly Color ColoreGriglia = Color.LightGray;
-        private static readonly Color ColorePlayhead = Color.FromArgb(90, 255, 140, 0);
+        private static readonly Color ColorePlayhead = Color.FromArgb(65, 153, 50, 204);
         private static readonly Color ColoreContornoPlayhead = Color.Gray;
         public static readonly Color ColoreScansionePrevista=Color.DarkOrange;
-        public static readonly Color ColoreScansioneCompletata=Color.DeepSkyBlue;
+        public static readonly Color ColoreScansioneCompletata=Color.RoyalBlue;
         private static readonly Color ColoreNota = Color.FromArgb(255, 60, 179, 75);
         private static readonly Color ColoreErrore = Color.FromArgb(255, 220, 30, 30);
 
@@ -249,14 +249,16 @@ namespace VisualMusicBlockLooper.App
             var griglia=InPixel(config.Area,dimensione);
             DisegnaLinea(g,griglia,indicatori.Esecuzione,Color.DarkOrchid,1);
             if(indicatori.Completata.HasValue)
-                DisegnaLinea(g,griglia,indicatori.Completata.Value,ColoreScansioneCompletata,3);
+                DisegnaLinea(g,griglia,indicatori.Completata.Value,ColoreScansioneCompletata,5);
             DisegnaLinea(g,griglia,indicatori.Prevista,ColoreScansionePrevista,2);
             if(griglia.Bottom+18<=dimensione.Height)
             {
                 using(var viola=new SolidBrush(ColoreScansionePrevista))
                 using(var azzurro=new SolidBrush(ColoreScansioneCompletata))
                 {
-                    g.DrawString("Scansione prevista +"+(indicatori.Prevista.MisuraAssoluta-indicatori.Esecuzione.MisuraAssoluta)+" misure",
+                    string anticipo=indicatori.AnticipoCelle>0?indicatori.AnticipoCelle+" celle":
+                        (indicatori.Prevista.MisuraAssoluta-indicatori.Esecuzione.MisuraAssoluta)+" misure";
+                    g.DrawString("Scansione prevista +"+anticipo,
                         SystemFonts.MessageBoxFont,viola,griglia.Left,griglia.Bottom+3);
                     g.DrawString("Ultima scansione confermata",SystemFonts.MessageBoxFont,azzurro,griglia.Left+260,griglia.Bottom+3);
                 }

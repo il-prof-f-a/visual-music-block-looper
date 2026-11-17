@@ -11,6 +11,30 @@ namespace VisualMusicBlockLooper.Tests
     public class ScansioneCelleTests
     {
         [Test]
+        public void AnticipoUnaCellaPubblicaPrimaDelProssimoAttaccoSenzaAttendereIlGiro()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var cal=NoteContigueVisionTests.Calibra(false);var uscita=new EsecutorePartituraTests.Uscita();
+            using(var bianco=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var scena=NoteContigueVisionTests.Scena(false))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(uscita,null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var prep=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,prep,new RegistroCatture(),()=>ora,
+                    true,null,true,1,scansioneCelle:true))
+                {
+                    r.Pubblica(bianco,ora);a.Passo(true);e.Avvia();e.TickInterno();
+                    for(int j=0;j<198;j++)e.TickInterno();
+                    for(int j=0;j<2;j++){ora+=30;r.Pubblica(scena,ora);a.Passo();}
+                    var nota=prep.Foglio.Ultima.CopiaStato().Note.Single(n=>n.Riga==2&&n.StepIniziale==3);
+                    for(int j=0;j<12;j++)e.TickInterno();
+                    Assert.That(uscita.Eventi,Does.Contain("On:"+nota.Traccia+":"+(nota.IdClip+36)),
+                        "Una cella di anticipo non deve rinviare tutto al giro successivo.");
+                }
+            }
+        }
+        [Test]
         public void TreCelleConMargineSuTutteLeVociParallele()
         {
             StrutturaTavolo.TryCrea(4,2,1,8,out var s);
@@ -61,11 +85,11 @@ namespace VisualMusicBlockLooper.Tests
                     for(int i=0;i<6;i++)e.TickInterno();
                     ora+=50;r.Pubblica(bianco,ora);
                     Assert.That(a.Passo(),Is.True,"Una nuova cella non aspetta la misura successiva.");
-                    Assert.That(a.Scansione.UltimaCompletata.Posizione.Step,Is.EqualTo(1).Within(1e-8));
+                    Assert.That(a.Scansione.UltimaCompletata.Posizione.Step,Is.EqualTo(5).Within(1e-8));
                     Assert.That(a.UltimeRegioni.Where(z=>z.X>=cfg.Area.X).All(z=>z.Larghezza<cfg.Area.Larghezza*.26),Is.True);
                     var prima=a.Scansione.UltimaCompletata;
                     for(int i=0;i<6;i++)e.TickInterno();
-                    Cv2.Rectangle(scuro,new Rect(210,580,300,145),Scalar.Black,-1);
+                    Cv2.Rectangle(scuro,new Rect(210,580,1100,145),Scalar.Black,-1);
                     ora+=50;r.Pubblica(scuro,ora);a.Passo();
                     Assert.That(a.Scansione.UltimaCompletata,Is.SameAs(prima),"Una voce buia non conferma le altre da sola.");
                 }
@@ -87,7 +111,7 @@ namespace VisualMusicBlockLooper.Tests
                     true,null,true,2,scansioneCelle:true))
                 {
                     r.Pubblica(bianco,ora);a.Passo(true);e.Avvia();e.TickInterno();
-                    for(int i=0;i<18;i++)e.TickInterno();
+                    for(int i=0;i<198;i++)e.TickInterno();
                     ora+=30;r.Pubblica(scena,ora);a.Passo();
                     Assert.That(prep.Foglio.Ultima.CopiaStato().Note,Is.Empty,"Non pubblicare la prima candidata.");
                     if(codaPiena)
@@ -100,13 +124,13 @@ namespace VisualMusicBlockLooper.Tests
                     {
                         Assert.That(a.UltimoStato.Note,Is.Empty,"Il catalogo non anticipa una pubblicazione fallita.");
                         Assert.That(a.Scansione.UltimaCompletata,Is.Null,"Il blu non certifica una modifica rifiutata.");
-                        for(int i=0;i<6;i++)e.TickInterno();
+                        for(int i=0;i<12;i++)e.TickInterno();
                         ora+=30;r.Pubblica(scena,ora);a.Passo();
                         Assert.That(prep.UltimoErrore,Is.Null);
                     }
                     Assert.That(prep.Foglio.Ultima.CopiaStato().Note.Any(n=>n.Riga==2&&n.StepIniziale==3),Is.True);
                     long versione=prep.Foglio.Ultima.Versione;
-                    a.MisureAnticipoScansione=8; // stesso rigo nel giro successivo, nuova osservazione esplicita
+                    a.MisureAnticipoScansione=1; // nuova finestra che include ancora il QR locale
                     ora+=30;r.Pubblica(bianco,ora);a.Passo();
                     Assert.That(prep.Foglio.Ultima.Versione,Is.EqualTo(versione));
                     ora+=30;r.Pubblica(bianco,ora);a.Passo();

@@ -64,7 +64,7 @@ namespace VisualMusicBlockLooper.Tests
                 var bottone=f.Controls.Find("pulsanteRileggiFoglio",true).Single();int larghezza=bottone.Width;
                 var iniziale=f.ClientSize;f.ClientSize=new Size(iniziale.Width*2,iniziale.Height*2);
                 Assert.That(bottone.Width,Is.EqualTo(larghezza*2).Within(2));
-                var combo=(ComboBox)f.Controls.Find("comboOsservazione",true).Single();Assert.That(combo.Items.Cast<string>(),Is.EqualTo(new[]{"1 misura in anticipo","2 misure in anticipo","4 misure in anticipo","8 misure in anticipo","16 misure in anticipo"}));
+                var combo=(ComboBox)f.Controls.Find("comboOsservazione",true).Single();Assert.That(combo.Items.Cast<string>(),Is.EqualTo(new[]{"1 cella in anticipo","2 celle in anticipo","4 celle in anticipo","8 celle in anticipo","16 celle in anticipo"}));
                 combo.SelectedIndex=4;
                 Assert.That(configApp.MisureAnticipoScansione,Is.EqualTo(16));
                 Assert.That(c.Analizzatore.MisureAnticipoScansione,Is.EqualTo(16));

@@ -313,6 +313,35 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void CambioAnticipoInPlaySaltaSubitoAllaNuovaDestinazioneNellaStessaMisura()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};
+            var cal=NoteContigueVisionTests.Calibra(false);
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,true,null,true,4))
+                {
+                    r.Pubblica(vuoto,ora);a.Passo(true);e.Avvia();e.TickInterno();
+                    ora+=66;r.Pubblica(vuoto,ora);a.Passo();
+                    Assert.That(a.Scansione.UltimaCompletata.MisuraAssoluta,Is.EqualTo(4));
+                    var proprieta=typeof(AnalizzatoreFoglio).GetProperty("MisureAnticipoScansione");
+                    Assert.That(proprieta.CanWrite,Is.True,"L'anticipo deve poter cambiare durante Play.");
+                    foreach(int anticipo in new[]{16,1,8,2,4})
+                    {
+                        proprieta.SetValue(a,anticipo);
+                        ora+=66;r.Pubblica(vuoto,ora);
+                        Assert.That(a.Passo(),Is.True,"Non attendere la prossima misura dopo la selezione.");
+                        Assert.That(a.Scansione.UltimaCompletata.MisuraAssoluta,Is.EqualTo(anticipo));
+                        Assert.That(e.Stato.InEsecuzione,Is.True);
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void LineaCompletataAttendeTutteLeRigheSimultaneeERiprovaSoloLaRigaBuia()
         {
             long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);

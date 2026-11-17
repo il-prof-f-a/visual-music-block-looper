@@ -22,6 +22,19 @@ namespace VisualMusicBlockLooper.Tests
         private static LetturaScansione Lettura(long misura,long inizio,long fine,long frame=1)
             =>new LetturaScansione(Trasporto(0,inizio),misura,(int)(misura%6),frame,inizio,inizio,fine);
 
+        [TestCase(1),TestCase(2),TestCase(4),TestCase(8),TestCase(16)]
+        public void AnticipoSceltoSpostaSubitoLaLineaSenzaCambiareRiproduzione(int anticipo)
+        {
+            var p=new PresentatoreScansione();var t=Trasporto(36);
+            var prima=p.Leggi(t,StatoScansione.Vuoto,4,110);
+            var dopo=p.Leggi(t,StatoScansione.Vuoto,anticipo,110);
+            Assert.That(dopo.Prevista.MisuraAssoluta,Is.EqualTo(anticipo));
+            Assert.That(dopo.Prevista.RigheAttive,Is.EqualTo(new[]{anticipo%6}));
+            Assert.That(dopo.Esecuzione.Step,Is.EqualTo(prima.Esecuzione.Step));
+            Assert.That(dopo.Prevista.Step,Is.EqualTo(prima.Prevista.Step));
+            Assert.That(RenderGuida.ColoreScansionePrevista,Is.EqualTo(Color.DarkOrange));
+        }
+
         [Test]
         public void LineaPrevistaCondivideClockEOffsetConLaPianificazione()
         {
@@ -32,6 +45,17 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(i.Prevista.MisuraAssoluta,Is.EqualTo(4));
             Assert.That(i.Prevista.RigheAttive,Is.EqualTo(new[]{4}));
             Assert.That(i.Completata.HasValue,Is.False);
+        }
+
+        [Test]
+        public void RiduzioneAnticipoMostraIlNuovoRisultatoAncheSeLaUiNonVedeIlResetIntermedio()
+        {
+            var p=new PresentatoreScansione();var lontana=Lettura(16,100,120);
+            p.Leggi(Trasporto(),new StatoScansione(null,lontana,lontana,"ok"),16,120);
+            var vicina=Lettura(1,140,160,2);
+            var i=p.Leggi(Trasporto(),new StatoScansione(null,vicina,vicina,"ok"),1,160);
+            Assert.That(i.Prevista.MisuraAssoluta,Is.EqualTo(1));
+            Assert.That(i.Completata.Value.MisuraAssoluta,Is.EqualTo(1));
         }
 
         [Test]

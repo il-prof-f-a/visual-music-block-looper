@@ -100,7 +100,12 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [TestCase(0,4)]
-        [TestCase(2,4)]
+        [TestCase(1,1)]
+        [TestCase(2,2)]
+        [TestCase(16,16)]
+        [TestCase(3,4)]
+        [TestCase(5,4)]
+        [TestCase(17,4)]
         [TestCase(9,4)]
         [TestCase(4,4)]
         [TestCase(8,8)]

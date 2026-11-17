@@ -14,7 +14,7 @@ namespace VisualMusicBlockLooper.App
         private static readonly Color ColoreGriglia = Color.LightGray;
         private static readonly Color ColorePlayhead = Color.FromArgb(90, 255, 140, 0);
         private static readonly Color ColoreContornoPlayhead = Color.Gray;
-        public static readonly Color ColoreScansionePrevista=Color.DarkOrchid;
+        public static readonly Color ColoreScansionePrevista=Color.DarkOrange;
         public static readonly Color ColoreScansioneCompletata=Color.DeepSkyBlue;
         private static readonly Color ColoreNota = Color.FromArgb(255, 60, 179, 75);
         private static readonly Color ColoreErrore = Color.FromArgb(255, 220, 30, 30);
@@ -247,7 +247,7 @@ namespace VisualMusicBlockLooper.App
         {
             if(!indicatori.Visibili||config.Step<=0||config.Tracce<=0)return;
             var griglia=InPixel(config.Area,dimensione);
-            DisegnaLinea(g,griglia,indicatori.Esecuzione,Color.DarkOrange,1);
+            DisegnaLinea(g,griglia,indicatori.Esecuzione,Color.DarkOrchid,1);
             if(indicatori.Completata.HasValue)
                 DisegnaLinea(g,griglia,indicatori.Completata.Value,ColoreScansioneCompletata,3);
             DisegnaLinea(g,griglia,indicatori.Prevista,ColoreScansionePrevista,2);

@@ -21,6 +21,7 @@ namespace VisualMusicBlockLooper.App
         private LetturaScansione ultima;
         private double partenza,destinazione,durata;
         private long inizio;
+        private int ultimoAnticipo;
         private double Coordinata(long ora)=>partenza+(destinazione-partenza)
             *(durata>0?Math.Max(0,Math.Min(1,(ora-inizio)/durata)):1);
         private static bool Compatibile(LetturaScansione l,IstantaneaTrasporto t)=>l!=null
@@ -30,6 +31,7 @@ namespace VisualMusicBlockLooper.App
         {
             if(!attivi||!t.InEsecuzione||t.Struttura==null)
             {ultima=null;return default;}
+            if(anticipo!=ultimoAnticipo){ultima=null;ultimoAnticipo=anticipo;}
             scansione=scansione??StatoScansione.Vuoto;
             if(!Compatibile(ultima,t)||scansione.UltimaCompletata==null)ultima=null;
             var nuova=scansione.UltimaCompletata;

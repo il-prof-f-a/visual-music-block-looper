@@ -15,6 +15,9 @@ namespace VisualMusicBlockLooper.Tests
     [TestFixture,Apartment(ApartmentState.STA)]
     public class InterfacciaMidiDeterministicaTests
     {
+        private sealed class FonteVuota : VisualMusicBlockLooper.Vision.IFonteImmagini
+        { public OpenCvSharp.Mat Frame()=>null; }
+
         [Test]
         public void FermaAnnullaAncheUnPlayInAttesaDelPrimoFoglio()
         {
@@ -36,12 +39,12 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void StatoVersioniRiletturaETempiMidiSonoAccessibiliERidimensionabili()
         {
-            var cfg=new ConfigGriglia();var fonte=new RilevatoreCommutabile();var configApp=new ConfigurazioneApplicazione();
+            var cfg=new ConfigGriglia();var fonte=new RilevatoreCommutabile();var configApp=new ConfigurazioneApplicazione{PulsazioniPerOsservazione=2};
             string percorso=Path.Combine(Path.GetTempPath(),"vmbl-bpm-"+Guid.NewGuid().ToString("N")+".json");
             try
             {
             using(var c=new Compositore(fonte,new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,
-                orologioMs:()=>0,esecuzioneDeterministica:true))
+                orologioMs:()=>0,esecuzioneDeterministica:true,fonteVideo:new FonteVuota(),scansioneABlocchiAnticipata:true))
             using(var f=new FormControllo(c,new FormProiettore(cfg),new GestoreWebcam(i=>null),fonte,
                 "calibrazione-test.txt",configApp,percorso,new List<InfoWebcam>(),()=>0,"MIDI",new List<string>(),new List<IDisposable>(),false))
             {
@@ -61,8 +64,13 @@ namespace VisualMusicBlockLooper.Tests
                 var bottone=f.Controls.Find("pulsanteRileggiFoglio",true).Single();int larghezza=bottone.Width;
                 var iniziale=f.ClientSize;f.ClientSize=new Size(iniziale.Width*2,iniziale.Height*2);
                 Assert.That(bottone.Width,Is.EqualTo(larghezza*2).Within(2));
-                var combo=(ComboBox)f.Controls.Find("comboOsservazione",true).Single();combo.SelectedIndex=2;
-                Assert.That(configApp.PulsazioniPerOsservazione,Is.EqualTo(2));
+                var combo=(ComboBox)f.Controls.Find("comboOsservazione",true).Single();Assert.That(combo.Items.Cast<string>(),Is.EqualTo(new[]{"1 misura in anticipo","2 misure in anticipo","4 misure in anticipo","8 misure in anticipo","16 misure in anticipo"}));
+                combo.SelectedIndex=4;
+                Assert.That(configApp.MisureAnticipoScansione,Is.EqualTo(16));
+                Assert.That(c.Analizzatore.MisureAnticipoScansione,Is.EqualTo(16));
+                Assert.That(c.Analizzatore.PulsazioniPerOsservazione,Is.EqualTo(2),"Il menu dell’anticipo preserva la cadenza configurata.");
+                typeof(FormControllo).GetMethod("SalvaDaTimer",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(f,null);
+                Assert.That(ConfigurazioneApplicazione.Carica(percorso).MisureAnticipoScansione,Is.EqualTo(16));
             }
             }
             finally

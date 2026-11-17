@@ -52,6 +52,15 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(r.Catalogo.Single().FineEstensioneX,Is.EqualTo(.375).Within(.006));
             }
         }
+        [Test] public void BordoDellaFinestraNonAccorciaUnaFineGiaNotaPiuLontana()
+        {
+            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.White))
+            {
+                Cv2.Rectangle(f,new Rect(370,120,430,60),new Scalar(40,40,220),-1);
+                var r=Lettore().Leggi(f,new RettangoloTavolo(.375,.17,.1875,1.0/6),new[]{Nota(.8)});
+                Assert.That(r.Catalogo.Single().FineEstensioneX,Is.EqualTo(.8));
+            }
+        }
         [Test] public void FrontieraOsservataContinuaNellaFinestraSuccessiva()
         {
             using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.White))
@@ -100,6 +109,7 @@ namespace VisualMusicBlockLooper.Tests
         }
     }
 }
+
 
 
 

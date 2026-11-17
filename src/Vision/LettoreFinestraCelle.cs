@@ -57,7 +57,8 @@ namespace VisualMusicBlockLooper.Vision
                     var precedente=catalogo.FirstOrDefault(c=>GeometriaRegioni.StessaPosizioneQr(c.AreaQr??c.Area,letto.AreaQr.Value));
                     letto.Colore=ColoreQr(colori,regione,letto.AreaQr.Value,frame.Size())??precedente?.Colore;
                     if(letto.Colore.HasValue)letto.FineEstensioneX=Segui(colori,regione,letto,Math.Max(zona.X,letto.AreaQr.Value.X+1.15*letto.AreaQr.Value.Larghezza),zona.X+zona.Larghezza,frame.Size(),true);
-                    if(precedente!=null)catalogo.Remove(precedente);
+                    if(precedente!=null)
+                    {letto.FineEstensioneX=ConservaFineNonOsservata(letto.FineEstensioneX,precedente.FineEstensioneX,zona,frame.Size());catalogo.Remove(precedente);}
                     catalogo.Add(letto);associati.Add(letto);
                 }
                 foreach(var c in catalogo.ToArray())
@@ -77,7 +78,7 @@ namespace VisualMusicBlockLooper.Vision
                         &&qr.Y+qr.Altezza/2>=zona.Y&&qr.Y+qr.Altezza/2<=zona.Y+zona.Altezza)
                     {
                         if(scuri>regione.Width*regione.Height*.8){completa=false;continue;}
-                        c.FineEstensioneX=Segui(colori,regione,c,zona.X,zona.X+zona.Larghezza,frame.Size());codaConosciuta=true;
+                        c.FineEstensioneX=ConservaFineNonOsservata(Segui(colori,regione,c,zona.X,zona.X+zona.Larghezza,frame.Size()),c.FineEstensioneX,zona,frame.Size());codaConosciuta=true;
                     }
                 }
                 // Colore sconosciuto non e prova di una rimozione o di un QR decodificato.
@@ -91,6 +92,13 @@ namespace VisualMusicBlockLooper.Vision
                 }
                 return new LetturaZona(catalogo.AsReadOnly(),completa,letti.Count,regione){RegioneMaschera=regione};
             }
+        }
+        // Il bordo del ritaglio e una frontiera osservata, non una fine fisica del corpo.
+        private static double? ConservaFineNonOsservata(double? osservata,double? precedente,RettangoloTavolo zona,Size frame)
+        {
+            if(osservata.HasValue&&precedente.HasValue&&osservata.Value>=zona.X+zona.Larghezza-2.0/Math.Max(frame.Width,frame.Height))
+                return Math.Max(osservata.Value,precedente.Value);
+            return osservata;
         }
         private ColoreTraccia? ColoreQr(sbyte[,] colori,Rect regione,RettangoloTavolo qr,Size frame)
         {
@@ -143,6 +151,7 @@ namespace VisualMusicBlockLooper.Vision
         }
     }
 }
+
 
 
 

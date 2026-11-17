@@ -12,6 +12,21 @@ namespace VisualMusicBlockLooper.Tests
         private static ConfigGriglia Griglia()=>new ConfigGriglia();
         private static CartoncinoRilevato Nota(double fine=.4)=>new CartoncinoRilevato { Payload="VMBL1;N;64",Colore=ColoreTraccia.Rosso,Area=new RettangoloTavolo(.1,.2,.3,.1),AreaQr=new RettangoloTavolo(.12,.22,.05,.05),FineEstensioneX=fine };
         private static LettoreFinestraCelle Lettore()=>new LettoreFinestraCelle(NoteContigueVisionTests.Calibra(false,1000,600),Griglia());
+        [Test] public void OmbraLocaleSullaCodaNonAccorciaLaNotaEChiedeRilettura()
+        {
+            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.White))
+            {
+                Cv2.Rectangle(f,new Rect(370,120,430,60),new Scalar(40,40,220),-1);
+                Cv2.Rectangle(f,new Rect(450,115,35,70),Scalar.All(15),-1);
+                var l=Lettore();var r=l.Leggi(f,new RettangoloTavolo(.375,.17,.1875,1.0/6),new[]{Nota(.8)});
+                var ripetuta=l.Leggi(f,new RettangoloTavolo(.375,.17,.1875,1.0/6),r.Catalogo);
+                Assert.That(r.Catalogo.Single().FineEstensioneX,Is.EqualTo(.8));
+                Assert.That(r.Completa,Is.False);
+                Assert.That(ripetuta.Catalogo.Single().FineEstensioneX,Is.EqualTo(.8));
+                Assert.That(ripetuta.Completa,Is.False);
+            }
+        }
+
         [Test] public void MascheraEDecoderRestanoNelleTreCelle()
         {
             using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.White))
@@ -109,6 +124,7 @@ namespace VisualMusicBlockLooper.Tests
         }
     }
 }
+
 
 
 

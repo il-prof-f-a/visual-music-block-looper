@@ -56,7 +56,12 @@ namespace VisualMusicBlockLooper.Vision
                     if(!GeometriaRegioni.ContieneCentro(zona,letto.AreaQr.Value))continue;
                     var precedente=catalogo.FirstOrDefault(c=>GeometriaRegioni.StessaPosizioneQr(c.AreaQr??c.Area,letto.AreaQr.Value));
                     letto.Colore=ColoreQr(colori,regione,letto.AreaQr.Value,frame.Size())??precedente?.Colore;
-                    if(letto.Colore.HasValue)letto.FineEstensioneX=Segui(colori,regione,letto,Math.Max(zona.X,letto.AreaQr.Value.X+1.15*letto.AreaQr.Value.Larghezza),zona.X+zona.Larghezza,frame.Size(),true);
+                    if(letto.Colore.HasValue)
+                    {
+                        double fine=Segui(colori,regione,letto,Math.Max(zona.X,letto.AreaQr.Value.X+1.15*letto.AreaQr.Value.Larghezza),zona.X+zona.Larghezza,frame.Size(),gray,out bool incerta,true);
+                        letto.FineEstensioneX=incerta?(precedente?.FineEstensioneX??fine):fine;
+                        if(incerta)completa=false;
+                    }
                     if(precedente!=null)
                     {letto.FineEstensioneX=ConservaFineNonOsservata(letto.FineEstensioneX,precedente.FineEstensioneX,zona,frame.Size());catalogo.Remove(precedente);}
                     catalogo.Add(letto);associati.Add(letto);
@@ -78,7 +83,10 @@ namespace VisualMusicBlockLooper.Vision
                         &&qr.Y+qr.Altezza/2>=zona.Y&&qr.Y+qr.Altezza/2<=zona.Y+zona.Altezza)
                     {
                         if(scuri>regione.Width*regione.Height*.8){completa=false;continue;}
-                        c.FineEstensioneX=ConservaFineNonOsservata(Segui(colori,regione,c,zona.X,zona.X+zona.Larghezza,frame.Size()),c.FineEstensioneX,zona,frame.Size());codaConosciuta=true;
+                        double fine=Segui(colori,regione,c,zona.X,zona.X+zona.Larghezza,frame.Size(),gray,out bool incerta);
+                        if(incerta)completa=false;
+                        else c.FineEstensioneX=ConservaFineNonOsservata(fine,c.FineEstensioneX,zona,frame.Size());
+                        codaConosciuta=true;
                     }
                 }
                 // Colore sconosciuto non e prova di una rimozione o di un QR decodificato.
@@ -110,9 +118,9 @@ namespace VisualMusicBlockLooper.Vision
             }
             int m=Array.IndexOf(conteggi,conteggi.Max());return conteggi[m]>=2?(ColoreTraccia?)m:null;
         }
-        private double Segui(sbyte[,] colori,Rect regione,CartoncinoRilevato nota,double inizio,double fine,Size frame,bool bordoQr=false)
+        private double Segui(sbyte[,] colori,Rect regione,CartoncinoRilevato nota,double inizio,double fine,Size frame,Mat gray,out bool incerta,bool bordoQr=false)
         {
-            var qr=nota.AreaQr??nota.Area;double passo=1.0/Math.Max(frame.Width,frame.Height),ultimo=inizio;
+            incerta=false;var qr=nota.AreaQr??nota.Area;double passo=1.0/Math.Max(frame.Width,frame.Height),ultimo=inizio;
             double rigaH=griglia.Area.Altezza/Math.Max(1,griglia.Tracce);
             int riga=(int)Math.Floor((qr.Y+qr.Altezza/2-griglia.Area.Y)/rigaH);
             double y0=Math.Max(qr.Y-.2*qr.Altezza,griglia.Area.Y+riga*rigaH+passo);
@@ -121,9 +129,29 @@ namespace VisualMusicBlockLooper.Vision
             {
                 int pieni=0;for(int i=0;i<17;i++)if(Campione(colori,regione,x,y0+(y1-y0)*i/16)==(int)nota.Colore.Value)pieni++;
                 if(pieni<2)
-                {if(bordoQr&&ultimo==inizio&&x-inizio<qr.Larghezza*.35)continue;break;}ultimo=x;
+                {
+                    if(bordoQr&&ultimo==inizio&&x-inizio<qr.Larghezza*.35)continue;
+                    incerta=!FineAffidabile(colori,gray,regione,x,y0,y1,nota.Colore.Value);
+                    break;
+                }
+                ultimo=x;
             }
             return ultimo;
+        }
+        // Carta chiara e colore diverso chiudono il corpo; ombre e occlusioni richiedono una nuova lettura.
+        private bool FineAffidabile(sbyte[,] colori,Mat gray,Rect regione,double x,double y0,double y1,ColoreTraccia colore)
+        {
+            int chiari=0,diversi=0;
+            for(int i=0;i<17;i++)
+            {
+                var p=calibrazione.DaTavoloACamera(new PuntoTavolo(x,y0+(y1-y0)*i/16));
+                int cx=(int)Math.Round(p.X)-regione.X,cy=(int)Math.Round(p.Y)-regione.Y;
+                if(cx<0||cy<0||cx>=regione.Width||cy>=regione.Height)continue;
+                int c=colori[cy,cx];
+                if(c>=0&&c!=(int)colore)diversi++;
+                if(c<0&&gray.At<byte>(cy,cx)>=190)chiari++;
+            }
+            return chiari>=13||diversi>=2;
         }
         private int Campione(sbyte[,] colori,Rect regione,double x,double y)
         {

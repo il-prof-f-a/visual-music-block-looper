@@ -45,7 +45,7 @@ namespace VisualMusicBlockLooper.Core
                     if(c.Step==stepAssoluto){if(c.Partitura.Dati.VersioneFoglio>=p.Dati.VersioneFoglio)return false;continue;}
                     lista.Add(c);
                 }
-                if(lista.Count>=64)return false;
+                if(lista.Count>=512)return false;
                 lista.Add(new AggiornamentoCella{Partitura=p,Step=stepAssoluto});
                 if(Interlocked.CompareExchange(ref celle,lista.ToArray(),prima)==prima)return p.Dati.Generazione==scambio.Generazione;
             }

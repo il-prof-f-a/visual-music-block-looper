@@ -50,8 +50,9 @@ namespace VisualMusicBlockLooper.App
         }
         public bool AggiornaPerCella(StatoTavolo stato,bool confermata,long generazione,long istante,long stepAssoluto)
         {
-            if(generazione!=Generazione||stepAssoluto<0)return false;
-            bool cambiato=Foglio.Aggiorna(stato,confermata,generazione,istante);
+            if(generazione!=Generazione||stepAssoluto<0||!confermata||stato==null)return false;
+            // A rejected publication must remain retryable even when the next confirmed reading is identical.
+            bool cambiato=Foglio.Aggiorna(stato,confermata,generazione,istante,UltimoErrore!=null);
             if(!cambiato)return false;
             var f=Foglio.Ultima;
             if(!esecutore.InEsecuzione){PreparaUltima(0);return false;}

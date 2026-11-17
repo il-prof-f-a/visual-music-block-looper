@@ -1,10 +1,33 @@
 using System.Linq;
 using NUnit.Framework;
 using VisualMusicBlockLooper.Core;
+using VisualMusicBlockLooper.App;
 namespace VisualMusicBlockLooper.Tests
 {
     public class DurateLiveMidiTests
     {
+        [Test]
+        public void PubblicazioneRifiutataRiprovaLoStessoFoglioQuandoLaCodaSiLibera()
+        {
+            var u=new EsecutorePartituraTests.Uscita();
+            using(var e=new EsecutoreMidi(u,null,new EsecutorePartituraTests.Mappa(),new ConfigGriglia(),()=>0))
+            {
+                var p=new PreparatoreFoglio(e);
+                StrutturaTavolo.TryCrea(2,1,1,2,out var struttura);
+                StatoTavolo Stato(int clip)=>new StatoTavolo(new[]{new CartoncinoNota{Riga=0,Traccia=0,IdClip=clip,DurataStep=8}},null,null,struttura);
+                Assert.That(p.PreparaAvvio(Stato(40),1,0));e.Avvia();e.TickInterno();
+                var riempitivo=e.Prepara(Stato(40),1,1,0);
+                for(int step=1;step<=512;step++)Assert.That(e.PubblicaCella(riempitivo,step));
+                Assert.That(p.AggiornaPerCella(Stato(41),true,1,1,513),Is.False);
+                Assert.That(p.UltimoErrore,Is.Not.Null);
+                for(int tick=0;tick<6;tick++)e.TickInterno();
+                Assert.That(p.AggiornaPerCella(Stato(41),true,1,2,513),Is.True);
+                Assert.That(p.UltimoErrore,Is.Null);
+                Assert.That(p.AggiornaPerCella(Stato(41),true,1,3,513),Is.False,"Successful unchanged observations need no publication.");
+                for(int tick=7;tick<=3078;tick++)e.TickInterno();
+                Assert.That(e.Stato.PartituraAttiva.CopiaStato().Note.Single().IdClip,Is.EqualTo(41));
+            }
+        }
         private static void Tick(MotorePartitura m,int n){for(int i=0;i<n;i++)m.TickInterno();}
         [TestCase(5,30)] [TestCase(2,12)]
         public void CellaAggiornaDurataSenzaRipetereAttacco(int durata,int fine)

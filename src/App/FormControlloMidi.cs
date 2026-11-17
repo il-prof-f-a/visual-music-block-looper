@@ -60,7 +60,7 @@ namespace VisualMusicBlockLooper.App
             };
             etichettaVersioniFoglio=new Label {Name="etichettaVersioniFoglio",Left=10,Top=750,Width=735,Height=70,AutoEllipsis=true,ForeColor=Color.DarkBlue};
             suggerimentiDebug.SetToolTip(rileggi,"Forza una nuova scansione completa del foglio. Durante l'esecuzione la nuova partitura entrerà alla prossima frontiera del giro.");
-            suggerimentiDebug.SetToolTip(combo,"Scegli 1, 2, 4, 8 o 16 misure in anticipo anche durante Play. La linea arancio salta subito alla destinazione; la lettura riparte sul primo frame nuovo senza leggere le misure intermedie. Azzurro: ultima lettura confermata.");
+            suggerimentiDebug.SetToolTip(combo,"Scegli 1, 2, 4, 8 o 16 misure in anticipo anche durante Play. Arancio: posizione prevista; si leggono tre celle vicine per ogni voce parallela. Azzurro: ultima cella confermata da tutte le voci. Il salto riparte sul primo frame nuovo.");
             Controls.AddRange(new Control[]{rileggi,pulsanteSalvaTempiMidi,combo,etichettaVersioniFoglio});
         }
         private void AggiornaStatoMidi()

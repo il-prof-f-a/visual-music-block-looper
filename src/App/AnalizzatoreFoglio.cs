@@ -10,7 +10,7 @@ using VisualMusicBlockLooper.Vision;
 namespace VisualMusicBlockLooper.App
 {
     /// <summary>Un solo produttore di osservazioni: richieste musicali coalescenti, una conferma breve e nessuna coda di foto.</summary>
-    public sealed class AnalizzatoreFoglio : IDisposable
+    public sealed partial class AnalizzatoreFoglio : IDisposable
     {
         private readonly RegistroFotogrammi immagini;
         private readonly Func<Calibrazione> calibrazione;
@@ -95,12 +95,13 @@ namespace VisualMusicBlockLooper.App
         public AnalizzatoreFoglio(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
             LayoutTavolo layout,PreparatoreFoglio preparatore,RegistroCatture registro,Func<long> orologio,
             bool analizzaSoloSeCambia=true,ParametriRilevatoreVariazioni parametriVariazioni=null,
-            bool scansioneABlocchiAnticipata=false,int misureAnticipoScansione=1)
+            bool scansioneABlocchiAnticipata=false,int misureAnticipoScansione=1,bool scansioneCelle=false)
         {
             this.immagini=immagini;this.calibrazione=calibrazione;this.config=config;this.layout=layout;
             this.preparatore=preparatore;this.registro=registro;this.orologio=orologio;
             this.analizzaSoloSeCambia=analizzaSoloSeCambia;
             this.scansioneABlocchiAnticipata=scansioneABlocchiAnticipata;
+            this.scansioneCelle=scansioneCelle;
             this.misureAnticipoScansione=ConfigurazioneApplicazione.AnticipoScansioneValido(misureAnticipoScansione)?misureAnticipoScansione:4;
             ultimoAnticipoScansione=this.misureAnticipoScansione;
             this.parametriVariazioni=(parametriVariazioni??new ParametriRilevatoreVariazioni()).Normalizzati();
@@ -144,13 +145,13 @@ namespace VisualMusicBlockLooper.App
             preparatore.ControllaScadenza();
             var motore=preparatore.Esecutore.Stato;
             long ora=orologio();
-            long segnale=PulsazioniPerOsservazione>0?motore.TickTempo/(24L*PulsazioniPerOsservazione):motore.SegnaleOsservazione;
+            long segnale=scansioneCelle&&motore.InEsecuzione?motore.TickTempo/6:PulsazioniPerOsservazione>0?motore.TickTempo/(24L*PulsazioniPerOsservazione):motore.SegnaleOsservazione;
             bool manuale=Volatile.Read(ref forzaRilettura)!=0;
             int anticipo=MisureAnticipoScansione;
             bool cambioAnticipo=anticipo!=ultimoAnticipoScansione;
-            bool normale=cambioAnticipo||(motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250);
+            bool normale=(scansioneCelle&&motore.InEsecuzione&&motore.Trasporto.Esecuzione!=esecuzioneCelle)||cambioAnticipo||(motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250);
             bool riprovaBlocchi=motore.InEsecuzione&&analizzaSoloSeCambia&&scansioneABlocchiAnticipata
-                &&(confermeBlocchi.Count>0||blocchiIncompleti.Count>0);
+                &&(confermeBlocchi.Count>0||blocchiIncompleti.Count>0||candidataCelle!=null);
             if(!forza&&!manuale&&!normale&&!riprovaBlocchi&&ora<retryAt)return false;
             using(var f=immagini.Copia())
             {
@@ -164,6 +165,7 @@ namespace VisualMusicBlockLooper.App
                 if(!ReferenceEquals(c,corrente)||f.Generazione!=generazioneVideo)
                 {
                     corrente=c;generazioneVideo=f.Generazione;generazione++;
+                    candidataCelle=null;calibrazioneCelle=null;
                     preparatore.ImpostaGenerazione(generazione);catalogo=new CartoncinoRilevato[0];inizializzato=false;
                     confermeBlocchi.Clear();
                     blocchiScansionati.Clear();blocchiIncompleti.Clear();strutturaScansione=null;esecuzionePrecedente=false;
@@ -179,6 +181,7 @@ namespace VisualMusicBlockLooper.App
                     confermeBlocchi.Clear();
                     blocchiScansionati.Clear();blocchiIncompleti.Clear();strutturaScansione=null;
                     destinazioniIncomplete.Clear();blocchiDaConfermare.Clear();Volatile.Write(ref scansione,StatoScansione.Vuoto);
+                    candidataCelle=null;calibrazioneCelle=null;
                     firmaCandidata=null;conferme=0;regioniDaVerificare=new RettangoloTavolo[0];
                     Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
                     Volatile.Write(ref ultimoStato,new StatoTavolo(null,null,null));
@@ -218,7 +221,8 @@ namespace VisualMusicBlockLooper.App
                     }
                     if(scansioneABlocchiAnticipata)
                     {
-                        AnalizzaBlocchiAnticipati(f,c,traccia,motore,anticipo,!normale&&!forza&&!manuale);
+                        if(scansioneCelle&&motore.InEsecuzione)AnalizzaFinestreCelle(f,c,traccia,motore,anticipo);
+                        else AnalizzaBlocchiAnticipati(f,c,traccia,motore,anticipo,!normale&&!forza&&!manuale);
                         return true;
                     }
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))
@@ -719,7 +723,7 @@ namespace VisualMusicBlockLooper.App
             =>string.Join(";",(cartoncini??new CartoncinoRilevato[0]).Select(n=>
             {
                 var qr=n.AreaQr??n.Area;
-                return (n.Payload??"")+":"+Quantizza(qr.X)+":"+Quantizza(qr.Y)+":"+
+                return (n.Payload??"")+":"+n.Colore+":"+Quantizza(qr.X)+":"+Quantizza(qr.Y)+":"+
                     Quantizza(qr.Larghezza)+":"+Quantizza(qr.Altezza)+":"+Quantizza(n.FineEstensioneX??double.NaN);
             }).OrderBy(x=>x,StringComparer.Ordinal));
 

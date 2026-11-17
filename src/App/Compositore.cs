@@ -79,7 +79,7 @@ namespace VisualMusicBlockLooper.App
                         ?? (rilevatore as RilevatoreCartoncini)?.Calibrazione;
                     Analizzatore=new AnalizzatoreFoglio(Video.Registro,calibrazione,config,Layout,Preparatore,
                         RegistroDiagnostica,orologioMs,analizzaSoloSeCambia,parametriVariazioni,
-                        scansioneABlocchiAnticipata,misureAnticipoScansione);
+                        scansioneABlocchiAnticipata,misureAnticipoScansione,scansioneCelle:true);
                     ComandiRapidi=new GestoreComandiRapidi(Video.Registro,calibrazione,config,Layout,Esecutore,
                         RegistroDiagnostica,orologioMs,parametriVariazioni);
                     Analizzatore.Sospesa=()=>osservazioneSospesa;ComandiRapidi.Sospesa=()=>osservazioneSospesa;

@@ -7,13 +7,13 @@ namespace VisualMusicBlockLooper.App
     public sealed class LetturaScansione
     {
         public LetturaScansione(IstantaneaTrasporto trasporto,long misura,int indiceMisura,long frameId,
-            long istanteFrameMs,long inizioMs,long fineMs=0)
+            long istanteFrameMs,long inizioMs,long fineMs=0,double? fase=null)
         {
             Trasporto=trasporto;MisuraAssoluta=misura;IndiceMisura=indiceMisura;FrameId=frameId;
             IstanteFrameMs=istanteFrameMs;InizioMs=inizioMs;FineMs=fineMs;
             var s=trasporto.Struttura;
             double durata=s.TickFineMisura(trasporto.IndiceMisura)-s.TickInizioMisura(trasporto.IndiceMisura);
-            Fase=Math.Max(0,Math.Min(1,(trasporto.TickNelGiro-s.TickInizioMisura(trasporto.IndiceMisura)
+            Fase=fase??Math.Max(0,Math.Min(1,(trasporto.TickNelGiro-s.TickInizioMisura(trasporto.IndiceMisura)
                 +trasporto.FrazioneTick(inizioMs))/durata));
         }
         public IstantaneaTrasporto Trasporto { get; }

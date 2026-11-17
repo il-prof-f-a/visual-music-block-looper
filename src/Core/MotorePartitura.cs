@@ -67,13 +67,16 @@ namespace VisualMusicBlockLooper.Core
             var nuova=scelta.Partitura;
             for(int i=0;i<numeroNoteOffPendenti;i++)
             {
-                var off=noteOffPendenti[i];int ordine=0;
+                var off=noteOffPendenti[i];int ordine=0;bool presente=false;
                 foreach(var e in nuova.Eventi)
                 {
                     if(!e.Dati.NoteOn||e.Dati.Tick!=off.Inizio||e.Dati.Canale*128+e.Dati.Nota!=off.Indice)continue;
                     if(off.Identita!=null?e.Dati.Identita!=off.Identita:ordine++!=off.Ordine)continue;
+                    presente=true;
                     noteOffPendenti[i]=new NoteOffPendente(off.Origine+e.FineTick-off.Inizio,off.Indice,off.Invio,off.Inizio,off.Ordine,off.Origine,off.Identita);break;
                 }
+                if(!presente)
+                    noteOffPendenti[i]=new NoteOffPendente(tickTempo,off.Indice,off.Invio,off.Inizio,off.Ordine,off.Origine,off.Identita);
             }
             // Restore the heap after changing live deadlines, without allocating on the clock thread.
             for(int i=numeroNoteOffPendenti/2-1;i>=0;i--)

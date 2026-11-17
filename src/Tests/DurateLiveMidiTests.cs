@@ -66,5 +66,18 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(u.Eventi.Count(e=>e=="Off:0:76"),Is.EqualTo(1));
             Tick(m,1);Assert.That(u.Eventi.Count(e=>e=="Off:0:76"),Is.EqualTo(2));
         }
+        [Test]
+        public void RimuovereUnaNotaAttivaLaSpegneAllaFrontieraDellaCella()
+        {
+            var u=new EsecutorePartituraTests.Uscita();var m=new MotorePartitura(u,new EsecutorePartituraTests.Mappa());
+            m.Pubblica(EsecutorePartituraTests.Partitura(u,durata:8));m.Avvia();Tick(m,6);
+            StrutturaTavolo.TryCrea(2,1,1,2,out var struttura);
+            var vuota=PartituraMidiPreparata.Prepara(new CompilatorePartitura(new ConfigGriglia(),new EsecutorePartituraTests.Mappa())
+                .Compila(new StatoTavolo(new CartoncinoNota[0],null,null,struttura),2,1),u);
+            m.PubblicaCella(vuota,1);Tick(m,1);
+            Assert.That(u.Eventi.Count(e=>e=="Off:0:76"),Is.EqualTo(1));
+            Tick(m,48);Assert.That(u.Eventi.Count(e=>e=="On:0:76"),Is.EqualTo(1));
+            Assert.That(u.Eventi.Count(e=>e=="Off:0:76"),Is.EqualTo(1));
+        }
     }
 }

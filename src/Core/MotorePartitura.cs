@@ -36,6 +36,9 @@ namespace VisualMusicBlockLooper.Core
         private long giro, tickTempo, ultimoClock, segnaleOsservazione, segnalePreparazione;
         private long ultimaMisuraDestinazione=-1,ultimaMisuraApplicazione=-1;
         private int ultimoAggiornamentoRinviato;
+        private IstantaneaTrasporto trasporto;
+        private int revisioneTrasporto;
+        private long esecuzione;
 
         public MotorePartitura(IUscitaMidi uscita, IMappaturaMidi mappatura, double bpm = 120, Func<long> orologioMs = null)
         {
@@ -66,6 +69,27 @@ namespace VisualMusicBlockLooper.Core
         public long UltimaMisuraApplicazione => Volatile.Read(ref ultimaMisuraApplicazione);
         public bool UltimoAggiornamentoRinviato => Volatile.Read(ref ultimoAggiornamentoRinviato)!=0;
         public long SegnalePreparazione => Volatile.Read(ref segnalePreparazione);
+        public IstantaneaTrasporto Trasporto
+        {
+            get
+            {
+                // Un solo scrittore. Il clock non attende mai i lettori e pubblica solo valori.
+                while(true)
+                {
+                    int prima=Volatile.Read(ref revisioneTrasporto);
+                    if((prima&1)!=0){Thread.SpinWait(1);continue;}
+                    var copia=trasporto;
+                    Thread.MemoryBarrier();
+                    if(prima==Volatile.Read(ref revisioneTrasporto))return copia;
+                }
+            }
+        }
+        private void PubblicaTrasporto(IstantaneaTrasporto valore)
+        {
+            Interlocked.Increment(ref revisioneTrasporto);
+            trasporto=valore;
+            Interlocked.Increment(ref revisioneTrasporto);
+        }
         public PosizioneGiro Posizione => Volatile.Read(ref posizione);
         public int StepCorrente => Posizione.StepInMisura;
         public StrutturaTavolo Struttura => PartituraAttiva?.Struttura ?? StrutturaTavolo.Default;
@@ -92,6 +116,9 @@ namespace VisualMusicBlockLooper.Core
             Volatile.Write(ref ultimaMisuraDestinazione,-1);Volatile.Write(ref ultimaMisuraApplicazione,-1);
             Volatile.Write(ref ultimoAggiornamentoRinviato,0);
             richiestaPlay = false; inEsecuzione = true;
+            esecuzione++;
+            PubblicaTrasporto(new IstantaneaTrasporto(attiva.Dati.Struttura,esecuzione,attiva.Dati.Generazione,
+                true,0,0,0,orologioMs(),0,attiva.Dati));
             if (inviaStart) start();
         }
         public void TickInterno()
@@ -99,9 +126,9 @@ namespace VisualMusicBlockLooper.Core
             if (modo != ModoSincronia.Master) return;
             TentaAvvio(true);
             if (bpmPendente > 0 && tickTempo % 24 == 0) { Volatile.Write(ref bpm, bpmPendente); bpmPendente = 0; }
-            clock(); Avanza();
+            long istante=orologioMs();clock(); Avanza(istante,Tempo.IntervalloTickMs(bpm));
         }
-        private void Avanza()
+        private void Avanza(long istante,double periodoTickMs)
         {
             if (inEsecuzione)
             {
@@ -135,7 +162,10 @@ namespace VisualMusicBlockLooper.Core
                 int inizio = (attiva.Dati.Struttura.AInizio - 1) * 4;
                 int ultimoInizioMisura = ((attiva.Dati.Struttura.AFine - 1) * 4 / attiva.Dati.Struttura.StepPerMisura) * attiva.Dati.Struttura.StepPerMisura;
                 if (tickNelGiro == (Math.Max(inizio, ultimoInizioMisura) - inizio) * 6) Interlocked.Increment(ref segnalePreparazione);
-                if(!EseguiEventi())return;tickNelGiro++;
+                if(!EseguiEventi())return;
+                PubblicaTrasporto(new IstantaneaTrasporto(attiva.Dati.Struttura,esecuzione,attiva.Dati.Generazione,true,
+                    Math.Max(0,segnaleOsservazione-1),attiva.Dati.Struttura.IndiceMisuraAlTick(tickNelGiro),tickNelGiro,istante,periodoTickMs,attiva.Dati));
+                tickNelGiro++;
             }
             for (int n = 0; n < 128; n++)
                 if (shotRimanenti[n] > 0 && --shotRimanenti[n] == 0) Spegni(canaleShot * 128 + n, shotOff[n]);
@@ -212,13 +242,11 @@ namespace VisualMusicBlockLooper.Core
         public PosizioneGiro PosizioneDopoMisure(int anticipo,out long misuraAssoluta)
         {
             if(anticipo<0)throw new ArgumentOutOfRangeException(nameof(anticipo));
-            var partitura=PartituraAttiva;
-            if(partitura==null)throw new InvalidOperationException("La partitura non è ancora attiva.");
-            misuraAssoluta=MisuraAssoluta+anticipo;
-            if(anticipo==0)return Posizione;
-            int periodo=partitura.Struttura.MisurePerGiro;
-            int indice=(int)(misuraAssoluta%periodo);
-            return partitura.Struttura.PosizioneMisuraGiro(indice);
+            var t=Trasporto;
+            if(t.Struttura==null)throw new InvalidOperationException("La partitura non è ancora attiva.");
+            misuraAssoluta=t.MisuraAssoluta+anticipo;
+            if(anticipo==0)return t.Partitura.PosizioneAlTick(t.TickNelGiro);
+            return t.Struttura.PosizioneMisuraGiro((t.IndiceMisura+anticipo)%t.Struttura.MisurePerGiro);
         }
         private void Spegni(int indice, Action off)
         {
@@ -267,6 +295,9 @@ namespace VisualMusicBlockLooper.Core
         public void Silenzia()
         {
             inEsecuzione = false; richiestaPlay = false;
+            var t=trasporto;
+            PubblicaTrasporto(new IstantaneaTrasporto(t.Struttura,t.Esecuzione,t.Generazione,false,
+                t.MisuraAssoluta,t.IndiceMisura,t.TickNelGiro,t.IstanteMs,0,t.Partitura));
             Exception errore = null;
             for (int i = 0; i < sonanti.Length; i++) if (sonanti[i] > 0)
             { try { spegnimenti[i]?.Invoke(); sonanti[i] = 0; } catch (Exception e) { errore = e; } }
@@ -291,13 +322,13 @@ namespace VisualMusicBlockLooper.Core
             if (modo != ModoSincronia.Slave) return;
             richiestaPlay = true; ultimoClock = orologioMs(); TentaAvvio(false);
         }
-        public void RiceviClock(long istante)
+        public void RiceviClock(long istante,double periodoTickMs=0)
         {
             if (modo != ModoSincronia.Slave) return;
             ultimoClock = istante;
             var pronta = scambio.Ultima;
             if (pronta != null && tickTempo % pronta.Dati.TickGiro == 0) TentaAvvio(false);
-            Avanza();
+            Avanza(istante,periodoTickMs>0?periodoTickMs:Tempo.IntervalloTickMs(bpm));
         }
         public void ControllaTimeoutClock(long adesso)
         { if (modo == ModoSincronia.Slave && adesso - ultimoClock > 500) Silenzia(); }

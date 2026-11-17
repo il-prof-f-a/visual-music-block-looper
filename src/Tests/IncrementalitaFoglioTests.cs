@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.IO;
 using NUnit.Framework;
 using OpenCvSharp;
 using VisualMusicBlockLooper.App;
@@ -250,11 +251,22 @@ namespace VisualMusicBlockLooper.Tests
                     Assert.That(e.Stato.MisuraAssoluta,Is.EqualTo(4));
 
                     Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
-                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+                    ora+=21;r.Pubblica(f,ora);a.Passo();
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),"La prima cattura crea il candidato ma non cancella la nota.");
-                    ora+=21;r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Null,"Un primo candidato non è ancora una lettura confermata.");
+                    Assert.That(a.Passo(),Is.False,"Il medesimo frame non conferma una rimozione.");
+                    ora+=66;r.Pubblica(f,ora);
+                    Assert.That(a.Passo(),Is.True,"La seconda cattura deve essere letta senza attendere una nuova misura.");
 
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9));
+                    var completata=a.Scansione.UltimaCompletata;
+                    Assert.That(completata,Is.Not.Null);
+                    Assert.That(completata.MisuraAssoluta,Is.EqualTo(8));
+                    Assert.That(completata.FrameId,Is.EqualTo(r.NumeroFotogrammi));
+                    Assert.That(completata.Posizione.RigheAttive,Is.EqualTo(new[]{2}));
+                    long lette=a.NumeroLetture;
+                    ora+=66;r.Pubblica(f,ora);a.Passo();
+                    Assert.That(a.NumeroLetture,Is.EqualTo(lette),"Conclusa la conferma si riprende la cadenza ordinaria.");
                     Assert.That(e.Stato.VersioneAttiva,Is.EqualTo(1));
                     Assert.That(e.Stato.VersionePronta,Is.GreaterThan(e.Stato.VersioneAttiva),
                         "La versione rimossa è pronta per la misura assoluta 8, quattro misure avanti.");
@@ -295,6 +307,68 @@ namespace VisualMusicBlockLooper.Tests
 
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),
                         "Due frame neri non devono sembrare conferma della rimozione di tutte le righe.");
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Null,"Il buio non deve avanzare la linea dei risultati.");
+                }
+            }
+        }
+
+        [Test]
+        public void LineaCompletataAttendeTutteLeRigheSimultaneeERiprovaSoloLaRigaBuia()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var f=NoteContigueVisionTests.Scena(false))
+            using(var qr=Cv2.ImRead(Path.Combine(GeneratoreCartoncini.CartellaCartoncini(),"speciale-link-2.png")))
+            using(var piccolo=new Mat())
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                Cv2.Resize(qr,piccolo,new Size(180,120));
+                using(var zona=new Mat(f,new Rect(25,387,180,120)))piccolo.CopyTo(zona);
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,true,null,true,4))
+                using(var buio=f.Clone())
+                {
+                    r.Pubblica(f,ora);a.Passo(true);
+                    Assert.That(a.UltimoStato.Struttura.RigheCollegate,Is.EqualTo(2));
+                    Cv2.Rectangle(buio,new Rect(220,588,1100,138),Scalar.Black,-1);
+                    e.Avvia();e.TickInterno();ora+=66;r.Pubblica(buio,ora);a.Passo();
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Null,
+                        "Le righe 0 e 2 da sole non completano il gruppo 0,2,4.");
+                    long letture=a.NumeroLetture;
+                    ora+=66;r.Pubblica(f,ora);a.Passo();
+                    Assert.That(a.NumeroLetture-letture,Is.EqualTo(1),"Ritentare solo la riga incompleta.");
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Not.Null);
+                    Assert.That(a.Scansione.UltimaCompletata.Posizione.RigheAttive,Is.EqualTo(new[]{0,2,4}));
+                    Assert.That(a.Scansione.UltimaCompletata.MisuraAssoluta,Is.EqualTo(4));
+                }
+            }
+        }
+
+        [Test]
+        public void QrIntegratiDaUnaRoiParzialeDiventanoProntiSoloDopoConfermaCompleta()
+        {
+            long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);
+            using(var vuoto=new Mat(900,1600,MatType.CV_8UC3,Scalar.White))
+            using(var scena=NoteContigueVisionTests.Scena(false))
+            using(var parziale=scena.Clone())
+            using(var r=new RegistroFotogrammi())
+            using(var e=new EsecutoreMidi(new EsecutorePartituraTests.Uscita(),null,new EsecutorePartituraTests.Mappa(),cfg,()=>ora))
+            {
+                var p=new PreparatoreFoglio(e);
+                using(var a=new AnalizzatoreFoglio(r,()=>cal,cfg,LayoutTavolo.Default,p,new RegistroCatture(),()=>ora,true,null,true,4))
+                {
+                    r.Pubblica(vuoto,ora);a.Passo(true);e.Avvia();e.TickInterno();
+                    for(int i=0;i<4*96;i++){ora+=21;e.TickInterno();}
+                    Cv2.Rectangle(parziale,new Rect(850,340,60,80),Scalar.Black,-1);
+                    ora+=66;r.Pubblica(parziale,ora);a.Passo();
+                    Assert.That(a.UltimoStato.Note.Count,Is.GreaterThan(0),"I QR leggibili possono entrare nel catalogo osservato.");
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Null);
+                    ora+=66;r.Pubblica(scena,ora);a.Passo();
+                    ora+=66;r.Pubblica(scena,ora);a.Passo();
+                    Assert.That(p.Foglio.Ultima.CopiaStato().Note,Has.Count.EqualTo(5),
+                        "La conferma deve trasferire al preparatore anche i QR già integrati dalla lettura parziale.");
+                    Assert.That(e.Stato.VersionePronta,Is.GreaterThan(e.Stato.VersioneAttiva));
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Not.Null);
                 }
             }
         }

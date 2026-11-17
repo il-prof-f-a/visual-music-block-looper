@@ -40,6 +40,10 @@ namespace VisualMusicBlockLooper.App
         private readonly Dictionary<int, ConfermaBlocco> confermeBlocchi=new Dictionary<int, ConfermaBlocco>();
         private readonly HashSet<ChiaveBloccoPianificato> blocchiScansionati=new HashSet<ChiaveBloccoPianificato>();
         private readonly HashSet<int> blocchiIncompleti=new HashSet<int>();
+        private readonly HashSet<int> blocchiDaConfermare=new HashSet<int>();
+        private readonly Dictionary<int,ChiaveBloccoPianificato> destinazioniIncomplete=new Dictionary<int,ChiaveBloccoPianificato>();
+        private StatoScansione scansione=StatoScansione.Vuoto;
+        private long esecuzioneScansione=-1;
         private StrutturaTavolo strutturaScansione;
         private bool esecuzionePrecedente;
         private IReadOnlyList<RettangoloTavolo> regioniDaVerificare=new RettangoloTavolo[0];
@@ -109,6 +113,9 @@ namespace VisualMusicBlockLooper.App
         public long NumeroLettureZone=>NumeroLetture;
         public long NumeroFotogrammi=>Volatile.Read(ref fotogrammi);
         public string UltimoEsito=>Volatile.Read(ref ultimoEsito);
+        public StatoScansione Scansione=>Volatile.Read(ref scansione);
+        public int MisureAnticipoScansione=>misureAnticipoScansione;
+        public bool IndicatoriScansioneAttivi=>analizzaSoloSeCambia&&scansioneABlocchiAnticipata;
         public int PulsazioniPerOsservazione { get; set; }
         public Func<bool> Sospesa { get; set; }=()=>false;
         public void Rileggi()
@@ -130,7 +137,9 @@ namespace VisualMusicBlockLooper.App
             long segnale=PulsazioniPerOsservazione>0?motore.TickTempo/(24L*PulsazioniPerOsservazione):motore.SegnaleOsservazione;
             bool manuale=Volatile.Read(ref forzaRilettura)!=0;
             bool normale=motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250;
-            if(!forza&&!manuale&&!normale&&ora<retryAt)return false;
+            bool riprovaBlocchi=motore.InEsecuzione&&analizzaSoloSeCambia&&scansioneABlocchiAnticipata
+                &&(confermeBlocchi.Count>0||blocchiIncompleti.Count>0);
+            if(!forza&&!manuale&&!normale&&!riprovaBlocchi&&ora<retryAt)return false;
             using(var f=immagini.Copia())
             {
                 if(f==null)
@@ -146,6 +155,7 @@ namespace VisualMusicBlockLooper.App
                     preparatore.ImpostaGenerazione(generazione);catalogo=new CartoncinoRilevato[0];inizializzato=false;
                     confermeBlocchi.Clear();
                     blocchiScansionati.Clear();blocchiIncompleti.Clear();strutturaScansione=null;esecuzionePrecedente=false;
+                    destinazioniIncomplete.Clear();blocchiDaConfermare.Clear();Volatile.Write(ref scansione,StatoScansione.Vuoto);
                     ultimoFrameScansioneCompleta=long.MinValue;
                     RiavviaConfronto();lettore=new LettoreZone(c,config);
                 }
@@ -156,6 +166,7 @@ namespace VisualMusicBlockLooper.App
                     RiavviaConfronto();catalogo=new CartoncinoRilevato[0];inizializzato=false;
                     confermeBlocchi.Clear();
                     blocchiScansionati.Clear();blocchiIncompleti.Clear();strutturaScansione=null;
+                    destinazioniIncomplete.Clear();blocchiDaConfermare.Clear();Volatile.Write(ref scansione,StatoScansione.Vuoto);
                     firmaCandidata=null;conferme=0;regioniDaVerificare=new RettangoloTavolo[0];
                     Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
                     Volatile.Write(ref ultimoStato,new StatoTavolo(null,null,null));
@@ -188,7 +199,7 @@ namespace VisualMusicBlockLooper.App
                     }
                     if(scansioneABlocchiAnticipata)
                     {
-                        AnalizzaBlocchiAnticipati(f,c,traccia,motore);
+                        AnalizzaBlocchiAnticipati(f,c,traccia,motore,!normale&&!forza&&!manuale);
                         return true;
                     }
                     using(var tavolo=ImmagineTavolo(f.Immagine,c))
@@ -367,10 +378,11 @@ namespace VisualMusicBlockLooper.App
         }
 
         private void AnalizzaBlocchiAnticipati(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia,
-            MotorePartitura motore)
+            MotorePartitura motore,bool soloPendenti=false)
         {
-            var struttura=motore.Struttura;var posizione=motore.Posizione;long giro=motore.Giro;
-            bool inEsecuzione=motore.InEsecuzione;long misuraCorrente=motore.MisuraAssoluta;
+            var trasporto=motore.Trasporto;
+            var struttura=trasporto.Struttura??motore.Struttura;var posizione=motore.Posizione;long giro=motore.Giro;
+            bool inEsecuzione=trasporto.InEsecuzione;long misuraCorrente=trasporto.MisuraAssoluta;
             long misuraDestinazione=-1;PosizioneGiro posizioneDestinazione=null;
             var tuttiBlocchi=Enumerable.Range(0,config.Tracce).Select(r=>new BloccoScansione(r,ZonaRiga(r)))
                 .Concat(new[]
@@ -391,27 +403,36 @@ namespace VisualMusicBlockLooper.App
 
             if(inEsecuzione)
             {
-                if(!esecuzionePrecedente||strutturaScansione==null||!strutturaScansione.Equals(struttura))
-                {blocchiScansionati.Clear();confermeBlocchi.Clear();}
+                if(!esecuzionePrecedente||esecuzioneScansione!=trasporto.Esecuzione
+                    ||strutturaScansione==null||!strutturaScansione.Equals(struttura))
+                {
+                    blocchiScansionati.Clear();confermeBlocchi.Clear();blocchiIncompleti.Clear();destinazioniIncomplete.Clear();blocchiDaConfermare.Clear();
+                    Volatile.Write(ref scansione,StatoScansione.Vuoto);
+                }
+                esecuzioneScansione=trasporto.Esecuzione;
                 esecuzionePrecedente=true;strutturaScansione=struttura;
                 blocchiScansionati.RemoveWhere(k=>k.Id<0?k.Giro<giro:k.MisuraAssoluta>=0&&k.MisuraAssoluta<misuraCorrente);
 
-                posizioneDestinazione=motore.PosizioneDopoMisure(misureAnticipoScansione,out misuraDestinazione);
-                foreach(int riga in posizioneDestinazione.RigheAttive??new int[0])
+                misuraDestinazione=trasporto.MisuraAssoluta+misureAnticipoScansione;
+                posizioneDestinazione=struttura.PosizioneMisuraGiro((trasporto.IndiceMisura+misureAnticipoScansione)%struttura.MisurePerGiro);
+                foreach(int riga in soloPendenti?new int[0]:posizioneDestinazione.RigheAttive??new int[0])
                     if(tuttiBlocchi.TryGetValue(riga,out var bloccoFuturo))
                         Aggiungi(bloccoFuturo,0,posizioneDestinazione.MisuraNelGiro,misuraDestinazione);
 
                 for(int riga=0;riga<config.Tracce;riga++)
-                    if(regioniDaVerificare.Any(z=>GeometriaRegioni.Interseca(z,ZonaRiga(riga)))
+                    if(!soloPendenti&&regioniDaVerificare.Any(z=>GeometriaRegioni.Interseca(z,ZonaRiga(riga)))
                         &&tuttiBlocchi.TryGetValue(riga,out var bloccoDaVerificare))
                         Aggiungi(bloccoDaVerificare,0,posizioneDestinazione.MisuraNelGiro,misuraDestinazione);
 
                 foreach(int id in new[]{-1,-2,-3})
-                    if(tuttiBlocchi.TryGetValue(id,out var vincolo))Aggiungi(vincolo,giro,-1);
+                    if(!soloPendenti&&tuttiBlocchi.TryGetValue(id,out var vincolo))Aggiungi(vincolo,giro,-1);
 
                 foreach(int id in blocchiIncompleti)
                     if(tuttiBlocchi.TryGetValue(id,out var bloccoIncompleto))
-                        Aggiungi(bloccoIncompleto,0,posizioneDestinazione.MisuraNelGiro,misuraDestinazione);
+                    {
+                        var origine=destinazioniIncomplete[id];
+                        Aggiungi(bloccoIncompleto,origine.Giro,origine.Misura,origine.MisuraAssoluta);
+                    }
 
                 foreach(var conferma in confermeBlocchi)
                     if(tuttiBlocchi.TryGetValue(conferma.Key,out var bloccoInConferma))
@@ -438,14 +459,47 @@ namespace VisualMusicBlockLooper.App
             var catalogoPrima=catalogo;
             var lavoro=catalogo;
             var modificheConfermate=new List<AggiornamentoBloccoConfermato>();
+            var lettureConfermate=new List<LetturaScansione>();
             bool catalogoAggiornato=false;
             int blocchiIncerti=0;
             foreach(var pianificato in blocchi)
             {
                 var blocco=pianificato.Blocco;
-                var lettura=lettore.Leggi(f.Immagine,blocco.Zona,lavoro,traccia,"blocco:"+blocco.Id);
+                var chiaveLettura=confermeBlocchi.TryGetValue(blocco.Id,out var pendente)
+                    ?new ChiaveBloccoPianificato(pendente.Giro,pendente.Misura,blocco.Id,pendente.MisuraAssoluta)
+                    :destinazioniIncomplete.TryGetValue(blocco.Id,out var incompleta)?incompleta:pianificato.Chiavi[0];
+                LetturaScansione operazione=null;
+                if(inEsecuzione&&blocco.Id>=0&&chiaveLettura.MisuraAssoluta>=0)
+                {
+                    int indice=0;
+                    while(indice+1<struttura.MisurePerGiro&&struttura.PosizioneMisuraGiro(indice).MisuraNelGiro!=chiaveLettura.Misura)indice++;
+                    if(struttura.PosizioneMisuraGiro(indice).RigheAttive.Contains(blocco.Id))
+                    {
+                        operazione=new LetturaScansione(trasporto,chiaveLettura.MisuraAssoluta,indice,f.Id,f.IstanteMs,orologio());
+                        Volatile.Write(ref scansione,new StatoScansione(operazione,Scansione.UltimaCompletata,Scansione.UltimaLettura,"Lettura in corso"));
+                    }
+                }
+                LetturaZona lettura;bool fallita=false;
+                try {lettura=lettore.Leggi(f.Immagine,blocco.Zona,lavoro,traccia,"blocco:"+blocco.Id);}
+                catch
+                {
+                    fallita=true;
+                    if(operazione!=null)Volatile.Write(ref scansione,new StatoScansione(null,
+                        Scansione.UltimaCompletata,operazione,"Errore di lettura"));
+                    throw;
+                }
+                finally
+                {
+                    if(operazione!=null&&!fallita)Volatile.Write(ref scansione,new StatoScansione(null,
+                        Scansione.UltimaCompletata,operazione,"Lettura terminata, verifica in corso"));
+                }
                 Interlocked.Increment(ref letture);
                 if(vita.InChiusura||Sospesa())return;
+                var adesso=motore.Trasporto;
+                if(inEsecuzione&&(!adesso.InEsecuzione||adesso.Esecuzione!=trasporto.Esecuzione
+                    ||!adesso.Struttura.Equals(struttura)||!ReferenceEquals(calibrazione(),c)
+                    ||immagini.GenerazioneCorrente!=f.Generazione))
+                {Volatile.Write(ref scansione,StatoScansione.Vuoto);return;}
                 var correnti=LocaliDelBlocco(lavoro,blocco);
                 var letti=LocaliDelBlocco(lettura.Catalogo,blocco);
                 string firmaLettura=FirmaCatalogoBlocco(letti);
@@ -455,11 +509,15 @@ namespace VisualMusicBlockLooper.App
                 {
                     blocchiIncerti++;
                     blocchiIncompleti.Add(blocco.Id);
+                    if(!destinazioniIncomplete.ContainsKey(blocco.Id))destinazioniIncomplete[blocco.Id]=chiaveLettura;
+                    if(operazione!=null)Volatile.Write(ref scansione,new StatoScansione(null,
+                        Scansione.UltimaCompletata,operazione,"Lettura incompleta o illuminazione insufficiente"));
                     confermeBlocchi.Remove(blocco.Id);
                     if(inEsecuzione)blocchiScansionati.ExceptWith(pianificato.Chiavi);
                     var integrati=UnisciCatalogoParziale(correnti,letti);
                     if(FirmaCatalogoBlocco(integrati)!=firmaCorrente)
                     {
+                        blocchiDaConfermare.Add(blocco.Id);
                         lavoro=SostituisciBlocco(lavoro,blocco,integrati);
                         catalogoAggiornato=true;
                     }
@@ -467,17 +525,19 @@ namespace VisualMusicBlockLooper.App
                 }
 
                 blocchiIncompleti.Remove(blocco.Id);
+                destinazioniIncomplete.Remove(blocco.Id);
                 regioniDaVerificare=regioniDaVerificare.Where(z=>!GeometriaRegioni.Interseca(z,blocco.Zona)).ToArray();
-                if(firmaLettura==firmaCorrente)
+                if(firmaLettura==firmaCorrente&&!blocchiDaConfermare.Contains(blocco.Id))
                 {
                     confermeBlocchi.Remove(blocco.Id);
                     if(inEsecuzione)blocchiScansionati.UnionWith(pianificato.Chiavi);
+                    if(operazione!=null)lettureConfermate.Add(operazione);
                     continue;
                 }
 
                 if(!confermeBlocchi.TryGetValue(blocco.Id,out var candidata)||candidata.Firma!=firmaLettura)
                 {
-                    var chiave=pianificato.Chiavi[0];
+                    var chiave=chiaveLettura;
                     candidata=new ConfermaBlocco{Firma=firmaLettura,UltimoFrame=f.Id,Giro=chiave.Giro,
                         Misura=chiave.Misura,MisuraAssoluta=chiave.MisuraAssoluta,Numero=1,Catalogo=letti};
                     confermeBlocchi[blocco.Id]=candidata;
@@ -490,14 +550,21 @@ namespace VisualMusicBlockLooper.App
                 }
                 if(candidata.Numero>=2)
                 {
+                    blocchiDaConfermare.Remove(blocco.Id);
                     lavoro=SostituisciBlocco(lavoro,blocco,candidata.Catalogo);
                     catalogoAggiornato=true;
                     modificheConfermate.Add(new AggiornamentoBloccoConfermato
                     {Blocco=blocco,MisuraAssoluta=candidata.MisuraAssoluta,Catalogo=candidata.Catalogo});
                     confermeBlocchi.Remove(blocco.Id);
                     if(inEsecuzione)blocchiScansionati.UnionWith(pianificato.Chiavi);
+                    if(operazione!=null)lettureConfermate.Add(operazione);
                 }
-                else if(inEsecuzione)blocchiScansionati.ExceptWith(pianificato.Chiavi);
+                else if(inEsecuzione)
+                {
+                    blocchiScansionati.ExceptWith(pianificato.Chiavi);
+                    if(operazione!=null)Volatile.Write(ref scansione,new StatoScansione(null,
+                        Scansione.UltimaCompletata,operazione,"Conferma 1/2 in attesa del prossimo frame"));
+                }
             }
 
             Volatile.Write(ref ultimeRegioni,blocchi.Select(p=>p.Blocco.Zona).ToArray());
@@ -512,13 +579,21 @@ namespace VisualMusicBlockLooper.App
                 if(inEsecuzione&&!strutturaCambiata&&modificheConfermate.Any(x=>x.Blocco.Id>=0))
                 {
                     var timeline=catalogoPrima;
-                    string firmaPrecedente=Firma(interprete.Interpreta(timeline));
+                    var baseConfermata=preparatore.Foglio.Ultima?.CopiaStato()??motore.PartituraAttiva.CopiaStato();
+                    var noteConfermate=baseConfermata.Note;
+                    string firmaPrecedente=Firma(baseConfermata);
                     foreach(var gruppo in modificheConfermate.Where(x=>x.Blocco.Id>=0)
                         .GroupBy(x=>x.MisuraAssoluta).OrderBy(x=>x.Key))
                     {
                         foreach(var modifica in gruppo.OrderBy(x=>x.Blocco.Id))
                             timeline=SostituisciBlocco(timeline,modifica.Blocco,modifica.Catalogo);
                         var statoMisura=interprete.Interpreta(timeline,traccia);
+                        // Il catalogo osservato può includere QR positivi di altre ROI ancora parziali.
+                        // Al MIDI trasferiamo soltanto le righe confermate di questo gruppo.
+                        var righeConfermate=new HashSet<int>(gruppo.Select(x=>x.Blocco.Id));
+                        noteConfermate=noteConfermate.Where(n=>!righeConfermate.Contains(n.Riga))
+                            .Concat(statoMisura.Note.Where(n=>righeConfermate.Contains(n.Riga))).ToArray();
+                        statoMisura=new StatoTavolo(noteConfermate,null,statoMisura.Errori,statoMisura.Struttura);
                         string firma=Firma(statoMisura);
                         if(firma!=firmaPrecedente)
                         {
@@ -538,6 +613,22 @@ namespace VisualMusicBlockLooper.App
                     if(!inEsecuzione||strutturaCambiata||modificheConfermate.Any(x=>x.Blocco.Id<0))
                         preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
                 }
+            }
+            foreach(var operazione in lettureConfermate.OrderBy(x=>x.MisuraAssoluta))
+            {
+                var attuale=motore.Trasporto;
+                if(preparatore.UltimoErrore!=null||!attuale.InEsecuzione||attuale.Esecuzione!=trasporto.Esecuzione
+                    ||!struttura.Equals(attuale.Struttura))continue;
+                var righe=struttura.PosizioneMisuraGiro(operazione.IndiceMisura).RigheAttive;
+                if(!righe.All(r=>blocchiScansionati.Any(k=>k.Id==r&&k.MisuraAssoluta==operazione.MisuraAssoluta)))continue;
+                var precedente=Scansione.UltimaCompletata;
+                if(precedente!=null&&precedente.MisuraAssoluta>operazione.MisuraAssoluta)continue;
+                var completa=new LetturaScansione(operazione.Trasporto,operazione.MisuraAssoluta,operazione.IndiceMisura,
+                    operazione.FrameId,operazione.IstanteFrameMs,operazione.InizioMs,orologio());
+                Volatile.Write(ref scansione,new StatoScansione(null,completa,completa,"Scansione confermata"));
+                if(traccia!=null)traccia.Visione.Add(new EventoDiagnosticoCartoncino("Scansione","Completata","MisuraAssoluta",
+                    $"Destinazione={completa.MisuraAssoluta}; frame={completa.FrameId}; cattura={completa.IstanteFrameMs}ms; "+
+                    $"inizio={completa.InizioMs}ms; fine={completa.FineMs}ms; righe={string.Join(",",completa.Posizione.RigheAttive)}."));
             }
             conferme=confermeBlocchi.Count==0?0:confermeBlocchi.Values.Max(x=>x.Numero);
             string esito=inEsecuzione?"ScansioneBlocchiAnticipata":"ScansioneBlocchiFermi";

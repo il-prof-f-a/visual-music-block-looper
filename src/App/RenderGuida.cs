@@ -14,6 +14,8 @@ namespace VisualMusicBlockLooper.App
         private static readonly Color ColoreGriglia = Color.LightGray;
         private static readonly Color ColorePlayhead = Color.FromArgb(90, 255, 140, 0);
         private static readonly Color ColoreContornoPlayhead = Color.Gray;
+        public static readonly Color ColoreScansionePrevista=Color.DarkOrchid;
+        public static readonly Color ColoreScansioneCompletata=Color.DeepSkyBlue;
         private static readonly Color ColoreNota = Color.FromArgb(255, 60, 179, 75);
         private static readonly Color ColoreErrore = Color.FromArgb(255, 220, 30, 30);
 
@@ -239,6 +241,35 @@ namespace VisualMusicBlockLooper.App
                     }
                 }
             }
+        }
+
+        public void DisegnaIndicatori(Graphics g,Size dimensione,IndicatoriScansione indicatori)
+        {
+            if(!indicatori.Visibili||config.Step<=0||config.Tracce<=0)return;
+            var griglia=InPixel(config.Area,dimensione);
+            DisegnaLinea(g,griglia,indicatori.Esecuzione,Color.DarkOrange,1);
+            if(indicatori.Completata.HasValue)
+                DisegnaLinea(g,griglia,indicatori.Completata.Value,ColoreScansioneCompletata,3);
+            DisegnaLinea(g,griglia,indicatori.Prevista,ColoreScansionePrevista,2);
+            if(griglia.Bottom+18<=dimensione.Height)
+            {
+                using(var viola=new SolidBrush(ColoreScansionePrevista))
+                using(var azzurro=new SolidBrush(ColoreScansioneCompletata))
+                {
+                    g.DrawString("Scansione prevista +"+(indicatori.Prevista.MisuraAssoluta-indicatori.Esecuzione.MisuraAssoluta)+" misure",
+                        SystemFonts.MessageBoxFont,viola,griglia.Left,griglia.Bottom+3);
+                    g.DrawString("Ultima scansione confermata",SystemFonts.MessageBoxFont,azzurro,griglia.Left+260,griglia.Bottom+3);
+                }
+            }
+        }
+        private void DisegnaLinea(Graphics g,Rectangle griglia,PosizioneIndicatore p,Color colore,float larghezza)
+        {
+            if(p.RigheAttive==null||p.Step<0||p.Step>config.Step)return;
+            float x=(float)(griglia.X+p.Step*griglia.Width/config.Step);
+            using(var penna=new Pen(colore,larghezza))
+                foreach(int riga in p.RigheAttive)
+                    if(riga>=0&&riga<config.Tracce)
+                        g.DrawLine(penna,x,BordoY(griglia,riga)+2,x,BordoY(griglia,riga+1)-2);
         }
 
         /// <summary>Bordi blu tratteggiati: osservazioni che non fanno ancora parte della partitura attiva.</summary>

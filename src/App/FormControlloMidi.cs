@@ -19,6 +19,7 @@ namespace VisualMusicBlockLooper.App
         private string messaggioTempi;
         private NumericUpDown campoBpm;
         private bool aggiornamentoBpm;
+        private readonly PresentatoreScansione presentatoreScansione=new PresentatoreScansione();
 
         private void AggiungiControlliMidi()
         {
@@ -38,7 +39,7 @@ namespace VisualMusicBlockLooper.App
             campoBpm.KeyDown+=(m,a)=>{if(a.KeyCode==Keys.Enter){SelectNextControl(campoBpm,true,true,true,true);a.Handled=true;a.SuppressKeyPress=true;}};
             suggerimentiDebug.SetToolTip(campoBpm,"Tempo Master: scrivi il valore e premi Invio. Durante Play cambia alla pulsazione successiva; in Slave segue il clock esterno.");
             Controls.AddRange(new Control[]{labelBpm,campoBpm});
-            ClientSize=new Size(760,800);
+            ClientSize=new Size(760,825);
             var rileggi=new Button {Name="pulsanteRileggiFoglio",Text="Rileggi foglio",Left=10,Top=714,Width=180,Height=28,TabIndex=32};
             rileggi.Click+=(m,a)=>compositore.RileggiFoglio();
             pulsanteSalvaTempiMidi=new Button {Name="pulsanteSalvaTempiMidi",Text="Salva tempi MIDI",Left=200,Top=714,Width=145,Height=28,TabIndex=33};
@@ -55,8 +56,9 @@ namespace VisualMusicBlockLooper.App
                 if(compositore.Analizzatore!=null)compositore.Analizzatore.PulsazioniPerOsservazione=cadenze[combo.SelectedIndex];
                 Riavvia(timerSalvaConfigurazione);
             };
-            etichettaVersioniFoglio=new Label {Name="etichettaVersioniFoglio",Left=10,Top=750,Width=735,Height=46,AutoEllipsis=true,ForeColor=Color.DarkBlue};
+            etichettaVersioniFoglio=new Label {Name="etichettaVersioniFoglio",Left=10,Top=750,Width=735,Height=70,AutoEllipsis=true,ForeColor=Color.DarkBlue};
             suggerimentiDebug.SetToolTip(rileggi,"Forza una nuova scansione completa del foglio. Durante l'esecuzione la nuova partitura entrerà alla prossima frontiera del giro.");
+            suggerimentiDebug.SetToolTip(combo,"La lettura riguarda l'intera riga della misura anticipata, alla cadenza scelta. La linea viola indica la destinazione prevista; quella azzurra segue soltanto letture confermate. Le conferme pendenti riprovano sul frame nuovo.");
             Controls.AddRange(new Control[]{rileggi,pulsanteSalvaTempiMidi,combo,etichettaVersioniFoglio});
         }
         private void AggiornaStatoMidi()
@@ -83,6 +85,14 @@ namespace VisualMusicBlockLooper.App
             string testo=$"Foglio letto v{osservata} | pronto v{e.Stato.VersionePronta} | in uso v{e.Stato.VersioneAttiva}"
                 +$" | letture scena/zone: {compositore.Analizzatore?.NumeroLetture??0}";
             testo+=Environment.NewLine+(errore??messaggioTempi??compositore.Analizzatore?.UltimoEsito??"Preparazione del foglio");
+            var analisi=compositore.Analizzatore;
+            if(analisi?.IndicatoriScansioneAttivi==true)
+            {
+                var scansione=analisi.Scansione;var letta=scansione.UltimaCompletata;
+                testo+=Environment.NewLine+"Viola: scansione prevista +"+analisi.MisureAnticipoScansione+" misure | Azzurro: ";
+                testo+=letta==null?scansione.Esito:
+                    $"letta m{letta.MisuraAssoluta+1}, frame {letta.FrameId}, {letta.FineMs-letta.InizioMs} ms (età frame {Math.Max(0,orologioMs()-letta.IstanteFrameMs)} ms) | {scansione.Esito}";
+            }
             etichettaVersioniFoglio.Text=testo;
             etichettaVersioniFoglio.ForeColor=errore==null?Color.DarkBlue:Color.DarkRed;
             suggerimentiDebug.SetToolTip(etichettaVersioniFoglio,testo);
@@ -96,18 +106,23 @@ namespace VisualMusicBlockLooper.App
             {
                 proiettore.AggiornaPosizione(compositore.Motore.Posizione,compositore.Motore.InEsecuzione);return;
             }
-            var attiva=e.Stato.PartituraAttiva;
+            var trasporto=e.Stato.Trasporto;
+            var attiva=trasporto.Partitura;
+            var posizione=attiva?.PosizioneAlTick(trasporto.TickNelGiro)??e.Posizione;
+            var analisi=compositore.Analizzatore;
+            proiettore.AggiornaIndicatori(presentatoreScansione.Leggi(trasporto,analisi?.Scansione,
+                analisi?.MisureAnticipoScansione??4,orologioMs(),analisi?.IndicatoriScansioneAttivi==true));
             var osservato=compositore.UltimoStato;
             if(!ReferenceEquals(attiva,partituraDisegnata)||!ReferenceEquals(osservato,osservatoDisegnato))
             {
                 var baseAttiva=attiva?.CopiaStato()??new StatoTavolo(null,null,null);
                 var stato=new StatoTavolo(baseAttiva.Note,null,osservato.Errori,baseAttiva.Struttura);
-                proiettore.Aggiorna(stato,e.Posizione,e.InEsecuzione);
+                proiettore.Aggiorna(stato,posizione,trasporto.InEsecuzione);
                 var attesa=osservato.Note.Where(n=>!baseAttiva.Note.Any(a=>a.Chiave==n.Chiave&&a.DurataStep==n.DurataStep)).ToArray();
                 proiettore.MostraInAttesa(new StatoTavolo(attesa,null,null,osservato.Struttura));
                 partituraDisegnata=attiva;osservatoDisegnato=osservato;
             }
-            else proiettore.AggiornaPosizione(e.Posizione,e.InEsecuzione);
+            else proiettore.AggiornaPosizione(posizione,trasporto.InEsecuzione);
         }
         private async Task SalvaTempiMidi()
         {

@@ -153,7 +153,7 @@ namespace VisualMusicBlockLooper.App
                         if (Modo != ModoSincronia.Slave) break;
                         if (Stato.InEsecuzione && orologioMs() - r.Istante >= Volatile.Read(ref intervalloEsternoMs))
                         { PerditaSincronia("Clock esterno in ritardo: arresto controllato."); RichiediStop(); }
-                        else Stato.RiceviClock(r.Istante);
+                        else Stato.RiceviClock(r.Istante,Volatile.Read(ref intervalloEsternoMs));
                         break;
                     case Tipo.StartEsterno: Volatile.Write(ref istanteAvvio,r.Istante);Stato.RiceviStart(); break;
                     case Tipo.ContinueEsterno: Volatile.Write(ref istanteAvvio,r.Istante);Stato.RiceviContinue(); break;

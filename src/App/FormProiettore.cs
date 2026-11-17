@@ -21,6 +21,7 @@ namespace VisualMusicBlockLooper.App
         private StatoTavolo inAttesa;
         private PosizioneGiro posizione;
         private bool inEsecuzione;
+        private IndicatoriScansione indicatori;
         private int? puntoCalibrazione;
 
         /// <summary>Crea la form per la griglia indicata. Non viene mostrata.</summary>
@@ -99,6 +100,11 @@ namespace VisualMusicBlockLooper.App
             RichiediDisegno();
         }
 
+        public void AggiornaIndicatori(IndicatoriScansione nuovi)
+        {
+            lock(bloccoStato){if(IsDisposed)return;indicatori=nuovi;}
+        }
+
         public void MostraInAttesa(StatoTavolo osservato)
         {
             lock(bloccoStato){if(IsDisposed)return;inAttesa=CopiaStato(osservato);}
@@ -150,6 +156,7 @@ namespace VisualMusicBlockLooper.App
             PosizioneGiro posizioneDisegnata;
             bool esecuzione;
             int? riferimento;
+            IndicatoriScansione linee;
 
             lock (bloccoStato)
             {
@@ -158,6 +165,7 @@ namespace VisualMusicBlockLooper.App
                 posizioneDisegnata = posizione;
                 esecuzione = inEsecuzione;
                 riferimento = puntoCalibrazione;
+                linee=indicatori;
             }
 
             if (riferimento.HasValue) RenderCalibrazione.Disegna(e.Graphics, ClientSize, riferimento.Value);
@@ -165,6 +173,7 @@ namespace VisualMusicBlockLooper.App
             {
                 renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
                 renderGuida.DisegnaInAttesa(e.Graphics,ClientSize,attesa);
+                renderGuida.DisegnaIndicatori(e.Graphics,ClientSize,linee);
             }
         }
 

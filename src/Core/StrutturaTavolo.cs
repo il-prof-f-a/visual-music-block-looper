@@ -36,6 +36,7 @@ namespace VisualMusicBlockLooper.Core
         private static readonly int[] RigheCollegateAmmesse = { 1, 2, 3, 6 };
         private readonly int misurePerGiro;
         private readonly PosizioneGiro[] posizioniMisuraGiro;
+        private readonly int[] tickMisura;
 
         private StrutturaTavolo(int battiti, int righeCollegate, int aInizio, int aFine)
         {
@@ -53,6 +54,11 @@ namespace VisualMusicBlockLooper.Core
             }
             posizioniMisuraGiro=posizioni.ToArray();
             misurePerGiro=posizioniMisuraGiro.Length;
+            tickMisura=new int[misurePerGiro+1];
+            for(int i=0;i<misurePerGiro;i++)
+                tickMisura[i]=(posizioniMisuraGiro[i].MisuraNelGiro*StepPerMisura
+                    +posizioniMisuraGiro[i].StepInMisura-(AInizio-1)*StepPerBattuta)*Sequencer.TickPerStep;
+            tickMisura[misurePerGiro]=StepGiro*Sequencer.TickPerStep;
         }
 
         /// <summary>Step (sedicesimi) in una battuta.</summary>
@@ -106,6 +112,15 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Numero di frontiere di misura/inizio A-B contate dal clock in un giro.</summary>
         public int MisurePerGiro => misurePerGiro;
+
+        public int TickInizioMisura(int indice)=>tickMisura[indice];
+        public int TickFineMisura(int indice)=>tickMisura[indice+1];
+        public int IndiceMisuraAlTick(int tick)
+        {
+            int indice=0;
+            while(indice+1<misurePerGiro&&tick>=tickMisura[indice+1])indice++;
+            return indice;
+        }
 
         /// <summary>Posizione all'indice di frontiera di misura del giro A-B, 0-based.</summary>
         public PosizioneGiro PosizioneMisuraGiro(int indice)

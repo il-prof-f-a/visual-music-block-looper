@@ -33,20 +33,27 @@ namespace VisualMusicBlockLooper.Vision
                 if(crop.Channels()==3)crop.CopyTo(bgr);
                 else Cv2.CvtColor(crop,bgr,crop.Channels()==4?ColorConversionCodes.BGRA2BGR:ColorConversionCodes.GRAY2BGR);
                 Cv2.CvtColor(bgr,gray,ColorConversionCodes.BGR2GRAY);
-                var colori=new sbyte[regione.Height,regione.Width];int colorati=0,scuri=0;
+                var colori=new sbyte[regione.Height,regione.Width];int colorati=0,scuri=0,neutri=0;
+                var luminositaNeutra=new int[256];
                 for(int y=0;y<bgr.Rows;y++)for(int x=0;x<bgr.Cols;x++)
                 {
                     var p=bgr.At<Vec3b>(y,x);var c=ClassificatoreColore.Classifica(p.Item2,p.Item1,p.Item0);
                     colori[y,x]=c.HasValue?(sbyte)c.Value:(sbyte)-1;if(c.HasValue)colorati++;
+                    if(!c.HasValue){luminositaNeutra[gray.At<byte>(y,x)]++;neutri++;}
                     if(gray.At<byte>(y,x)<100)scuri++;
                 }
+                int riferimento=255,cumulati=0;
+                for(int i=0;i<256&&neutri>0;i++)
+                {cumulati+=luminositaNeutra[i];if(cumulati>=neutri*.75){riferimento=i;break;}}
+                int sogliaCarta=Math.Max(120,Math.Min(190,(int)(riferimento*.85)));
+                bool corpoColorato=colorati>50&&CorpoColorato(colori);
                 var letti=new List<CartoncinoRilevato>();
                 // Sfondo chiaro uniforme: nessun finder QR, nessun decoder da invocare.
                 if(scuri>30)
                 {
                     letti=Decodifica(gray,regione,1);
                     // Un solo recupero locale, limitato a finestre piccole con corpo presente.
-                    if(letti.Count==0&&colorati>50&&gray.Width<600&&gray.Height<400)
+                    if(letti.Count==0&&corpoColorato&&gray.Width<600&&gray.Height<400)
                         using(var grande=new Mat())
                         {Cv2.Resize(gray,grande,new Size(),2,2,InterpolationFlags.Linear);letti=Decodifica(grande,regione,2);}
                 }
@@ -58,7 +65,7 @@ namespace VisualMusicBlockLooper.Vision
                     letto.Colore=ColoreQr(colori,regione,letto.AreaQr.Value,frame.Size())??precedente?.Colore;
                     if(letto.Colore.HasValue)
                     {
-                        double fine=Segui(colori,regione,letto,Math.Max(zona.X,letto.AreaQr.Value.X+1.15*letto.AreaQr.Value.Larghezza),zona.X+zona.Larghezza,frame.Size(),gray,out bool incerta,true);
+                        double fine=Segui(colori,regione,letto,Math.Max(zona.X,letto.AreaQr.Value.X+1.15*letto.AreaQr.Value.Larghezza),zona.X+zona.Larghezza,frame.Size(),gray,sogliaCarta,out bool incerta,true);
                         letto.FineEstensioneX=incerta?(precedente?.FineEstensioneX??fine):fine;
                         if(incerta)completa=false;
                     }
@@ -75,7 +82,7 @@ namespace VisualMusicBlockLooper.Vision
                         if((box&regione)!=box||box.Width==0||box.Height==0){completa=false;continue;}
                         int chiari=0;
                         for(int y=box.Top;y<box.Bottom;y++)for(int x=box.Left;x<box.Right;x++)
-                            if(gray.At<byte>(y-regione.Y,x-regione.X)>=190&&colori[y-regione.Y,x-regione.X]<0)chiari++;
+                            if(gray.At<byte>(y-regione.Y,x-regione.X)>=sogliaCarta&&colori[y-regione.Y,x-regione.X]<0)chiari++;
                         if(chiari>=box.Width*box.Height*.985)catalogo.Remove(c);else completa=false;
                     }
                     else if(qr.X+qr.Larghezza<zona.X&&c.Colore.HasValue&&c.FineEstensioneX.HasValue
@@ -83,14 +90,14 @@ namespace VisualMusicBlockLooper.Vision
                         &&qr.Y+qr.Altezza/2>=zona.Y&&qr.Y+qr.Altezza/2<=zona.Y+zona.Altezza)
                     {
                         if(scuri>regione.Width*regione.Height*.8){completa=false;continue;}
-                        double fine=Segui(colori,regione,c,zona.X,zona.X+zona.Larghezza,frame.Size(),gray,out bool incerta);
+                        double fine=Segui(colori,regione,c,zona.X,zona.X+zona.Larghezza,frame.Size(),gray,sogliaCarta,out bool incerta);
                         if(incerta)completa=false;
                         else c.FineEstensioneX=ConservaFineNonOsservata(fine,c.FineEstensioneX,zona,frame.Size());
                         codaConosciuta=true;
                     }
                 }
                 // Colore sconosciuto non e prova di una rimozione o di un QR decodificato.
-                if(colorati>50&&letti.Count==0&&!codaConosciuta&&!catalogo.Any(c=>c.Colore.HasValue&&GeometriaRegioni.Interseca(zona,c.Area)))completa=false;
+                if(corpoColorato&&letti.Count==0&&!codaConosciuta&&!catalogo.Any(c=>c.Colore.HasValue&&GeometriaRegioni.Interseca(zona,c.Area)))completa=false;
                 if(scuri>regione.Width*regione.Height*.8)completa=false;
                 if(traccia!=null)
                 {
@@ -99,6 +106,21 @@ namespace VisualMusicBlockLooper.Vision
                     traccia.Visione.Add(new EventoDiagnosticoCartoncino("Visione","LetturaFinestra","LetturaFinestra",$"ROI {regione}; {letti.Count} QR; completa={completa}",areaTavolo:zona));
                 }
                 return new LetturaZona(catalogo.AsReadOnly(),completa,letti.Count,regione){RegioneMaschera=regione};
+            }
+        }
+        // Le linee del proiettore non costituiscono un corpo pieno. Il filtro riguarda solo
+        // questa evidenza: i pixel originali rimangono disponibili per decoder e code.
+        private static bool CorpoColorato(sbyte[,] colori)
+        {
+            int h=colori.GetLength(0),w=colori.GetLength(1);
+            using(var mask=new Mat(h,w,MatType.CV_8UC1,Scalar.All(0)))
+            using(var erosa=new Mat())
+            using(var kernel=Cv2.GetStructuringElement(MorphShapes.Rect,new Size(
+                Math.Min(11,Math.Max(3,(int)(h*.06)|1)),Math.Min(11,Math.Max(3,(int)(h*.06)|1)))))
+            {
+                for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(colori[y,x]>=0)mask.Set(y,x,(byte)255);
+                Cv2.Erode(mask,erosa,kernel);
+                return Cv2.CountNonZero(erosa)>=12;
             }
         }
         // Il bordo del ritaglio e una frontiera osservata, non una fine fisica del corpo.
@@ -118,7 +140,7 @@ namespace VisualMusicBlockLooper.Vision
             }
             int m=Array.IndexOf(conteggi,conteggi.Max());return conteggi[m]>=2?(ColoreTraccia?)m:null;
         }
-        private double Segui(sbyte[,] colori,Rect regione,CartoncinoRilevato nota,double inizio,double fine,Size frame,Mat gray,out bool incerta,bool bordoQr=false)
+        private double Segui(sbyte[,] colori,Rect regione,CartoncinoRilevato nota,double inizio,double fine,Size frame,Mat gray,int sogliaCarta,out bool incerta,bool bordoQr=false)
         {
             incerta=false;var qr=nota.AreaQr??nota.Area;double passo=1.0/Math.Max(frame.Width,frame.Height),ultimo=inizio;
             double rigaH=griglia.Area.Altezza/Math.Max(1,griglia.Tracce);
@@ -131,7 +153,7 @@ namespace VisualMusicBlockLooper.Vision
                 if(pieni<2)
                 {
                     if(bordoQr&&ultimo==inizio&&x-inizio<qr.Larghezza*.35)continue;
-                    incerta=!FineAffidabile(colori,gray,regione,x,y0,y1,nota.Colore.Value);
+                    incerta=!FineAffidabile(colori,gray,regione,x,y0,y1,nota.Colore.Value,sogliaCarta);
                     break;
                 }
                 ultimo=x;
@@ -139,7 +161,7 @@ namespace VisualMusicBlockLooper.Vision
             return ultimo;
         }
         // Carta chiara e colore diverso chiudono il corpo; ombre e occlusioni richiedono una nuova lettura.
-        private bool FineAffidabile(sbyte[,] colori,Mat gray,Rect regione,double x,double y0,double y1,ColoreTraccia colore)
+        private bool FineAffidabile(sbyte[,] colori,Mat gray,Rect regione,double x,double y0,double y1,ColoreTraccia colore,int sogliaCarta)
         {
             int chiari=0,diversi=0;
             for(int i=0;i<17;i++)
@@ -149,7 +171,7 @@ namespace VisualMusicBlockLooper.Vision
                 if(cx<0||cy<0||cx>=regione.Width||cy>=regione.Height)continue;
                 int c=colori[cy,cx];
                 if(c>=0&&c!=(int)colore)diversi++;
-                if(c<0&&gray.At<byte>(cy,cx)>=190)chiari++;
+                if(c<0&&gray.At<byte>(cy,cx)>=sogliaCarta)chiari++;
             }
             return chiari>=13||diversi>=2;
         }
@@ -179,7 +201,3 @@ namespace VisualMusicBlockLooper.Vision
         }
     }
 }
-
-
-
-

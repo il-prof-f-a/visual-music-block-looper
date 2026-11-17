@@ -12,9 +12,9 @@ namespace VisualMusicBlockLooper.Tests
         private static ConfigGriglia Griglia()=>new ConfigGriglia();
         private static CartoncinoRilevato Nota(double fine=.4)=>new CartoncinoRilevato { Payload="VMBL1;N;64",Colore=ColoreTraccia.Rosso,Area=new RettangoloTavolo(.1,.2,.3,.1),AreaQr=new RettangoloTavolo(.12,.22,.05,.05),FineEstensioneX=fine };
         private static LettoreFinestraCelle Lettore()=>new LettoreFinestraCelle(NoteContigueVisionTests.Calibra(false,1000,600),Griglia());
-        [Test] public void OmbraLocaleSullaCodaNonAccorciaLaNotaEChiedeRilettura()
+        [TestCase(170)] [TestCase(255)] public void OmbraLocaleSullaCodaNonAccorciaLaNotaEChiedeRilettura(int carta)
         {
-            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.White))
+            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.All(carta)))
             {
                 Cv2.Rectangle(f,new Rect(370,120,430,60),new Scalar(40,40,220),-1);
                 Cv2.Rectangle(f,new Rect(450,115,35,70),Scalar.All(15),-1);
@@ -24,6 +24,36 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(r.Completa,Is.False);
                 Assert.That(ripetuta.Catalogo.Single().FineEstensioneX,Is.EqualTo(.8));
                 Assert.That(ripetuta.Completa,Is.False);
+            }
+        }
+
+        [Test] public void CartaNeutraConLuminositaDellaScenaConfermaRimozioneEFineCoda()
+        {
+            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.All(170)))
+            {
+                var l=Lettore();var vuota=l.Leggi(f,new RettangoloTavolo(.1,.17,.1875,1.0/6),new[]{Nota()});
+                Assert.That(vuota.Completa,Is.True);Assert.That(vuota.Catalogo,Is.Empty);
+                Cv2.Rectangle(f,new Rect(370,120,80,60),new Scalar(40,40,220),-1);
+                var coda=l.Leggi(f,new RettangoloTavolo(.375,.17,.1875,1.0/6),new[]{Nota(.8)});
+                Assert.That(coda.Completa,Is.True);Assert.That(coda.Catalogo.Single().FineEstensioneX,Is.EqualTo(.45).Within(.003));
+            }
+        }
+        [TestCase(1)] [TestCase(3)] public void LineeProiettateSottiliNonSonoUnCartoncinoSconosciuto(int spessore)
+        {
+            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.All(170)))
+            {
+                for(int y=100;y<210;y+=12)Cv2.Line(f,new Point(350,y),new Point(600,y),new Scalar(100,180,100),spessore);
+                var r=Lettore().Leggi(f,new RettangoloTavolo(.375,.17,.1875,1.0/6),new CartoncinoRilevato[0]);
+                Assert.That(r.Completa,Is.True);Assert.That(r.QrDecodificati,Is.Zero);
+            }
+        }
+        [Test] public void CorpoPienoSconosciutoRimaneDaRileggere()
+        {
+            using(var f=new Mat(600,1000,MatType.CV_8UC3,Scalar.All(170)))
+            {
+                Cv2.Rectangle(f,new Rect(410,120,80,60),new Scalar(40,40,220),-1);
+                var r=Lettore().Leggi(f,new RettangoloTavolo(.375,.17,.1875,1.0/6),new CartoncinoRilevato[0]);
+                Assert.That(r.Completa,Is.False);
             }
         }
 
@@ -124,9 +154,3 @@ namespace VisualMusicBlockLooper.Tests
         }
     }
 }
-
-
-
-
-
-

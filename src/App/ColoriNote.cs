@@ -15,7 +15,11 @@ namespace VisualMusicBlockLooper.App
         public static Color DaMidi(int midi)
         {
             double t = Math.Max(0, Math.Min(1, (midi - 21) / 87.0));
-            double lunghezzaOnda = 700 - 300 * t; // 700 nm (La0) → 400 nm (Do8)
+            // Il generatore interpola la frequenza ottica, non la lunghezza d'onda:
+            // 1/λ = (1-t)/700 + t/400. La linearità di λ produrrebbe colori sbagliati
+            // (per esempio Do5 verde invece del ciano del cartoncino).
+            double inversoLunghezza = (1 - t) / 700.0 + t / 400.0;
+            double lunghezzaOnda = 1.0 / inversoLunghezza;
             return Spettro(lunghezzaOnda);
         }
 

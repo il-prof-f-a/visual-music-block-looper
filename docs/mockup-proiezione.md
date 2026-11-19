@@ -63,11 +63,11 @@ Il colore non viene letto dai pixel. `src/App/ColoriNote.cs` riproduce la formul
 ```text
 midi = 36 + idClip
 t = (midi - 21) / 87
-λ = 700 - 300·t          (nm)
-RGB = spettro(λ)         (approssimazione sRGB del generatore)
+1/λ = (1 - t)/700 + t/400     (nm⁻¹)
+RGB = spettro(λ)              (approssimazione sRGB del generatore)
 ```
 
-`spettro` è la stessa spezzata del generatore, con correzione `c^0,8 · 0,72`. La formula diretta nota → colore è quindi deterministica. L'inversa colore → nota non è unica: più lunghezze d'onda possono produrre RGB simili, quindi non viene usata. Per i cartoncini speciali il colore dipende dal tipo: MISURA blu, COLLEGA verde, A-B/ripetizione violetto.
+L'interpolazione è sulla **frequenza ottica**, non sulla lunghezza d'onda: per questo Do5 è ciano e non verde. `spettro` è la stessa spezzata del generatore, con correzione `c^0,8 · 0,72`. La formula diretta nota → colore è quindi deterministica. L'inversa colore → nota non è unica: più lunghezze d'onda possono produrre RGB simili, quindi non viene usata. Per i cartoncini speciali il colore dipende dal tipo: MISURA blu, COLLEGA verde, A-B/ripetizione violetto.
 - **Contorno rosso** nella riga 6: un cartoncino scartato, per esempio per `Sovrapposto` o `FuoriMisura`. Il motivo dello scarto è nella tabella della prova hardware (`docs/prova-hardware.md`, sezione 9).
 - **Zona comandi** a destra: i cartoncini comando (PLAY, STOP, TAP, MODO, ONESHOT) sono letti dalla zona e non diventano note.
 

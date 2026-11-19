@@ -7,10 +7,10 @@ namespace VisualMusicBlockLooper.Tests
     [TestFixture]
     public class ColoriNoteTests
     {
-        [TestCase(0, 184, 0, 0)]     // MIDI 36, La0: rosso
-        [TestCase(7, 184, 74, 0)]    // MIDI 43: arancio
-        [TestCase(24, 153, 184, 0)]  // MIDI 60, Do4: giallo-verde
-        [TestCase(47, 0, 172, 184)]  // MIDI 83, Si5: ciano
+        [TestCase(0, 184, 86, 0)]    // MIDI 36, Do2: arancio
+        [TestCase(7, 184, 164, 0)]   // MIDI 43: giallo
+        [TestCase(24, 50, 184, 0)]   // MIDI 60, Do4: verde
+        [TestCase(47, 0, 74, 184)]   // MIDI 83, Si5: blu
         public void ColoreDerivaDallaNota(int idClip, int r, int g, int b)
         {
             var colore = ColoriNote.DaIdClip(idClip);

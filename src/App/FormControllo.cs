@@ -697,8 +697,20 @@ namespace VisualMusicBlockLooper.App
                 formCorrezione.Activate();
                 return;
             }
-            var iniziali = configurazione.CorrezioneBordo.Converti();
-            formCorrezione = new FormCorrezioneBordo(iniziali, ApplicaCorrezioneBordo, SalvaCorrezioneBordo);
+            Calibrazione attuale = rilevatore.CalibrazioneAttiva;
+            ParametriCorrezioneBordo iniziali = configurazione.CorrezioneBordo.Converti();
+            if (attuale != null)
+            {
+                iniziali.Modello = attuale.ModelloCorrente;
+                if (attuale.FocaleSferica > 0) iniziali.Focale = attuale.FocaleSferica;
+                if (attuale.CentroSfericoX > 0) iniziali.CentroX = attuale.CentroSfericoX;
+                if (attuale.CentroSfericoY > 0) iniziali.CentroY = attuale.CentroSfericoY;
+                iniziali.TipoSferico = attuale.TipoSferico;
+            }
+            int larghezza = attuale != null && attuale.Larghezza > 0 ? attuale.Larghezza : webcam.Larghezza;
+            int altezza = attuale != null && attuale.Altezza > 0 ? attuale.Altezza : webcam.Altezza;
+            formCorrezione = new FormCorrezioneBordo(iniziali, larghezza, altezza,
+                ApplicaCorrezioneBordo, SalvaCorrezioneBordo);
             formCorrezione.FormClosed += (m, a) => formCorrezione = null;
             formCorrezione.Show(this);
         }

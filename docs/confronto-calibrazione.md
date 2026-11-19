@@ -94,6 +94,34 @@ Un fattore **minore di 1** allarga la fascia in quella direzione: `FattoreY = 0,
 
 Il test sintetico `CalibrazioneCurvaTests.BordoCurvo_LineeInterneDritteE12PuntiRispettati` riproduce il caso reale: bordo curvo, centro omografico, linee orizzontali e verticali interne rette. Il vecchio caso sintetico con distorsione radiale resta utile per studiare una lente reale, ma non rappresenta il tavolo attuale.
 
+### Modello «Sferico»
+
+Il terzo modello assimila la lente a una sfera: un raggio che entra con angolo `θ` rispetto all'asse ottico viene proiettato sul sensore a distanza radiale `r_d`. Le proiezioni classiche sono:
+
+| Proiezione | Legge | Inversa |
+| --- | --- | --- |
+| Equisolido | `r_d = 2f·sin(θ/2)` | `θ = 2·asin(r_d/(2f))` |
+| Equidistante | `r_d = f·θ` | `θ = r_d/f` |
+| Stereografico | `r_d = 2f·tan(θ/2)` | `θ = 2·atan(r_d/(2f))` |
+
+La mappa completa è: i dodici punti del tavolo passano per un'omografia `H` verso il piano ideale; il punto ideale `q` ha raggio `r = |q - centro|` e angolo `θ = atan(r/f)`; la sfera produce `r_d`; il pixel camera è `centro + (q-centro)·r_d/r`. L'inversa usa la tabella e poi `r_u = f·tan(θ)`, quindi `H⁻¹`.
+
+I dodici click stimano `H`, `f` e il centro ottico. Non serve un nuovo formato: si parte dalle stesse dodici coppie di `VMBL-CAL3`. Sul frame reale 1284x966 la stima ha dato `f ≈ 740 px`, centro `≈ (693, 483)` e RMS sui dodici punti `≈ 5,3 px`; visivamente i cartoncini ai bordi risultano più rettangolari dei due modelli di bordo.
+
+```json
+"CorrezioneBordo": {
+  "Modello": "Sferico",
+  "TipoSferico": "Equisolido",
+  "Focale": 740,
+  "CentroX": 693,
+  "CentroY": 483
+}
+```
+
+Con `Focale = 0`, `CentroX = 0` o `CentroY = 0` il programma stima il valore dai dodici punti. Il pulsante **Correzione bordo...** permette di scegliere la proiezione e regolare focale e centro dal vivo.
+
+Riferimenti consultati: [ortorettifica fisheye equisolida](https://www.mdpi.com/2072-4292/14/17/4175), [rassegna dei modelli fisheye](https://arxiv.org/html/2401.00442v1), [tabella delle proiezioni](https://commonlands.com/blogs/technical/wide-angle-lenses-and-fisheye-camera-lens-distortion), [equazioni di proiezione fisheye ISPRS](https://www.isprs.org/proceedings/xxxvi/5-W8/Paper/PanoWS_Berlin2005_Schwalbe.pdf).
+
 ## Limiti
 
-I dodici punti descrivono solo il perimetro. Se anche le linee interne sono realmente curve (distorsione radiale della lente, superficie non piana), il blend non basta: servono il modello radiale stimato dai dodici punti oppure una calibrazione guidata dalle linee proiettate. In quel caso la verifica va fatta su un frame grezzo e sulle linee interne, non solo sul rettangolo esterno. I dati CAL3 originali restano invariati; la cattura serve a scegliere e verificare il modello, non a sostituire i dodici riferimenti.
+I dodici punti descrivono solo il perimetro. Il modello sferico aggiunge un vincolo fisico globale e ha dato il risultato migliore sul frame reale, ma non è una garanzia per ogni lente: se la forma non è assimilabile a una sfera, restano i modelli di bordo o una calibrazione guidata dalle linee proiettate. In tutti i casi la verifica va fatta su un frame grezzo e sulle linee interne, non solo sul rettangolo esterno. I dati CAL3 originali restano invariati; la cattura serve a scegliere e verificare il modello, non a sostituire i dodici riferimenti.

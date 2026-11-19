@@ -169,6 +169,33 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void ConParametriBordo_PuoPassareAlModelloSferico()
+        {
+            var punti = SchemaCalibrazione.Punti.Select(CameraBordo).ToArray();
+            var baseCal = SchemaCalibrazione.Calcola(punti, 1280, 720, out _);
+            var sferica = baseCal.ConParametriBordo(new ParametriCorrezioneBordo
+            {
+                Modello = ModelloCorrezioneBordo.Sferico,
+                TipoSferico = TipoProiezioneSferica.Equisolido,
+                Focale = 740,
+                CentroX = 690,
+                CentroY = 483
+            });
+
+            Assert.That(sferica.ModelloCorrente, Is.EqualTo(ModelloCorrezioneBordo.Sferico));
+            Assert.That(sferica.FocaleSferica, Is.EqualTo(740).Within(1e-6));
+            Assert.That(sferica.CentroSfericoX, Is.EqualTo(690).Within(1e-6));
+            foreach (double x in new[] { 0.1, 0.3, 0.5, 0.7, 0.9 })
+                foreach (double y in new[] { 0.1, 0.3, 0.5, 0.7, 0.9 })
+                {
+                    var p = new PuntoTavolo(x, y);
+                    PuntoImmagine c = sferica.DaTavoloACamera(p);
+                    Assert.That(Distanza(sferica.DaCameraATavolo(c), p), Is.LessThan(1e-6),
+                        "Inversa " + x + "," + y);
+                }
+        }
+
+        [Test]
         public void ModelloSferico_RicostruisceLaProiezioneEquisolida()
         {
             Calibrazione.ParametriBordo = new ParametriCorrezioneBordo

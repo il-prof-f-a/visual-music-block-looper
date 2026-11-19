@@ -46,6 +46,8 @@ namespace VisualMusicBlockLooper.Tests
 
             Assert.That(configurazione.CorrezioneBordo.Pieno, Is.EqualTo(0.04).Within(1e-9));
             Assert.That(configurazione.CorrezioneBordo.Esterno, Is.EqualTo(0.22).Within(1e-9));
+            Assert.That(configurazione.CorrezioneBordo.TipoSferico, Is.EqualTo("Equisolido"));
+            Assert.That(configurazione.CorrezioneBordo.Focale, Is.EqualTo(0).Within(1e-9));
         }
 
         [Test]
@@ -103,6 +105,29 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(parametri.FattoreX, Is.EqualTo(0.8).Within(1e-9));
                 Assert.That(parametri.FattoreY, Is.EqualTo(1.2).Within(1e-9));
                 Assert.That(parametri.Smussamento, Is.EqualTo(20).Within(1e-9));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
+        public void ModelloSfericoVieneConservato()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"CorrezioneBordo\":{\"Modello\":\"Sferico\",\"TipoSferico\":\"Equisolido\","
+                    + "\"Focale\":737,\"CentroX\":672,\"CentroY\":494}}");
+                var parametri = ConfigurazioneApplicazione.Carica(percorso).CorrezioneBordo.Converti();
+
+                Assert.That(parametri.Modello, Is.EqualTo(VisualMusicBlockLooper.Vision.ModelloCorrezioneBordo.Sferico));
+                Assert.That(parametri.TipoSferico, Is.EqualTo(VisualMusicBlockLooper.Vision.TipoProiezioneSferica.Equisolido));
+                Assert.That(parametri.Focale, Is.EqualTo(737).Within(1e-9));
+                Assert.That(parametri.CentroX, Is.EqualTo(672).Within(1e-9));
+                Assert.That(parametri.CentroY, Is.EqualTo(494).Within(1e-9));
             }
             finally
             {

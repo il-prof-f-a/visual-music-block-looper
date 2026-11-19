@@ -97,19 +97,40 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Intensità della softmin; 0 usa il minimo netto (default 0).</summary>
         public double Smussamento { get; set; } = 0.0;
 
+        /// <summary>«Equisolido», «Equidistante» o «Stereografico» (usato con Modello = Sferico).</summary>
+        public string TipoSferico { get; set; } = "Equisolido";
+
+        /// <summary>Focale in pixel; 0 = stimata dai dodici punti.</summary>
+        public double Focale { get; set; } = 0.0;
+
+        /// <summary>Centro ottico X in pixel; 0 = centro dell'immagine.</summary>
+        public double CentroX { get; set; } = 0.0;
+
+        /// <summary>Centro ottico Y in pixel; 0 = centro dell'immagine.</summary>
+        public double CentroY { get; set; } = 0.0;
+
         public ParametriCorrezioneBordo Converti()
         {
             var parametri = new ParametriCorrezioneBordo
             {
-                Modello = string.Equals(Modello, nameof(ModelloCorrezioneBordo.BordoSmussato),
-                    StringComparison.OrdinalIgnoreCase)
-                    ? ModelloCorrezioneBordo.BordoSmussato
-                    : ModelloCorrezioneBordo.Bordo,
+                Modello = string.Equals(Modello, nameof(ModelloCorrezioneBordo.Sferico), StringComparison.OrdinalIgnoreCase)
+                    ? ModelloCorrezioneBordo.Sferico
+                    : string.Equals(Modello, nameof(ModelloCorrezioneBordo.BordoSmussato), StringComparison.OrdinalIgnoreCase)
+                        ? ModelloCorrezioneBordo.BordoSmussato
+                        : ModelloCorrezioneBordo.Bordo,
                 Pieno = Pieno,
                 Esterno = Esterno,
                 FattoreX = FattoreX,
                 FattoreY = FattoreY,
-                Smussamento = Smussamento
+                Smussamento = Smussamento,
+                TipoSferico = string.Equals(TipoSferico, nameof(TipoProiezioneSferica.Equidistante), StringComparison.OrdinalIgnoreCase)
+                    ? TipoProiezioneSferica.Equidistante
+                    : string.Equals(TipoSferico, nameof(TipoProiezioneSferica.Stereografico), StringComparison.OrdinalIgnoreCase)
+                        ? TipoProiezioneSferica.Stereografico
+                        : TipoProiezioneSferica.Equisolido,
+                Focale = Focale,
+                CentroX = CentroX,
+                CentroY = CentroY
             };
             return parametri.Normalizzati();
         }
@@ -123,6 +144,10 @@ namespace VisualMusicBlockLooper.App
             FattoreX = p.FattoreX;
             FattoreY = p.FattoreY;
             Smussamento = p.Smussamento;
+            TipoSferico = p.TipoSferico.ToString();
+            Focale = p.Focale;
+            CentroX = p.CentroX;
+            CentroY = p.CentroY;
         }
     }
 

@@ -83,16 +83,26 @@ namespace VisualMusicBlockLooper.App
             Volatile.Write(ref scansione,new StatoScansione(operazione,Scansione.UltimaCompletata,Scansione.UltimaLettura,"Lettura locale di tre celle"));
             // Ripetere gli stessi vincoli sul secondo frame della conferma, senza accumulare fotografie.
             var zone=piano.Zone.Concat(piano.Vincoli);
+            Volatile.Write(ref regioniLettura,piano.Zone);
+            Volatile.Write(ref letturaInCorso,1);
             var lavoro=catalogo;bool completa=true;
-            foreach(var zona in zone)
+            try
             {
-                long prima=tempo.ElapsedMilliseconds;
-                var lettura=lettoreCelle.Leggi(f.Immagine,zona,lavoro,traccia);
-                Interlocked.Increment(ref letture);
-                completa&=lettura.Completa&&IlluminazioneAffidabile(f.Immagine,lettura.RegioneCamera);
-                lavoro=lettura.Catalogo;
-                traccia?.Visione.Add(new EventoDiagnosticoCartoncino("Scansione","TempoFinestra","TempoFinestra",
-                    $"frame={f.Id}; cella={piano.Step+1}; ms={tempo.ElapsedMilliseconds-prima}; ROI={lettura.RegioneCamera}",areaTavolo:zona));
+                foreach(var zona in zone)
+                {
+                    long prima=tempo.ElapsedMilliseconds;
+                    var lettura=lettoreCelle.Leggi(f.Immagine,zona,lavoro,traccia);
+                    Interlocked.Increment(ref letture);
+                    completa&=lettura.Completa&&IlluminazioneAffidabile(f.Immagine,lettura.RegioneCamera);
+                    lavoro=lettura.Catalogo;
+                    traccia?.Visione.Add(new EventoDiagnosticoCartoncino("Scansione","TempoFinestra","TempoFinestra",
+                        $"frame={f.Id}; cella={piano.Step+1}; ms={tempo.ElapsedMilliseconds-prima}; ROI={lettura.RegioneCamera}",areaTavolo:zona));
+                }
+            }
+            finally
+            {
+                Volatile.Write(ref letturaInCorso,0);
+                Volatile.Write(ref mostraLetturaFinoA,orologio()+150);
             }
             Volatile.Write(ref ultimeRegioni,piano.Zone);
             Volatile.Write(ref durataCelleMs,tempo.Elapsed.TotalMilliseconds);

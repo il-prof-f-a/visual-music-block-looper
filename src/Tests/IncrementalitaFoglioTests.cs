@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.IO;
 using NUnit.Framework;
@@ -34,7 +34,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(daMezzaBattuta.MisurePerGiro,Is.EqualTo(2));
             Assert.That(AnalizzatoreFoglio.RigheAnticipate(daMezzaBattuta,daMezzaBattuta.Posizione(0),1),
                 Is.EqualTo(new[]{1,3,5}),
-                "Le frontiere devono seguire la misura reale anche quando A-B inizia a metà battuta.");
+                "Le frontiere devono seguire la misura reale anche quando A-B inizia a metÃ  battuta.");
         }
 
         [Test]
@@ -98,19 +98,19 @@ namespace VisualMusicBlockLooper.Tests
                     e.TickInterno(); // misura 0: multiplo di 4, parte la lettura completa
                     ora += 25; r.Pubblica(f, ora); a.Passo(true);
                     ora += 25; r.Pubblica(f, ora); a.Passo(true);
-                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(2),
-                        "Due frame della lettura completa periodica.");
-                    Assert.That(a.UltimoEsito, Does.Contain("ScansioneCompleta"));
+                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(1),
+                        "La lettura completa periodica usa una sola istantanea, come Rileggi.");
+                    Assert.That(a.UltimoEsito, Does.Contain("LetturaCompleta"));
 
                     for (int i = 0; i < 96; i++) { ora += 25; e.TickInterno(); } // misura 1
                     ora += 25; r.Pubblica(f, ora); a.Passo(true);
-                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(2),
+                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(1),
                         "Una misura non multipla non rilegge il foglio.");
 
                     for (int i = 0; i < 3 * 96; i++) { ora += 25; e.TickInterno(); } // misura 4
                     ora += 25; r.Pubblica(f, ora); a.Passo(true);
                     ora += 25; r.Pubblica(f, ora); a.Passo(true);
-                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(4),
+                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(2),
                         "Al quarto multiplo parte una nuova lettura completa.");
                 }
             }
@@ -139,7 +139,7 @@ namespace VisualMusicBlockLooper.Tests
 
                     ora+=25;r.Pubblica(f,ora);a.Passo(true);
                     Assert.That(a.NumeroLettureZone-lettureIniziali,Is.EqualTo(primaFinestra),
-                        "Una nuova cattura nella stessa misura non deve ridigitalizzare blocchi già confermati.");
+                        "Una nuova cattura nella stessa misura non deve ridigitalizzare blocchi giÃ  confermati.");
 
                     for(int i=0;i<96;i++){ora+=25;e.TickInterno();}
                     r.Pubblica(f,ora);a.Passo(true);
@@ -297,7 +297,7 @@ namespace VisualMusicBlockLooper.Tests
                     Cv2.Rectangle(f,new Rect(225,310,200,140),Scalar.White,-1);
                     ora+=21;r.Pubblica(f,ora);a.Passo();
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10),"La prima cattura crea il candidato ma non cancella la nota.");
-                    Assert.That(a.Scansione.UltimaCompletata,Is.Null,"Un primo candidato non è ancora una lettura confermata.");
+                    Assert.That(a.Scansione.UltimaCompletata,Is.Null,"Un primo candidato non Ã¨ ancora una lettura confermata.");
                     Assert.That(a.Passo(),Is.False,"Il medesimo frame non conferma una rimozione.");
                     ora+=66;r.Pubblica(f,ora);
                     Assert.That(a.Passo(),Is.True,"La seconda cattura deve essere letta senza attendere una nuova misura.");
@@ -313,7 +313,7 @@ namespace VisualMusicBlockLooper.Tests
                     Assert.That(a.NumeroLetture,Is.EqualTo(lette),"Conclusa la conferma si riprende la cadenza ordinaria.");
                     Assert.That(e.Stato.VersioneAttiva,Is.EqualTo(1));
                     Assert.That(e.Stato.VersionePronta,Is.GreaterThan(e.Stato.VersioneAttiva),
-                        "La versione rimossa è pronta per la misura assoluta 8, quattro misure avanti.");
+                        "La versione rimossa Ã¨ pronta per la misura assoluta 8, quattro misure avanti.");
                     Assert.That(e.Stato.PartituraAttiva.CopiaStato().Note,Has.Count.EqualTo(10));
 
                     for(int i=0;i<4*96;i++){ora+=21;e.TickInterno();}
@@ -439,7 +439,7 @@ namespace VisualMusicBlockLooper.Tests
                     ora+=66;r.Pubblica(scena,ora);a.Passo();
                     ora+=66;r.Pubblica(scena,ora);a.Passo();
                     Assert.That(p.Foglio.Ultima.CopiaStato().Note,Has.Count.EqualTo(5),
-                        "La conferma deve trasferire al preparatore anche i QR già integrati dalla lettura parziale.");
+                        "La conferma deve trasferire al preparatore anche i QR giÃ  integrati dalla lettura parziale.");
                     Assert.That(e.Stato.VersionePronta,Is.GreaterThan(e.Stato.VersioneAttiva));
                     Assert.That(a.Scansione.UltimaCompletata,Is.Not.Null);
                 }
@@ -679,12 +679,12 @@ namespace VisualMusicBlockLooper.Tests
 
                     ora+=300;a.Passo();
                     Assert.That(a.NumeroLettureZone,Is.EqualTo(letture),
-                        "Il frame ripetuto dalla webcam non è una seconda cattura indipendente.");
+                        "Il frame ripetuto dalla webcam non Ã¨ una seconda cattura indipendente.");
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(10));
 
                     ora+=100;r.Pubblica(f,ora);a.Passo(true);
                     Assert.That(a.UltimoStato.Note,Has.Count.EqualTo(9),
-                        "Un nuovo frame coerente può completare la conferma e rimuovere la nota.");
+                        "Un nuovo frame coerente puÃ² completare la conferma e rimuovere la nota.");
                 }
             }
         }
@@ -713,3 +713,4 @@ namespace VisualMusicBlockLooper.Tests
         }
     }
 }
+

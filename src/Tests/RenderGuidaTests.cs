@@ -47,6 +47,31 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void LetturaDisegnaLineaVerdeSoloMentreAttiva()
+        {
+            var config = ConfigPiena();
+            var regione = new RettangoloTavolo(0.15, 0.10, 0.50, 0.15);
+            using (var bmp = new Bitmap(Dimensione.Width, Dimensione.Height))
+            using (var g = Graphics.FromImage(bmp))
+            {
+                var render = new RenderGuida(config);
+                g.Clear(Color.White);
+                render.DisegnaLettura(g, Dimensione, new[] { regione }, true);
+                var punto = new Point(
+                    (int)((regione.X + regione.Larghezza / 2) * Dimensione.Width),
+                    (int)((regione.Y + regione.Altezza) * Dimensione.Height) - 3);
+                Color acceso = bmp.GetPixel(punto.X, punto.Y);
+                Assert.That(acceso.G, Is.GreaterThan(150), "linea verde accesa");
+                Assert.That(acceso.R, Is.LessThan(120), "linea verde accesa");
+
+                g.Clear(Color.White);
+                render.DisegnaLettura(g, Dimensione, new[] { regione }, false);
+                Color spento = bmp.GetPixel(punto.X, punto.Y);
+                Assert.That(spento.ToArgb(), Is.EqualTo(Color.White.ToArgb()), "linea rimossa a lettura finita");
+            }
+        }
+
+        [Test]
         public void FondoBianco()
         {
             using (Bitmap bmp = Disegna(ConfigPiena(), StatoCon(), 0, false))

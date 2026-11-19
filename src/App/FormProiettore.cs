@@ -22,6 +22,8 @@ namespace VisualMusicBlockLooper.App
         private PosizioneGiro posizione;
         private bool inEsecuzione;
         private IndicatoriScansione indicatori;
+        private IReadOnlyList<RettangoloTavolo> letturaRegioni = new RettangoloTavolo[0];
+        private bool letturaInCorso;
         private int? puntoCalibrazione;
 
         /// <summary>Crea la form per la griglia indicata. Non viene mostrata.</summary>
@@ -105,6 +107,21 @@ namespace VisualMusicBlockLooper.App
             lock(bloccoStato){if(IsDisposed)return;indicatori=nuovi;}
         }
 
+        /// <summary>Regioni attualmente in lettura: linea verde sul bordo inferiore finché dura l'analisi.</summary>
+        public void AggiornaLettura(IReadOnlyList<RettangoloTavolo> regioni,bool attiva)
+        {
+            bool cambiata;
+            lock(bloccoStato)
+            {
+                if(IsDisposed)return;
+                IReadOnlyList<RettangoloTavolo> nuove=regioni??new RettangoloTavolo[0];
+                cambiata=attiva!=letturaInCorso||!ReferenceEquals(nuove,letturaRegioni);
+                letturaRegioni=nuove;
+                letturaInCorso=attiva;
+            }
+            if(cambiata)RichiediDisegno();
+        }
+
         public void MostraInAttesa(StatoTavolo osservato)
         {
             lock(bloccoStato){if(IsDisposed)return;inAttesa=CopiaStato(osservato);}
@@ -157,6 +174,8 @@ namespace VisualMusicBlockLooper.App
             bool esecuzione;
             int? riferimento;
             IndicatoriScansione linee;
+            IReadOnlyList<RettangoloTavolo> letture;
+            bool letturaAttiva;
 
             lock (bloccoStato)
             {
@@ -166,6 +185,8 @@ namespace VisualMusicBlockLooper.App
                 esecuzione = inEsecuzione;
                 riferimento = puntoCalibrazione;
                 linee=indicatori;
+                letture=letturaRegioni;
+                letturaAttiva=letturaInCorso;
             }
 
             if (riferimento.HasValue) RenderCalibrazione.Disegna(e.Graphics, ClientSize, riferimento.Value);
@@ -174,6 +195,7 @@ namespace VisualMusicBlockLooper.App
                 renderGuida.Disegna(e.Graphics, ClientSize, statoCorrente, posizioneDisegnata ?? new PosizioneGiro(0, 0, TutteLeRighe()), esecuzione);
                 renderGuida.DisegnaInAttesa(e.Graphics,ClientSize,attesa);
                 renderGuida.DisegnaIndicatori(e.Graphics,ClientSize,linee);
+                renderGuida.DisegnaLettura(e.Graphics,ClientSize,letture,letturaAttiva);
             }
         }
 

@@ -30,7 +30,10 @@ namespace VisualMusicBlockLooper.App
         private long ultimaMisuraLetturaCompleta = long.MinValue, esecuzioneLetturaCompleta = -1;
         private long misuraLetturaCompleta = -1;
         private bool letturaCompletaInCorso;
-        private int tentativiLetturaCompleta;
+        private int letturaInCorso;
+        private int periodoPrecedenteLettura = -1;
+        private long mostraLetturaFinoA = long.MinValue;
+        private IReadOnlyList<RettangoloTavolo> regioniLettura = new RettangoloTavolo[0];
         private int modalitaLetturaPrecedente = -1;
         private readonly ParametriRilevatoreVariazioni parametriVariazioni;
         private RilevatoreVariazioni differenze;
@@ -123,6 +126,9 @@ namespace VisualMusicBlockLooper.App
         public long NumeroFotogrammi=>Volatile.Read(ref fotogrammi);
         public string UltimoEsito=>Volatile.Read(ref ultimoEsito);
         public StatoScansione Scansione=>Volatile.Read(ref scansione);
+        public bool LetturaInCorso=>Volatile.Read(ref letturaInCorso)!=0
+            ||orologio()<Volatile.Read(ref mostraLetturaFinoA);
+        public IReadOnlyList<RettangoloTavolo> RegioniLettura=>Volatile.Read(ref regioniLettura);
         public int MisureAnticipoScansione
         {
             get=>Volatile.Read(ref misureAnticipoScansione);
@@ -182,22 +188,28 @@ namespace VisualMusicBlockLooper.App
             {
                 modalitaLetturaPrecedente=completaPeriodica?1:0;
                 ultimaMisuraLetturaCompleta=long.MinValue;esecuzioneLetturaCompleta=-1;
-                letturaCompletaInCorso=false;tentativiLetturaCompleta=0;misuraLetturaCompleta=-1;
+                letturaCompletaInCorso=false;misuraLetturaCompleta=-1;periodoPrecedenteLettura=-1;
                 confermeBlocchi.Clear();blocchiIncompleti.Clear();blocchiDaConfermare.Clear();
                 destinazioniIncomplete.Clear();blocchiScansionati.Clear();candidataCelle=null;
                 Volatile.Write(ref scansione,StatoScansione.Vuoto);
+            }
+            if(completaPeriodica&&PeriodoLetturaCompleta!=periodoPrecedenteLettura)
+            {
+                periodoPrecedenteLettura=PeriodoLetturaCompleta;
+                ultimaMisuraLetturaCompleta=long.MinValue;
+                letturaCompletaInCorso=true;misuraLetturaCompleta=motore.Trasporto.MisuraAssoluta;
             }
             if(completaPeriodica&&motore.Trasporto.Esecuzione!=esecuzioneLetturaCompleta)
             {
                 esecuzioneLetturaCompleta=motore.Trasporto.Esecuzione;
                 ultimaMisuraLetturaCompleta=long.MinValue;
-                letturaCompletaInCorso=false;tentativiLetturaCompleta=0;misuraLetturaCompleta=-1;
+                letturaCompletaInCorso=false;misuraLetturaCompleta=-1;
             }
             if(DeveRileggereCompletamente(completaPeriodica,motore.Trasporto.MisuraAssoluta,
                 PeriodoLetturaCompleta,ultimaMisuraLetturaCompleta)&&!letturaCompletaInCorso)
             {
                 ultimaMisuraLetturaCompleta=motore.Trasporto.MisuraAssoluta;
-                letturaCompletaInCorso=true;tentativiLetturaCompleta=0;
+                letturaCompletaInCorso=true;
                 misuraLetturaCompleta=motore.Trasporto.MisuraAssoluta;
                 conferme=0;firmaCandidata=null;
                 Volatile.Write(ref ultimoEsito,"Lettura completa periodica in corso");
@@ -205,7 +217,7 @@ namespace VisualMusicBlockLooper.App
             bool manuale=Volatile.Read(ref forzaRilettura)!=0;
             int anticipo=MisureAnticipoScansione;
             bool cambioAnticipo=anticipo!=ultimoAnticipoScansione;
-            bool normale=letturaCompletaInCorso||(!completaPeriodica&&((scansioneCelle&&motore.InEsecuzione&&motore.Trasporto.Esecuzione!=esecuzioneCelle)||cambioAnticipo||(motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250)));
+            bool normale=(!inizializzato&&ora-ultimaOsservazione>=250)||letturaCompletaInCorso||(!completaPeriodica&&((scansioneCelle&&motore.InEsecuzione&&motore.Trasporto.Esecuzione!=esecuzioneCelle)||cambioAnticipo||(motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250)));
             bool riprovaBlocchi=!completaPeriodica&&motore.InEsecuzione&&analizzaSoloSeCambia&&scansioneABlocchiAnticipata
                 &&(confermeBlocchi.Count>0||blocchiIncompleti.Count>0||candidataCelle!=null);
             if(!forza&&!manuale&&!normale&&!riprovaBlocchi&&ora<retryAt)return false;
@@ -269,16 +281,20 @@ namespace VisualMusicBlockLooper.App
                 try
                 {
                     if(traccia!=null){traccia.Layout=layout;traccia.CalibrazionePresente=true;traccia.LarghezzaFrame=f.Immagine.Cols;traccia.AltezzaFrame=f.Immagine.Rows;}
-                    if(!inizializzato)return PrimaIstantanea(f,c,traccia);
+                    if(!inizializzato)
+                    {
+                        bool esito=PrimaIstantanea(f,c,traccia);
+                        if(completaPeriodica)letturaCompletaInCorso=false;
+                        return esito;
+                    }
                     // In modalità completa le finestre progressive non vengono eseguite:
                     // il prossimo aggiornamento arriva dalla lettura completa periodica.
                     if(completaPeriodica)
                     {
                         if(letturaCompletaInCorso)
                         {
-                            AnalizzaScenaCompleta(f,c,traccia,true);
-                            tentativiLetturaCompleta++;
-                            if(conferme>=2||tentativiLetturaCompleta>=3)letturaCompletaInCorso=false;
+                            AnalizzaIstantaneaPeriodica(f,c,traccia);
+                            letturaCompletaInCorso=false;
                         }
                         return true;
                     }
@@ -454,6 +470,57 @@ namespace VisualMusicBlockLooper.App
                 Descrivi(traccia,completa?"ScansioneCompletaConfermata":"ScansioneCompletaConIncertezze",f);
             }
             else Descrivi(traccia,completa?"ScansioneCompletaInAttesaDiConferma":"ScansioneCompletaDaConfermare",f);
+        }
+
+        /// <summary>
+        /// Lettura completa periodica: una sola istantanea dell'intero foglio, come «Rileggi»,
+        /// senza la conferma su due frame che può fallire per il jitter delle durate.
+        /// </summary>
+        private void AnalizzaIstantaneaPeriodica(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia)
+        {
+            Volatile.Write(ref regioniLettura,new[]{new RettangoloTavolo(0,0,1,1)});
+            Volatile.Write(ref letturaInCorso,1);
+            LetturaIstantanea letta;
+            try{letta=new LettoreIstantanea(c,config).Leggi(f.Immagine,traccia);}
+            finally
+            {
+                Volatile.Write(ref letturaInCorso,0);
+                Volatile.Write(ref mostraLetturaFinoA,orologio()+150);
+            }
+            Interlocked.Increment(ref letture);
+            if(vita.InChiusura||Sospesa()||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)
+            {Descrivi(traccia,"LetturaObsoleta",f);return;}
+
+            var incerte=letta.RegioniDaRileggere.Where(z=>z.X<layout.Comandi.X).ToArray();
+            if(letta.Cartoncini.Count==0&&!letta.VuotoAffidabile&&incerte.Length==0)
+            {
+                firmaCandidata=null;conferme=0;
+                Descrivi(traccia,"LetturaCompletaNonAffidabile",f);
+                return;
+            }
+
+            preparatore.ControllaScadenza();
+            var nuovi=letta.Cartoncini.Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
+            var daConservare=incerte.Length==0?new CartoncinoRilevato[0]:catalogo.Where(n=>
+            {
+                var area=n.AreaQr??n.Area;
+                return incerte.Any(z=>GeometriaRegioni.ContieneCentro(z,area));
+            }).ToArray();
+            var lavoro=UnisciCatalogoParziale(daConservare,nuovi)
+                .Where(n=>layout.ZonaDelCentro(n.AreaQr??n.Area)!=ZonaSpeciale.Comandi).ToArray();
+            var stato=interprete.Interpreta(lavoro,traccia);
+            catalogo=lavoro;inizializzato=true;conferme=1;
+            regioniDaVerificare=incerte;
+            Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
+            Volatile.Write(ref ultimoStato,stato);
+            var trasporto=preparatore.Esecutore.Stato.Trasporto;
+            bool strutturaCambiata=trasporto.Struttura==null||!stato.Struttura.Equals(trasporto.Struttura);
+            if(!strutturaCambiata&&preparatore.Esecutore.Stato.InEsecuzione)
+                preparatore.AggiornaPerMisura(stato,true,generazione,f.IstanteMs,
+                    preparatore.Esecutore.Stato.MisuraAssoluta+1);
+            else
+                preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
+            Descrivi(traccia,incerte.Length==0?"LetturaCompletaConfermata":"LetturaCompletaConIncertezze",f);
         }
 
         public static int[] RigheAnticipate(StrutturaTavolo struttura,PosizioneGiro posizione,int misure)

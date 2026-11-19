@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using VisualMusicBlockLooper.Core;
@@ -264,6 +265,23 @@ namespace VisualMusicBlockLooper.App
                 }
             }
         }
+        /// <summary>
+        /// Linea verde sul bordo inferiore delle regioni in lettura: tre finestre nel progressivo,
+        /// tutto il tavolo nella lettura completa. Scompare appena la lettura termina.
+        /// </summary>
+        public void DisegnaLettura(Graphics g,Size dimensione,IReadOnlyList<RettangoloTavolo> regioni,bool attiva)
+        {
+            if(!attiva||regioni==null||regioni.Count==0)return;
+            using(var penna=new Pen(Color.LimeGreen,3))
+                foreach(var regione in regioni)
+                {
+                    if(regione.Larghezza<=0||regione.Altezza<=0)continue;
+                    Rectangle area=InPixel(regione,dimensione);
+                    int y=Math.Max(area.Top+1,area.Bottom-3);
+                    g.DrawLine(penna,area.Left+2,y,area.Right-2,y);
+                }
+        }
+
         private void DisegnaLinea(Graphics g,Rectangle griglia,PosizioneIndicatore p,Color colore,float larghezza)
         {
             if(p.RigheAttive==null||p.Step<0||p.Step>config.Step)return;

@@ -129,7 +129,9 @@ namespace VisualMusicBlockLooper.App
             }
             else if(completa)
             {
-                testo+=Environment.NewLine+$"Lettura completa periodica ogni {analisi.PeriodoLetturaCompleta} misure: nessuna finestra progressiva.";
+                testo+=Environment.NewLine+$"Lettura completa periodica ogni {analisi.PeriodoLetturaCompleta} misure"
+                    +(analisi.LetturaInCorso?" | lettura in corso":" | in attesa del prossimo multiplo")
+                    +": nessuna finestra progressiva.";
             }
             etichettaVersioniFoglio.Text=testo;
             etichettaVersioniFoglio.ForeColor=errore==null?Color.DarkBlue:Color.DarkRed;
@@ -148,6 +150,7 @@ namespace VisualMusicBlockLooper.App
             var attiva=trasporto.Partitura;
             var posizione=attiva?.PosizioneAlTick(trasporto.TickNelGiro)??e.Posizione;
             var analisi=compositore.Analizzatore;
+            proiettore.AggiornaLettura(analisi?.RegioniLettura,analisi?.LetturaInCorso==true);
             proiettore.AggiornaIndicatori(presentatoreScansione.Leggi(trasporto,analisi?.Scansione,
                 analisi?.MisureAnticipoScansione??4,orologioMs(),analisi?.IndicatoriScansioneAttivi==true,
                 anticipoInCelle:analisi?.ScansioneCelleAttiva==true));

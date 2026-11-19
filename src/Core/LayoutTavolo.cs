@@ -67,6 +67,28 @@ namespace VisualMusicBlockLooper.Core
             return ZonaSpeciale.Nessuna;
         }
 
+        /// <summary>
+        /// Riga della fascia destra in cui cade il centro dell'area, dividendo la zona comandi
+        /// in <paramref name="righe"/> sezioni orizzontali uguali. -1 se è fuori.
+        /// </summary>
+        public int RigaNellaZonaComandi(RettangoloTavolo area, int righe)
+        {
+            if (righe <= 0 || Comandi.Altezza <= 0)
+            {
+                return -1;
+            }
+
+            double cx = area.X + area.Larghezza / 2;
+            double cy = area.Y + area.Altezza / 2;
+            if (!Contiene(Comandi, cx, cy))
+            {
+                return -1;
+            }
+
+            int riga = (int)System.Math.Floor((cy - Comandi.Y) / (Comandi.Altezza / righe));
+            return System.Math.Max(0, System.Math.Min(righe - 1, riga));
+        }
+
         private static bool Contiene(RettangoloTavolo r, double x, double y)
         {
             return x >= r.X && x <= r.X + r.Larghezza && y >= r.Y && y <= r.Y + r.Altezza;

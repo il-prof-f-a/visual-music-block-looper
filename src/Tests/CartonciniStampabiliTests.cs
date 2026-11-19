@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using OpenCvSharp;
 using VisualMusicBlockLooper.Core;
@@ -56,6 +57,46 @@ namespace VisualMusicBlockLooper.Tests
             GeneratoreCartoncini.Genera(dir, passoMm, GeneratoreCartoncini.AltezzaMmDefault, passi);
 
             Assert.That(Directory.GetFiles(dir, "*.png"), Has.Length.EqualTo(75));
+        }
+
+        [Test, Explicit("Rigenera accordi e canali in assets/cartoncini-accordi")]
+        public void GeneraCartonciniAccordi()
+        {
+            string dir = Path.GetFullPath(Path.Combine(GeneratoreCartoncini.CartellaCartoncini(), "..", "cartoncini-accordi"));
+            GeneratoreCartoncini.GeneraAccordiECanali(dir);
+            Assert.That(Directory.GetFiles(dir, "accordo-*.png"), Has.Length.EqualTo(12 * GeneratoreCartoncini.QualitaStampate.Length));
+            Assert.That(Directory.GetFiles(dir, "canale-*.png"), Has.Length.EqualTo(16));
+        }
+
+        // I cartoncini di accordo e di canale devono essere letti dal rilevatore reale.
+        [Test]
+        public void Rileva_CartonciniAccordiECanali_PayloadCorretto()
+        {
+            const int larghezza = 1600;
+            const int altezza = 1100;
+            string dir = Path.Combine(GeneratoreCartoncini.CartellaCartoncini(), "..", "cartoncini-accordi");
+            Assert.IsNotNull(dir);
+
+            using (Bitmap tavolo = new Bitmap(larghezza, altezza))
+            using (Graphics g = Graphics.FromImage(tavolo))
+            {
+                g.Clear(Color.White);
+                using (Bitmap maggiore = new Bitmap(Path.Combine(dir, "accordo-do-maggiore.png")))
+                using (Bitmap settima = new Bitmap(Path.Combine(dir, "accordo-sol-7.png")))
+                using (Bitmap canale = new Bitmap(Path.Combine(dir, "canale-05.png")))
+                {
+                    g.DrawImage(maggiore, 60, 40);
+                    g.DrawImage(settima, 60, 560);
+                    g.DrawImage(canale, 800, 300);
+                }
+
+                var rilevati = RilevaSul(tavolo, larghezza, altezza);
+                var payload = rilevati.Select(r => r.Payload).ToList();
+
+                Assert.That(payload, Does.Contain("VMBL1;A;0;+"));
+                Assert.That(payload, Does.Contain("VMBL1;A;7;7"));
+                Assert.That(payload, Does.Contain("VMBL1;S;CH;5"));
+            }
         }
 
         private static IReadOnlyList<CartoncinoRilevato> RilevaSul(Bitmap tavolo, int larghezza, int altezza)

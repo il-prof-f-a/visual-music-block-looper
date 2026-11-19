@@ -4,6 +4,9 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.IO;
+using System.Linq;
+using VisualMusicBlockLooper.App;
+using VisualMusicBlockLooper.Core;
 using ZXing;
 using ZXing.Common;
 using ZXing.QrCode;
@@ -66,7 +69,122 @@ namespace VisualMusicBlockLooper.Tests
         /// <summary>Nomi dei colori in italiano, nello stesso ordine di <see cref="ColoriCorpo"/>.</summary>
         public static readonly string[] NomiColori = { "Rosso", "Arancione", "Giallo", "Verde", "Blu", "Viola" };
 
-        /// <summary>Crea il cartoncino di una nota: colore = traccia, clip = idClip.</summary>
+        /// <summary>Nomi italiani delle dodici classi di altezza, con il diesis in notazione stampata.</summary>
+        public static readonly string[] NomiNote = { "Do", "Do♯", "Re", "Re♯", "Mi", "Fa", "Fa♯", "Sol", "Sol♯", "La", "La♯", "Si" };
+
+        private static readonly string[] SuffissiFileNote = { "do", "do-diesis", "re", "re-diesis", "mi", "fa", "fa-diesis", "sol", "sol-diesis", "la", "la-diesis", "si" };
+
+        /// <summary>Qualità stampate per ogni fondamentale: le quattro richieste e le combinazioni principali.</summary>
+        public static readonly TipoAccordo[] QualitaStampate =
+        {
+            TipoAccordo.Maggiore,
+            TipoAccordo.Minore,
+            TipoAccordo.Settima,
+            TipoAccordo.MinoreSettima,
+            TipoAccordo.MaggioreSettima,
+            TipoAccordo.Diminuito,
+            TipoAccordo.DiminuitoSettima,
+            TipoAccordo.Aumentato
+        };
+
+        /// <summary>
+        /// Crea un cartoncino di accordo: il corpo usa il colore del fondamentale a partire da Do3,
+        /// quindi Do+ è colorato come Do3. Il payload è la codifica compatta VMBL1;A;pc;tipo.
+        /// </summary>
+        public static Bitmap CartoncinoAccordo(int fondamentale, TipoAccordo tipo, int passi = 2,
+            double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
+        {
+            if (fondamentale < 0 || fondamentale > 11)
+            {
+                throw new ArgumentOutOfRangeException(nameof(fondamentale));
+            }
+
+            int pc = fondamentale % 12;
+            string etichetta = NomiNote[pc] + Accordi.Simbolo(tipo);
+            Color corpo = ColoriNote.DaMidi(Accordi.MidiBase + pc);
+            string dettaglio = string.Join(" ", Accordi.Note(pc, tipo)
+                .Select(midi => NomiNote[midi % 12] + (midi / 12 - 1)));
+            return Disegna($"VMBL1;A;{pc};{Accordi.Codice(tipo)}", corpo, etichetta,
+                passi, passoMm, altezzaMm, ErrorCorrectionLevel.L, dettaglio);
+        }
+
+        /// <summary>Crea un cartoncino CANALE per la fascia destra (payload breve, QR versione 1).</summary>
+        public static Bitmap CartoncinoCanale(int canale, int passi = 2,
+            double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
+        {
+            if (canale < 1 || canale > 16)
+            {
+                throw new ArgumentOutOfRangeException(nameof(canale));
+            }
+
+            return Disegna($"VMBL1;S;CH;{canale}", ColoreComando, "Canale MIDI " + canale,
+                passi, passoMm, altezzaMm, ErrorCorrectionLevel.L);
+        }
+
+        /// <summary>Elenco degli accordi stampabili: 12 fondamentali per le qualità principali.</summary>
+        public static IReadOnlyList<(string Nome, string Payload, string Etichetta)> ElencoAccordi()
+        {
+            var elenco = new List<(string Nome, string Payload, string Etichetta)>();
+            for (int pc = 0; pc < 12; pc++)
+            {
+                foreach (TipoAccordo tipo in QualitaStampate)
+                {
+                    string codice = Accordi.Codice(tipo);
+                    elenco.Add(($"accordo-{SuffissiFileNote[pc]}-{SuffissoFile(tipo)}.png",
+                        $"VMBL1;A;{pc};{codice}", NomiNote[pc] + Accordi.Simbolo(tipo)));
+                }
+            }
+
+            return elenco;
+        }
+
+        private static string SuffissoFile(TipoAccordo tipo)
+        {
+            switch (tipo)
+            {
+                case TipoAccordo.Maggiore: return "maggiore";
+                case TipoAccordo.Minore: return "minore";
+                case TipoAccordo.Settima: return "7";
+                case TipoAccordo.MinoreSettima: return "min7";
+                case TipoAccordo.MaggioreSettima: return "maj7";
+                case TipoAccordo.Diminuito: return "dim";
+                case TipoAccordo.DiminuitoSettima: return "dim7";
+                default: return "aug";
+            }
+        }
+
+        /// <summary>Genera tutti i cartoncini di accordo e i 16 cartoncini di canale in una cartella.</summary>
+        public static void GeneraAccordiECanali(string cartella, double passoMm = PassoMmDefault,
+            double altezzaMm = AltezzaMmDefault, int passi = PassiDefault)
+        {
+            Directory.CreateDirectory(cartella);
+            foreach (string vecchio in Directory.GetFiles(cartella, "accordo-*.png"))
+            {
+                File.Delete(vecchio);
+            }
+
+            foreach (string vecchio in Directory.GetFiles(cartella, "canale-*.png"))
+            {
+                File.Delete(vecchio);
+            }
+
+            for (int pc = 0; pc < 12; pc++)
+            {
+                foreach (TipoAccordo tipo in QualitaStampate)
+                {
+                    string nome = $"accordo-{SuffissiFileNote[pc]}-{SuffissoFile(tipo)}.png";
+                    Salva(CartoncinoAccordo(pc, tipo, passi, passoMm, altezzaMm), Path.Combine(cartella, nome));
+                }
+            }
+
+            for (int canale = 1; canale <= 16; canale++)
+            {
+                Salva(CartoncinoCanale(canale, passi, passoMm, altezzaMm),
+                    Path.Combine(cartella, $"canale-{canale:00}.png"));
+            }
+        }
+
+        /// <summary>Genera un cartoncino di una nota: colore = traccia, clip = idClip.</summary>
         public static Bitmap CartoncinoNota(int traccia, int idClip, int passi = 2, double passoMm = PassoMmDefault,
             double altezzaMm = AltezzaMmDefault)
         {
@@ -165,7 +283,7 @@ namespace VisualMusicBlockLooper.Tests
         /// etichetta in alto a destra del corpo, area di disegno incorniciata, contorno di taglio nero.
         /// </summary>
         public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm,
-            ErrorCorrectionLevel? livelloEcc = null)
+            ErrorCorrectionLevel? livelloEcc = null, string dettaglio = null)
         {
             if (passi < PassiMinimi)
             {
@@ -205,6 +323,11 @@ namespace VisualMusicBlockLooper.Tests
                 {
                     g.FillRectangle(bianco, xArea, yArea, wArea, hArea);
                     g.DrawRectangle(cornice, xArea, yArea, wArea, hArea);
+
+                    if (!string.IsNullOrEmpty(dettaglio))
+                    {
+                        DisegnaDettaglio(g, dettaglio, new RectangleF(xArea, yArea, wArea, hArea));
+                    }
                 }
 
                 DisegnaEtichetta(g, etichetta, colore,
@@ -306,6 +429,41 @@ namespace VisualMusicBlockLooper.Tests
                 using (Brush penna = new SolidBrush(inchiostro))
                 {
                     g.DrawString(testo, font, penna, new PointF(area.X, area.Y));
+                }
+            }
+        }
+
+        /// <summary>Scrive le note dell'accordo, centrate, nell'area bianca del cartoncino.</summary>
+        private static void DisegnaDettaglio(Graphics g, string testo, RectangleF area)
+        {
+            g.TextRenderingHint = TextRenderingHint.AntiAlias;
+            using (StringFormat formato = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+                FormatFlags = StringFormatFlags.NoWrap
+            })
+            {
+                float punti = 12f;
+                Font font;
+                do
+                {
+                    font = new Font("Arial", punti, FontStyle.Bold, GraphicsUnit.Point);
+                    SizeF misura = g.MeasureString(testo, font, new SizeF(float.MaxValue, float.MaxValue), formato);
+                    bool entra = misura.Width * 1.08f <= area.Width && misura.Height <= area.Height;
+                    if (entra || punti <= 4f)
+                    {
+                        break;
+                    }
+
+                    font.Dispose();
+                    punti -= 0.5f;
+                } while (true);
+
+                using (font)
+                using (Brush penna = new SolidBrush(Color.Black))
+                {
+                    g.DrawString(testo, font, penna, area, formato);
                 }
             }
         }

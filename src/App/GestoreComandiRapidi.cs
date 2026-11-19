@@ -29,7 +29,7 @@ namespace VisualMusicBlockLooper.App
         private long ultimoFrame,video,ultimaOsservazione=-1000,letture,istanteCandidato;
         private long? istanteFramePrecedente;
         private int conferme,forzaRilettura;
-        private string candidata,ultimoEsito;
+        private string candidata,ultimoEsito,firmaAssegnazioni;
         public GestoreComandiRapidi(RegistroFotogrammi immagini,Func<Calibrazione> calibrazione,ConfigGriglia config,
             LayoutTavolo layout,EsecutoreMidi esecutore,RegistroCatture registro,Func<long> orologio,
             ParametriRilevatoreVariazioni parametriVariazioni=null)
@@ -43,6 +43,9 @@ namespace VisualMusicBlockLooper.App
         public long NumeroLetture=>Volatile.Read(ref letture);
         public string UltimoEsito=>Volatile.Read(ref ultimoEsito);
         public Func<bool> Sospesa {get;set;}=()=>false;
+
+        /// <summary>Notifica i canali/strumenti letti nella fascia destra, solo a sistema fermo.</summary>
+        public Action<IReadOnlyList<AssegnazioneRiga>> AssegnazioniRilevate { get; set; }
         public void RichiediRilettura()
         {
             Interlocked.Exchange(ref forzaRilettura,1);
@@ -129,6 +132,7 @@ namespace VisualMusicBlockLooper.App
                         if(firma!=candidata){candidata=firma;conferme=1;istanteCandidato=inizioVariazione;}else conferme=Math.Min(2,conferme+1);
                         var stabile=stabilizzatore.Aggiorna(grezzo,traccia);
                         if(conferme>=2){catalogo=lavoro;differenze.Conferma(v.Regioni);}
+                        if(conferme>=2)AggiornaAssegnazioni(stabile);
                         esecutore.InviaComandi(stabile.Comandi,istanteCandidato);
                         Volatile.Write(ref ultimoEsito,"Comandi letti: "+stabile.Comandi.Count);
                         if(traccia!=null)
@@ -145,5 +149,22 @@ namespace VisualMusicBlockLooper.App
             }
         }
         public void Dispose()=>vita.Dispose();
+
+        private void AggiornaAssegnazioni(StatoTavolo stato)
+        {
+            // Solo a sistema fermo: durante Play i cartoncini restano visibili ma non cambiano nulla.
+            if(esecutore.InEsecuzione||stato?.AssegnazioniRiga==null||stato.AssegnazioniRiga.Count==0)
+            {
+                firmaAssegnazioni=null;
+                return;
+            }
+
+            string firma=string.Join(";",stato.AssegnazioniRiga
+                .Select(a=>a.Riga+":"+a.Canale+":"+(a.Strumento??""))
+                .OrderBy(x=>x));
+            if(firma==firmaAssegnazioni)return;
+            firmaAssegnazioni=firma;
+            AssegnazioniRilevate?.Invoke(stato.AssegnazioniRiga);
+        }
     }
 }

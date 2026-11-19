@@ -6,7 +6,7 @@ using VisualMusicBlockLooper.Core;
 namespace VisualMusicBlockLooper.Midi
 {
     /// <summary>Mappatura MIDI letta da una configurazione JSON.</summary>
-    public class MappaturaMidiJson : IMappaturaMidi
+    public class MappaturaMidiJson : IMappaturaMidi, IMappaturaCanaliRiga
     {
         private const int CanaleMinimo = 0;
         private const int CanaleMassimo = 15;
@@ -17,6 +17,9 @@ namespace VisualMusicBlockLooper.Midi
         private const int VelocityMassima = 127;
 
         private readonly ConfigurazioneMidi configurazione;
+
+        // Override per riga: null = usa la mappatura normale della traccia.
+        private readonly int?[] canaliRiga = new int?[StrutturaTavolo.RigheTotali];
 
         /// <summary>Crea la mappatura a partire da una configurazione già in memoria.</summary>
         /// <param name="configurazione">Configurazione da cui leggere canali, note e velocity.</param>
@@ -94,6 +97,42 @@ namespace VisualMusicBlockLooper.Midi
 
         /// <inheritdoc />
         public int Velocity => Limita(configurazione.Velocity, VelocityMinima, VelocityMassima);
+
+        /// <summary>Imposta (o rimuove con -1) l'override di canale di una riga.</summary>
+        public void ImpostaCanaleRiga(int riga, int canale)
+        {
+            if (riga < 0 || riga >= canaliRiga.Length)
+            {
+                return;
+            }
+
+            canaliRiga[riga] = canale < 0 ? (int?)null : Limita(canale, CanaleMinimo, CanaleMassimo);
+        }
+
+        /// <summary>Override corrente per riga: -1 dove la riga usa la mappatura normale.</summary>
+        public int[] CanaliRiga()
+        {
+            int[] copia = new int[canaliRiga.Length];
+            for (int i = 0; i < canaliRiga.Length; i++)
+            {
+                copia[i] = canaliRiga[i] ?? -1;
+            }
+
+            return copia;
+        }
+
+        /// <inheritdoc />
+        public bool TryCanaleRiga(int riga, out int canale)
+        {
+            canale = -1;
+            if (riga < 0 || riga >= canaliRiga.Length || !canaliRiga[riga].HasValue)
+            {
+                return false;
+            }
+
+            canale = canaliRiga[riga].Value;
+            return true;
+        }
 
         private static int Limita(int valore, int minimo, int massimo)
         {

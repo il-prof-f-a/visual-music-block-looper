@@ -10,7 +10,10 @@ namespace VisualMusicBlockLooper.Core
         Comando,
 
         /// <summary>Cartoncino che imposta un parametro del tavolo.</summary>
-        Impostazione
+        Impostazione,
+
+        /// <summary>Cartoncino che suona più note contemporaneamente (accordo).</summary>
+        Accordo
     }
 
     /// <summary>Tipo di impostazione letta da un cartoncino di tipo Impostazione.</summary>
@@ -23,7 +26,13 @@ namespace VisualMusicBlockLooper.Core
         Collegamento,
 
         /// <summary>Intervallo AB (due parametri interi).</summary>
-        IntervalloAb
+        IntervalloAb,
+
+        /// <summary>Canale MIDI di uscita della riga: valore 1..16.</summary>
+        Canale,
+
+        /// <summary>Strumento da caricare sul canale della riga (nome breve).</summary>
+        Strumento
     }
 
     /// <summary>Comando eseguibile da un cartoncino di tipo Comando.</summary>
@@ -61,5 +70,14 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Secondo valore dell'intervallo AB (solo per IntervalloAb).</summary>
         public int ValoreB { get; set; }
+
+        /// <summary>Fondamentale dell'accordo, classe di altezza 0..11 (Do = 0).</summary>
+        public int Fondamentale { get; set; }
+
+        /// <summary>Qualità dell'accordo (solo per Tipo = Accordo).</summary>
+        public TipoAccordo Accordo { get; set; }
+
+        /// <summary>Nome breve dello strumento (solo per Impostazione = Strumento).</summary>
+        public string Strumento { get; set; }
     }
 }

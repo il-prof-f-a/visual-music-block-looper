@@ -40,6 +40,15 @@ namespace VisualMusicBlockLooper.App
             Calibrazione.ParametriBordo = configurazione.CorrezioneBordo.Converti();
             Cv2.SetNumThreads(configurazione.NumeroThreadOpenCv);
 
+            // I canali per riga salvati hanno priorità sulla mappatura per traccia.
+            for (int riga = 0; riga < configurazione.CanaliRiga.Length && riga < StrutturaTavolo.RigheTotali; riga++)
+            {
+                if (configurazione.CanaliRiga[riga] >= 0)
+                {
+                    mappatura.ImpostaCanaleRiga(riga, configurazione.CanaliRiga[riga]);
+                }
+            }
+
             // L'elenco si rileva prima di aprire la webcam configurata: una webcam aperta risulterebbe occupata.
             IReadOnlyList<InfoWebcam> elencoWebcam = ElencoWebcam.RilevaReali();
             GestoreWebcam webcam = new GestoreWebcam((indice, larghezza, altezza) => WebcamFonte.Apri(indice, larghezza, altezza));

@@ -16,7 +16,7 @@ Coordinate normalizzate del tavolo (0..1), da `LayoutTavolo.Default` e `LayoutTa
 | Collegamento | (0,01; 0,36; 0,12; 0,28) | «COLLEGA» e le righe (`1 righe`, `2 righe`, `3 righe`, `6 righe`) |
 | A-B | (0,01; 0,68; 0,12; 0,28) | «A-B» e l'intervallo (`1-6`, `2-3`, ...) |
 | Griglia (6 righe x 16 colonne) | (0,15; 0,04; 0,67; 0,92) | Celle, barre di gruppo, numeri di riga, note, errori |
-| Comandi | (0,84; 0,04; 0,14; 0,92) | «COMANDI», senza valore |
+| Comandi | (0,84; 0,04; 0,14; 0,92) | «COMANDI» e sei sezioni orizzontali numerate 1-6, allineate ai righi |
 
 La griglia occupa il 67% della larghezza (prima 80%): lo step proiettato è circa il 16% più stretto.
 
@@ -27,7 +27,7 @@ La guida è disegnata da `RenderGuida.Disegna` sull'intero schermo del proiettor
 | Elemento | Quando | Colore (RGB) | Dettaglio |
 |---|---|---|---|
 | Fondo | sempre | bianco (255, 255, 255) | `Color.White`: il tavolo è la zona bianca proiettata. |
-| Zone speciali | con il layout | contorno grigio (128, 128, 128), spessore 2; etichetta e valore grigio scuro (169, 169, 169) | Zone Misura, Collegamento, A-B e Comandi. |
+| Zone speciali | con il layout | contorno grigio (128, 128, 128), spessore 2; etichetta e valore grigio scuro (169, 169, 169) | Zone Misura, Collegamento, A-B e Comandi; la fascia destra mostra anche le sei sezioni per riga. |
 | Celle | sempre | contorno grigio chiaro (211, 211, 211), 1 px | 6 righe x 16 colonne. |
 | Colonne oltre la misura | se lo step è oltre `StepPerMisura` | grigio (215, 215, 215) | Con 3/4 le colonne 13-16, con 2/4 le colonne 9-16. |
 | Righe fuori da A-B | se la riga non è nell'intervallo A-B del gruppo | grigio molto chiaro (240, 240, 240) | Le righe in posizione fuori da A-B non suonano. |
@@ -40,10 +40,24 @@ La guida è disegnata da `RenderGuida.Disegna` sull'intero schermo del proiettor
 | Barra di lettura | mentre il foglio è in analisi | barra verde piena, altezza 6–8 px, disegnata per ultima | Progressiva: sotto ciascuna delle tre finestre. Completa: lungo il bordo inferiore di tutto il tavolo. Scompare dopo circa 250 ms. |
 | Errore | per ogni cartoncino scartato | riempimento rosso chiaro (255, 120, 120) con opacità circa 24%, bordo rosso (220, 30, 30) spessore 3 | Disegnato sull'area reale del cartoncino, non sulla cella. |
 
+## Accordi e canali
+
+| Cartoncino | Payload | Uso |
+|---|---|---|
+| Accordo | `VMBL1;A;<0..11>;<tipo>` | Sulla griglia come una nota: attacco, durata e nota dell'accordo. |
+| Canale | `VMBL1;S;CH;<1..16>` | Nella sezione della riga, a sistema fermo: override del canale MIDI. |
+| Strumento | `VMBL1;S;ST;<nome>` | Nella sezione della riga: salvato, invio ad Ableton in seconda fase. |
+
+Il cartoncino di accordo usa il colore del fondamentale **nel terzo registro** (Do+ come Do3),
+calcolato dalla stessa formula delle note. La voce parte da Do3: Do+ = 48-52-55, Do-7 = 48-51-55-58.
+Le qualità stampate sono `+`, `-`, `7`, `-7`, `+7`, `dim`, `dim7`, `aug`; il parser accetta anche
+`sus2`, `sus4`, `6`, `-6`. Il materiale è in `assets/cartoncini-accordi/` con `indice.csv` e
+`LEGGIMI.md`.
+
 ## Elementi fisici (non disegnati dalla guida)
 
 - **Cartoncini speciali**: si posano nelle tre zone a sinistra, con il centro del cartoncino nella zona. Il corpo è viola-grigio (135, 115, 150). Nel mockup il cartoncino `speciale-misura-3`, `speciale-link-3` e `speciale-ab-2-3` è mostrato come riferimento.
-- **Zona comandi**: fascia destra del tavolo, x da 0,84 a 0,98, y da 0,04 a 0,96 (`Compositore.ZonaComandiDefault`). Un cartoncino è un comando se il suo centro cade in questa zona. La guida la disegna solo come cornice con l'etichetta «COMANDI»: il cartoncino PLAY nel mockup è fisico.
+- **Zona comandi**: fascia destra del tavolo, x da 0,84 a 0,98, y da 0,04 a 0,96 (`Compositore.ZonaComandiDefault`). Un cartoncino è un comando se il suo centro cade in questa zona. La guida divide la fascia in sei sezioni orizzontali, una per riga: un cartoncino CANALE o STRUMENTO vale per la sezione in cui è posato; i comandi PLAY/STOP/TAP/MODO/ONESHOT restano validi in qualsiasi sezione. Il cartoncino PLAY nel mockup è fisico.
 - **Cartoncini**: sono sul tavolo fisico, non sul proiettore.
 - **Etichette di testo dei cartoncini** (nomi, «PLAY»): nel mockup sono annotazioni del documento. `RenderGuida` non disegna il testo dei cartoncini.
 
@@ -54,7 +68,7 @@ La guida è disegnata da `RenderGuida.Disegna` sull'intero schermo del proiettor
 - **Righe fuori da A-B**: con A-B 2-3 la prima riga di ogni gruppo, cioè le righe 1 e 4, è in grigio chiaro e non suona.
 - **Colonne oltre la misura**: con 3/4 le colonne 13-16 sono in grigio. Una nota che inizia lì sarebbe scartata come `FuoriMisura`.
 - **Playhead** sulla colonna 6 (indice 5) solo nelle righe attive: la riga 2 e la riga 5, una per gruppo. Le altre righe della colonna non sono evidenziate.
-- **Nota colorata**: il cartoncino è sulla riga 2, parte dal secondo passo e dura 3 passi. Il bordo usa il colore della nota ricavato dal QR; il canale MIDI dipende dal gruppo di righe, non dal colore.
+- **Nota colorata**: il cartoncino è sulla riga 2, parte dal secondo passo e dura 3 passi. Il bordo usa il colore della nota ricavato dal QR; il canale MIDI dipende dal gruppo di righe, salvo override per riga da cartoncino CANALE.
 
 ## Colore delle note
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using VisualMusicBlockLooper.Core;
+using VisualMusicBlockLooper.Midi;
 
 namespace VisualMusicBlockLooper.App
 {
@@ -17,6 +18,7 @@ namespace VisualMusicBlockLooper.App
         private StatoTavolo osservatoDisegnato;
         private bool salvataggioTempi;
         private string messaggioTempi;
+        private string ultimoEsitoAssegnazioni;
         private NumericUpDown campoBpm;
         private ComboBox comboOsservazione, comboModalitaLettura;
         private bool aggiornamentoBpm;
@@ -116,6 +118,8 @@ namespace VisualMusicBlockLooper.App
             string testo=$"Foglio letto v{osservata} | pronto v{e.Stato.VersionePronta} | in uso v{e.Stato.VersioneAttiva}"
                 +$" | letture scena/zone: {compositore.Analizzatore?.NumeroLetture??0}";
             testo+=Environment.NewLine+(errore??messaggioTempi??compositore.Analizzatore?.UltimoEsito??"Preparazione del foglio");
+            if(!string.IsNullOrEmpty(ultimoEsitoAssegnazioni))
+                testo+=Environment.NewLine+ultimoEsitoAssegnazioni;
             var analisi=compositore.Analizzatore;
             bool completa=analisi?.LetturaCompletaPeriodica==true;
             if(comboOsservazione!=null)comboOsservazione.Enabled=!inCalibrazione&&!completa;
@@ -166,6 +170,56 @@ namespace VisualMusicBlockLooper.App
             }
             else proiettore.AggiornaPosizione(posizione,trasporto.InEsecuzione);
         }
+        /// <summary>
+        /// Applica i cartoncini CANALE/STRUMENTO letti nella fascia destra. Viene chiamato solo dalla
+        /// corsia comandi e solo a sistema fermo: durante Play il gestore non notifica nulla.
+        /// </summary>
+        private void ApplicaAssegnazioniRiga(System.Collections.Generic.IReadOnlyList<AssegnazioneRiga> lista)
+        {
+            var esecutore=compositore?.Esecutore;
+            if(esecutore==null||esecutore.InEsecuzione||lista==null)return;
+
+            if(configurazione.CanaliRiga==null||configurazione.CanaliRiga.Length<StrutturaTavolo.RigheTotali)
+                configurazione.CanaliRiga=new int[StrutturaTavolo.RigheTotali];
+            if(configurazione.StrumentiRiga==null||configurazione.StrumentiRiga.Length<StrutturaTavolo.RigheTotali)
+                configurazione.StrumentiRiga=new string[StrutturaTavolo.RigheTotali];
+            for(int i=0;i<configurazione.CanaliRiga.Length;i++)
+                if(configurazione.CanaliRiga[i]<-1||configurazione.CanaliRiga[i]>15)configurazione.CanaliRiga[i]=-1;
+
+            var mappatura=compositore.Mappatura as MappaturaMidiJson;
+            bool cambiato=false;
+            var descrizioni=new System.Collections.Generic.List<string>();
+            foreach(AssegnazioneRiga assegnazione in lista)
+            {
+                if(assegnazione==null||assegnazione.Riga<0||assegnazione.Riga>=StrutturaTavolo.RigheTotali)continue;
+                if(assegnazione.Canale>=0)
+                {
+                    configurazione.CanaliRiga[assegnazione.Riga]=assegnazione.Canale;
+                    mappatura?.ImpostaCanaleRiga(assegnazione.Riga,assegnazione.Canale);
+                    descrizioni.Add($"riga {assegnazione.Riga+1} → canale MIDI {assegnazione.Canale+1}");
+                    cambiato=true;
+                }
+
+                if(!string.IsNullOrEmpty(assegnazione.Strumento))
+                {
+                    configurazione.StrumentiRiga[assegnazione.Riga]=assegnazione.Strumento;
+                    descrizioni.Add($"riga {assegnazione.Riga+1} → strumento «{assegnazione.Strumento}» (caricamento in Ableton non ancora inviato)");
+                    cambiato=true;
+                }
+            }
+
+            if(!cambiato)return;
+            ultimoEsitoAssegnazioni="Assegnazioni: "+string.Join("; ",descrizioni);
+            try{configurazione.Salva(percorsoConfigurazione);}
+            catch(Exception ex)when(ex is IOException||ex is UnauthorizedAccessException||ex is ArgumentException||
+                ex is System.Security.SecurityException)
+            {ultimoEsitoAssegnazioni+=" | configurazione non salvata: "+ex.Message;}
+
+            // Le note già lette devono usare subito il nuovo canale, senza aspettare un nuovo Play.
+            compositore.Preparatore?.Ricompila();
+            AggiornaStatoMidi();
+        }
+
         private async Task SalvaTempiMidi()
         {
             if(salvataggioTempi)return;salvataggioTempi=true;AggiornaStatoMidi();

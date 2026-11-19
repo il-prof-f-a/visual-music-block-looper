@@ -25,6 +25,26 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void AccordoCambiaQualitaNellaStessaCella_SostituitoDopoNFrame()
+        {
+            var stabilizzatore = new StabilizzatoreTavolo();
+            CartoncinoNota maggiore = Nota(3, 2);
+            maggiore.NoteMidi = new[] { 48, 52, 55 };
+            StabilizzaNota(stabilizzatore, maggiore);
+
+            CartoncinoNota minore = Nota(3, 2);
+            minore.NoteMidi = new[] { 48, 51, 55 };
+
+            Assert.That(stabilizzatore.Aggiorna(Stato(note: new[] { minore })).Note[0].NoteMidi,
+                Is.EqualTo(new[] { 48, 52, 55 }), "La conferma non è ancora completa");
+            Assert.That(stabilizzatore.Aggiorna(Stato(note: new[] { minore })).Note, Has.Count.EqualTo(1));
+            StatoTavolo terzo = stabilizzatore.Aggiorna(Stato(note: new[] { minore }));
+
+            Assert.That(terzo.Note, Has.Count.EqualTo(1), "La carta precedente esce subito");
+            Assert.That(terzo.Note[0].NoteMidi, Is.EqualTo(new[] { 48, 51, 55 }));
+        }
+
+        [Test]
         public void NotaPersisteAlTremolio()
         {
             var stabilizzatore = new StabilizzatoreTavolo();

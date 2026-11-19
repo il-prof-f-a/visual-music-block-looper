@@ -183,6 +183,42 @@ namespace VisualMusicBlockLooper.App
             DisegnaZona(g, dimensione, layout.Collegamento, "COLLEGA", EtichettaRighe(struttura.RigheCollegate));
             DisegnaZona(g, dimensione, layout.Ab, "A-B", struttura.AInizio + "-" + struttura.AFine);
             DisegnaZona(g, dimensione, layout.Comandi, "COMANDI", null);
+            DisegnaSezioniComandi(g, dimensione);
+        }
+
+        /// <summary>
+        /// Sei sezioni orizzontali nella fascia destra, allineate ai righi della griglia.
+        /// Un cartoncino CANALE/STRUMENTO vale per la sezione (riga) in cui è posato.
+        /// </summary>
+        private void DisegnaSezioniComandi(Graphics g, Size dimensione)
+        {
+            RettangoloTavolo zona = layout.Comandi;
+            if (zona.Larghezza <= 0 || zona.Altezza <= 0)
+            {
+                return;
+            }
+
+            Rectangle area = InPixel(zona, dimensione);
+            int righe = StrutturaTavolo.RigheTotali;
+            float altezza = area.Height / (float)righe;
+            using (var penna = new Pen(Color.FromArgb(110, ColoreContornoZona), 1))
+            using (var pennello = new SolidBrush(Color.FromArgb(150, 70, 80, 95)))
+            using (var carattere = new Font(FontFamily.GenericSansSerif, 7.5f, FontStyle.Bold))
+            using (var formato = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center })
+            {
+                for (int riga = 1; riga < righe; riga++)
+                {
+                    float y = area.Top + altezza * riga;
+                    g.DrawLine(penna, area.Left + 1, y, area.Right - 1, y);
+                }
+
+                for (int riga = 0; riga < righe; riga++)
+                {
+                    var testo = new RectangleF(area.Left + 3, area.Top + altezza * riga,
+                        Math.Max(area.Width - 6, 1), altezza);
+                    g.DrawString((riga + 1).ToString(), carattere, pennello, testo, formato);
+                }
+            }
         }
 
         private static void DisegnaZona(Graphics g, Size dimensione, RettangoloTavolo zona, string etichetta, string valore)

@@ -65,6 +65,7 @@ namespace VisualMusicBlockLooper.App
 
             Layout = layout ?? LayoutTavolo.ConSoloComandi(ZonaComandiDefault);
             ConfigurazioneGriglia = config;
+            Mappatura = mappatura;
             if(orologioMs==null){var t=Stopwatch.StartNew();orologioMs=()=>t.ElapsedMilliseconds;}
             orologio=orologioMs;
             interprete = new InterpreteTavolo(new Griglia(config), Layout);
@@ -93,6 +94,9 @@ namespace VisualMusicBlockLooper.App
         public LayoutTavolo Layout { get; }
 
         public ConfigGriglia ConfigurazioneGriglia { get; }
+
+        /// <summary>Mappatura MIDI usata da interprete e compilatore (canali per riga inclusi).</summary>
+        public IMappaturaMidi Mappatura { get; }
 
         /// <summary>Motore musicale pilotato dal compositore.</summary>
         public IMotoreMusicale Motore { get; }

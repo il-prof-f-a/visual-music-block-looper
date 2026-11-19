@@ -79,6 +79,19 @@ namespace VisualMusicBlockLooper.App
             if(UltimoErrore!=null&&f!=null)Foglio.Aggiorna(f.CopiaStato(),true,f.Generazione,f.Istante,true);
             ultimaTentata = 0;
         }
+
+        /// <summary>
+        /// Ricompila l'ultimo foglio con la mappatura corrente. Serve quando cambia un canale per riga
+        /// a sistema fermo: le note già lette devono usare subito il nuovo canale.
+        /// </summary>
+        public void Ricompila()
+        {
+            var f=Foglio.Ultima;
+            if(f==null||f.Generazione!=Generazione)return;
+            ultimaTentata=0;
+            Foglio.Aggiorna(f.CopiaStato(),true,f.Generazione,f.Istante,true);
+            PreparaUltima(0);
+        }
         public bool PreparaAvvio(StatoTavolo stato,long generazione,long istante,Action primoGruppo=null)
         {
             if(generazione!=Generazione)return false;

@@ -424,6 +424,93 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(stato.Note[1].StepIniziale, Is.EqualTo(4));
         }
 
+        [Test]
+        public void AccordoSuGriglia_ProduceLeNoteDellAccordo()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(1, 2, 2, ColoreTraccia.Giallo, "VMBL1;A;0;+")
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Note, Has.Count.EqualTo(1));
+            CartoncinoNota nota = stato.Note[0];
+            Assert.That(nota.NoteMidi, Is.EqualTo(new[] { 48, 52, 55 }));
+            Assert.That(nota.IdClip, Is.EqualTo(12), "Do3 (MIDI 48) per il colore del terzo registro");
+            Assert.That(nota.Riga, Is.EqualTo(1));
+            Assert.That(nota.StepIniziale, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void AccordoInZonaComandi_Rifiutato()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Rilevato("VMBL1;A;0;+", ColoreTraccia.Giallo, AreaInZonaComandiRiga(2))
+            });
+
+            Assert.That(stato.Note, Is.Empty);
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.PayloadNonValido));
+        }
+
+        [TestCase(0)]
+        [TestCase(2)]
+        [TestCase(5)]
+        public void CanaleNellaSezioneDestra_AssegnatoAllaRiga(int riga)
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Rilevato("VMBL1;S;CANALE;5", null, AreaInZonaComandiRiga(riga))
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.AssegnazioniRiga, Has.Count.EqualTo(1));
+            Assert.That(stato.AssegnazioniRiga[0].Riga, Is.EqualTo(riga));
+            Assert.That(stato.AssegnazioniRiga[0].Canale, Is.EqualTo(4), "Il cartoncino usa 1..16, lo stato 0..15");
+        }
+
+        [Test]
+        public void StrumentoNellaSezioneDestra_AssegnatoAllaRiga()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Rilevato("VMBL1;S;STRUMENTO;Piano", null, AreaInZonaComandiRiga(3))
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.AssegnazioniRiga, Has.Count.EqualTo(1));
+            Assert.That(stato.AssegnazioniRiga[0].Riga, Is.EqualTo(3));
+            Assert.That(stato.AssegnazioniRiga[0].Canale, Is.EqualTo(-1));
+            Assert.That(stato.AssegnazioniRiga[0].Strumento, Is.EqualTo("Piano"));
+        }
+
+        [Test]
+        public void CanaleInGriglia_Rifiutato()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Carta(1, 2, 1, null, "VMBL1;S;CANALE;5")
+            });
+
+            Assert.That(stato.AssegnazioniRiga, Is.Empty);
+            Assert.That(stato.Errori, Has.Count.EqualTo(1));
+            Assert.That(stato.Errori[0].Tipo, Is.EqualTo(TipoErrore.PayloadNonValido));
+        }
+
+        [Test]
+        public void ComandoRestaValidoInOgniSezioneDestra()
+        {
+            StatoTavolo stato = CreaInterpreteCompleto().Interpreta(new[]
+            {
+                Rilevato("VMBL1;C;PLAY", null, AreaInZonaComandiRiga(4))
+            });
+
+            Assert.That(stato.Errori, Is.Empty);
+            Assert.That(stato.Comandi, Has.Count.EqualTo(1));
+            Assert.That(stato.AssegnazioniRiga, Is.Empty);
+        }
+
         private static InterpreteTavolo CreaInterprete()
         {
             var config = new ConfigGriglia { Area = new RettangoloTavolo(0, 0, 1, 0.8) };
@@ -442,6 +529,14 @@ namespace VisualMusicBlockLooper.Tests
         private static RettangoloTavolo AreaInZonaComandi()
         {
             return new RettangoloTavolo(0.1, 0.85, LarghezzaStep, AltezzaCartoncino);
+        }
+
+        private static RettangoloTavolo AreaInZonaComandiRiga(int riga)
+        {
+            RettangoloTavolo z = LayoutTavolo.Default.Comandi;
+            double altezza = z.Altezza / StrutturaTavolo.RigheTotali;
+            return new RettangoloTavolo(z.X + 0.02, z.Y + riga * altezza + altezza * 0.25,
+                z.Larghezza - 0.04, altezza * 0.5);
         }
 
         private static CartoncinoRilevato Rilevato(string payload, ColoreTraccia? colore, RettangoloTavolo area)

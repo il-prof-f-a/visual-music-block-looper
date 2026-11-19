@@ -24,8 +24,19 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Colore associato alla riga, solo per la visualizzazione.</summary>
         public ColoreTraccia Colore { get; set; }
 
+        /// <summary>Note MIDI dell'accordo; null per un cartoncino di nota singola.</summary>
+        public int[] NoteMidi { get; set; }
+
         /// <summary>Chiave univoca della nota: clip, traccia, riga e step iniziale.</summary>
         public string Chiave => $"{IdClip}:{Traccia}:{Riga}:{StepIniziale}";
+
+        /// <summary>
+        /// Identità completa, accordo compreso: due carte nella stessa cella ma con note diverse
+        /// (per esempio Do+ e Do-) sono eventi distinti per lo stabilizzatore.
+        /// </summary>
+        public string Identita => NoteMidi == null || NoteMidi.Length == 0
+            ? Chiave
+            : Chiave + ":" + string.Join(",", NoteMidi);
     }
 
     /// <summary>Cartoncino di struttura valido, con la sua area sul tavolo (solo per la guida).</summary>
@@ -33,6 +44,19 @@ namespace VisualMusicBlockLooper.Core
     {
         public TipoImpostazione Tipo { get; set; }
         public RettangoloTavolo Area { get; set; }
+    }
+
+    /// <summary>Canale e/o strumento osservati nella fascia destra per una riga.</summary>
+    public class AssegnazioneRiga
+    {
+        /// <summary>Riga del tavolo (0-based) a cui si riferisce la sezione.</summary>
+        public int Riga { get; set; }
+
+        /// <summary>Canale MIDI 0-based, oppure -1 se il cartoncino non imposta il canale.</summary>
+        public int Canale { get; set; } = -1;
+
+        /// <summary>Nome breve dello strumento, oppure null.</summary>
+        public string Strumento { get; set; }
     }
 
     /// <summary>Comando richiesto da un cartoncino posto nella zona comandi.</summary>
@@ -77,12 +101,14 @@ namespace VisualMusicBlockLooper.Core
             IEnumerable<ComandoRilevato> comandi,
             IEnumerable<ErroreTavolo> errori,
             StrutturaTavolo struttura = null,
-            IEnumerable<CartoncinoSpeciale> speciali = null)
+            IEnumerable<CartoncinoSpeciale> speciali = null,
+            IEnumerable<AssegnazioneRiga> assegnazioniRiga = null)
         {
             Note = note?.ToList() ?? new List<CartoncinoNota>();
             Comandi = comandi?.ToList() ?? new List<ComandoRilevato>();
             Errori = errori?.ToList() ?? new List<ErroreTavolo>();
             Speciali = speciali?.ToList() ?? new List<CartoncinoSpeciale>();
+            AssegnazioniRiga = assegnazioniRiga?.ToList() ?? new List<AssegnazioneRiga>();
             Struttura = struttura ?? StrutturaTavolo.Default;
         }
 
@@ -100,5 +126,8 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Cartoncini di struttura validi, con area per la guida; mai null.</summary>
         public IReadOnlyList<CartoncinoSpeciale> Speciali { get; }
+
+        /// <summary>Canali e strumenti osservati nella fascia destra; mai null.</summary>
+        public IReadOnlyList<AssegnazioneRiga> AssegnazioniRiga { get; }
     }
 }

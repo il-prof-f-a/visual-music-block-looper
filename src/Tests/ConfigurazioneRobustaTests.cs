@@ -174,6 +174,34 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void CanaliRigaNonValidiVengonoNormalizzati()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"CanaliRiga\":[3,-2,20]," +
+                    "\"StrumentiRiga\":[\" Piano \",null,\"\",\"Basso\"]}");
+                var configurazione = ConfigurazioneApplicazione.Carica(percorso);
+
+                Assert.That(configurazione.CanaliRiga, Has.Length.EqualTo(StrutturaTavolo.RigheTotali));
+                Assert.That(configurazione.CanaliRiga[0], Is.EqualTo(3));
+                Assert.That(configurazione.CanaliRiga[1], Is.EqualTo(-1));
+                Assert.That(configurazione.CanaliRiga[2], Is.EqualTo(-1), "Fuori 0..15 viene ignorato");
+                Assert.That(configurazione.CanaliRiga[3], Is.EqualTo(-1));
+
+                Assert.That(configurazione.StrumentiRiga[0], Is.EqualTo("Piano"));
+                Assert.That(configurazione.StrumentiRiga[1], Is.Null);
+                Assert.That(configurazione.StrumentiRiga[2], Is.Null);
+                Assert.That(configurazione.StrumentiRiga[3], Is.EqualTo("Basso"));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
         public void BpmNonFinitoRipristinaIlDefaultApplicativo()
         {
             string percorso = Path.GetTempFileName();

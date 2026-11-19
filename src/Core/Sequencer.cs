@@ -48,7 +48,7 @@ namespace VisualMusicBlockLooper.Core
             List<CartoncinoNota> noteAttive = (note ?? new List<CartoncinoNota>())
                 .Where(n => n != null)
                 .ToList();
-            HashSet<string> chiaviPresenti = new HashSet<string>(noteAttive.Select(n => n.Chiave));
+            HashSet<string> chiaviPresenti = new HashSet<string>(noteAttive.Select(n => n.Identita));
             List<EventoNota> eventi = new List<EventoNota>();
 
             if (ultimaStruttura != null && !ultimaStruttura.Equals(struttura))
@@ -84,7 +84,7 @@ namespace VisualMusicBlockLooper.Core
                 .ThenBy(n => n.IdClip)
                 .ThenBy(n => n.Riga))
             {
-                if (suonanti.Any(s => s.Chiave == nota.Chiave))
+                if (suonanti.Any(s => s.Chiave == nota.Identita))
                 {
                     continue;
                 }
@@ -92,8 +92,22 @@ namespace VisualMusicBlockLooper.Core
                 int passoNelGiro = passoAssoluto % struttura.StepGiro;
                 int durataRimanenteGiro = struttura.StepGiro - passoNelGiro;
                 int durataClampata = Math.Min(Math.Max(nota.DurataStep, 1), durataRimanenteGiro);
-                suonanti.Add(new NotaInCorso(nota.Chiave, nota.Traccia, nota.IdClip, passoAssoluto + durataClampata));
-                eventi.Add(new EventoNota(nota.Traccia, nota.IdClip, true,durataClampata,nota.Chiave));
+                int[] noteMidi = nota.NoteMidi != null && nota.NoteMidi.Length > 0 ? nota.NoteMidi : null;
+                suonanti.Add(new NotaInCorso(nota.Identita, nota.Traccia, nota.IdClip, nota.Riga,
+                    passoAssoluto + durataClampata, noteMidi));
+                if (noteMidi == null)
+                {
+                    eventi.Add(new EventoNota(nota.Traccia, nota.IdClip, true,durataClampata,nota.Identita,
+                        nota.Riga));
+                }
+                else
+                {
+                    foreach (int midi in noteMidi)
+                    {
+                        eventi.Add(new EventoNota(nota.Traccia, nota.IdClip, true, durataClampata,
+                            nota.Identita, nota.Riga, midi));
+                    }
+                }
             }
 
             return eventi;
@@ -114,22 +128,35 @@ namespace VisualMusicBlockLooper.Core
 
         private static List<EventoNota> EventiDiSpegnimento(IEnumerable<NotaInCorso> note)
         {
-            return note
-                .OrderBy(n => n.Traccia)
-                .ThenBy(n => n.IdClip)
-                .Select(n => new EventoNota(n.Traccia, n.IdClip, false))
-                .ToList();
+            var eventi = new List<EventoNota>();
+            foreach (NotaInCorso n in note.OrderBy(n => n.Traccia).ThenBy(n => n.IdClip))
+            {
+                if (n.NoteMidi == null || n.NoteMidi.Length == 0)
+                {
+                    eventi.Add(new EventoNota(n.Traccia, n.IdClip, false, riga: n.Riga));
+                    continue;
+                }
+
+                foreach (int midi in n.NoteMidi)
+                {
+                    eventi.Add(new EventoNota(n.Traccia, n.IdClip, false, riga: n.Riga, notaMidi: midi));
+                }
+            }
+
+            return eventi;
         }
 
         /// <summary>Nota attualmente in riproduzione, con il passo assoluto in cui deve terminare.</summary>
         private class NotaInCorso
         {
-            public NotaInCorso(string chiave, int traccia, int idClip, int passoFine)
+            public NotaInCorso(string chiave, int traccia, int idClip, int riga, int passoFine, int[] noteMidi)
             {
                 Chiave = chiave;
                 Traccia = traccia;
                 IdClip = idClip;
+                Riga = riga;
                 PassoFine = passoFine;
+                NoteMidi = noteMidi;
             }
 
             public string Chiave { get; }
@@ -137,6 +164,10 @@ namespace VisualMusicBlockLooper.Core
             public int Traccia { get; }
 
             public int IdClip { get; }
+
+            public int Riga { get; }
+
+            public int[] NoteMidi { get; }
 
             /// <summary>Passo assoluto (contato dall'avvio) alla cui raggiunta la nota si spegne.</summary>
             public int PassoFine { get; }

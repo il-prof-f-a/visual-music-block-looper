@@ -67,6 +67,38 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void OverrideCanalePerRiga()
+        {
+            var mappatura = new MappaturaMidiJson(new ConfigurazioneMidi());
+
+            Assert.That(mappatura.TryCanaleRiga(3, out _), Is.False, "Nessun override iniziale");
+
+            mappatura.ImpostaCanaleRiga(3, 9);
+
+            Assert.That(mappatura.TryCanaleRiga(3, out int canale), Is.True);
+            Assert.That(canale, Is.EqualTo(9));
+            Assert.That(mappatura.TryCanaleRiga(2, out _), Is.False);
+            Assert.That(mappatura.CanaliRiga()[3], Is.EqualTo(9));
+            Assert.That(mappatura.CanaliRiga()[0], Is.EqualTo(-1));
+
+            mappatura.ImpostaCanaleRiga(3, -1);
+            Assert.That(mappatura.TryCanaleRiga(3, out _), Is.False, "Il canale -1 rimuove l'override");
+        }
+
+        [Test]
+        public void OverrideCanaleFuoriIntervallo_Limitato()
+        {
+            var mappatura = new MappaturaMidiJson(new ConfigurazioneMidi());
+
+            mappatura.ImpostaCanaleRiga(0, 20);
+            mappatura.ImpostaCanaleRiga(1, -4);
+
+            Assert.That(mappatura.TryCanaleRiga(0, out int alto), Is.True);
+            Assert.That(alto, Is.EqualTo(15));
+            Assert.That(mappatura.TryCanaleRiga(1, out _), Is.False);
+        }
+
+        [Test]
         public void ClampDeiValori()
         {
             ConfigurazioneMidi configurazione = new ConfigurazioneMidi();

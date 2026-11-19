@@ -63,7 +63,7 @@ Passi principali:
 | Collegamento | (0,01; 0,36; 0,12; 0,28) | Impostazione `LINK`: 1, 2, 3 o 6 righe per gruppo. |
 | A-B | (0,01; 0,68; 0,12; 0,28) | Impostazione `AB`: intervallo di righe da A a B. |
 | Griglia | (0,15; 0,04; 0,67; 0,92) | 6 righe x 16 colonne (`LayoutTavolo.AreaGrigliaDefault`). Note. |
-| Comandi | (0,84; 0,04; 0,14; 0,92) | Comandi (`Compositore.ZonaComandiDefault`). |
+| Comandi | (0,84; 0,04; 0,14; 0,92) | Comandi e sei sezioni per riga (`Compositore.ZonaComandiDefault`). |
 
 Un cartoncino appartiene a una zona se il suo centro cade nel rettangolo. L'ordine di controllo è Misura, Collegamento, A-B, Comandi; altrimenti è nella griglia. La griglia è più stretta della versione precedente (0,67 invece di 0,80 della larghezza): lo step proiettato è circa il 16% più stretto.
 
@@ -72,7 +72,7 @@ Un cartoncino appartiene a una zona se il suo centro cade nel rettangolo. L'ordi
 `StrutturaTavolo` contiene quattro valori: `BattitiPerMisura` (2, 3 o 4), `RigheCollegate` (1, 2, 3 o 6), `AInizio` e `AFine` (A-B, 1-based, dentro il gruppo). Il default è 4/4, 6 righe collegate, A-B `[1, 6]`.
 
 - **Riga = misura.** Una riga ha `StepPerMisura = 4 x battiti` colonne (sedicesimi): 16, 12 o 8. Le colonne fisiche restano 16; in 3/4 e 2/4 le colonne oltre la misura sono oscurate e le note che iniziano lì sono scartate (`FuoriMisura`).
-- **Colore = strumento.** Il colore del cartoncino determina il canale MIDI (`Traccia` = indice del colore). Nella stessa riga si possono mescolare colori diversi.
+- **Gruppo = strumento.** Il canale MIDI deriva dal gruppo di righe collegate (`Traccia = riga / RigheCollegate`); il colore del cartoncino è solo visivo e viene ricalcolato dal QR. Un cartoncino `CH` nella fascia destra può sovrascrivere il canale di una singola riga, solo a sistema fermo.
 - **Gruppi.** Le 6 righe sono divise in `NumeroGruppi = 6 / RigheCollegate` gruppi consecutivi. Dentro un gruppo le righe suonano in sequenza (misure consecutive); gruppi diversi suonano in contemporanea.
 - **A-B.** Il giro ripete solo le righe da `AInizio` a `AFine` di ogni gruppo.
 
@@ -163,7 +163,7 @@ Dentro `Sequencer.Tick`, in quest'ordine:
 - Una nota già in corso, identificata dalla chiave `IdClip:Traccia:Riga:StepIniziale`, non viene riaccesa finché suona.
 - La durata minima è 1 passo, troncata a fine misura.
 
-Mappatura verso MIDI (`MappaturaMidiJson`): canale = `CanalePerTraccia[traccia]` (0-based, la traccia è il colore), nota = `NotaPerClip[idClip]` oppure `36 + idClip`, velocity = `Velocity` (default 100).
+Mappatura verso MIDI (`MappaturaMidiJson`): canale = override per riga (`CanaliRiga`) se presente, altrimenti `CanalePerTraccia[traccia]` (0-based); nota = `NoteMidi` dell'accordo, altrimenti `NotaPerClip[idClip]` oppure `36 + idClip`; velocity = `Velocity` (default 100).
 
 ## Cartoncini comando
 
@@ -178,6 +178,18 @@ I comandi sono letti solo nella zona comandi. Sono eseguiti una volta, quando di
 | `VMBL1;C;ONESHOT;n` | Note-on della nota `n` sul canale della traccia 0, note-off dopo 6 tick di clock. | Come Master, ma i tick arrivano dal clock esterno. | `n` tra 0 e 127; una nota già accesa viene riarmata. |
 
 Cartoncini di nota nella zona comandi, o comandi fuori dalla zona, producono errori (vedi sotto), non effetti.
+
+### Accordi e canali per riga
+
+| Payload | Dove | Effetto |
+|---|---|---|
+| `VMBL1;A;<0..11>;<tipo>` | Griglia | Accordo: note MIDI da Do3 (48) più gli intervalli del tipo; colore del fondamentale nel terzo registro. |
+| `VMBL1;S;CH;<1..16>` | Fascia destra, sezione della riga | Override del canale MIDI della riga, applicato solo a sistema fermo. |
+| `VMBL1;S;ST;<nome>` | Fascia destra, sezione della riga | Richiesta di strumento salvata in configurazione; l'invio ad Ableton è ancora da implementare. |
+
+Tipi di accordo: `+` maggiore, `-` minore, `7` settima, `m7` minore settima, `M7` maggiore settima, `dim` diminuito, `dim7` diminuito settima, `aug` aumentato, più `sus2`, `sus4`, `6`, `m6` accettati dal parser.
+
+I cartoncini stampati sono in `assets/cartoncini-accordi/` (96 accordi e 16 canali).
 
 ## Cartoncini speciali
 

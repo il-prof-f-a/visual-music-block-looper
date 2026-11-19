@@ -146,9 +146,25 @@ Nota: lo stesso nome di porta è usato in uscita e in ingresso, quindi ciò che 
 
 ### Comandi dalla zona comandi
 
-- La zona comandi è la fascia destra del tavolo (circa 14% della larghezza, da x 0,84 a x 0,98 del tavolo). Un cartoncino è un comando se il suo centro cade in questa zona. La guida proiettata **non disegna** questa zona: è un riferimento fisico da tenere sul tavolo (ad esempio con un nastro).
+- La zona comandi è la fascia destra del tavolo (circa 14% della larghezza, da x 0,84 a x 0,98 del tavolo). Un cartoncino è un comando se il suo centro cade in questa zona. La guida proietta la cornice «COMANDI» e la divide in **sei sezioni orizzontali numerate**, allineate ai righi.
 - Ogni comando viene eseguito una volta sola, quando diventa stabile: tenere fermo il cartoncino non ripete il comando.
 - `comando-oneshot-36.png` suona la nota 36 sul canale della traccia 0 per circa 6 tick di clock.
+
+### Accordi sulla griglia
+
+1. Usare i cartoncini in `assets/cartoncini-accordi/` (`accordo-*.png`). Il corpo ha il colore del fondamentale nel terzo registro: `accordo-do-maggiore.png` è colorato come Do3.
+2. Posare il cartoncino su una riga come una nota: la colonna dà l'attacco, la larghezza dà la durata.
+3. All'avvio devono suonare tutte le note dell'accordo insieme. Do+ = 48-52-55; Do-7 = 48-51-55-58; Sol7 = 55-59-62-65.
+4. Se si sostituisce nella stessa cella un accordo con un altro (per esempio Do+ con Do-), la guida mantiene il vecchio per i frame di conferma e poi passa al nuovo senza sovrapporre i due accordi.
+
+### Canale di uscita per riga
+
+1. Fermare la riproduzione.
+2. Posare un cartoncino `canale-NN.png` nella sezione destra della riga da configurare (sezione 1 = riga 1, in alto).
+3. Dopo la conferma la riga di stato mostra «riga n → canale MIDI m» e `configurazione.json` contiene il valore in `CanaliRiga`.
+4. Premere Play: le note di quella riga partono sul nuovo canale; le altre righe restano sulla mappatura del gruppo.
+5. Rimuovere il cartoncino non annulla l'assegnazione: resta salvata. Per tornare alla mappatura normale si modifica `CanaliRiga` nel file (valore `-1`).
+6. Durante Play i cartoncini canale restano visibili ma non vengono applicati. Il cartoncino `ST` (strumento) viene salvato in `StrumentiRiga`, ma l'invio ad Ableton non è ancora implementato.
 
 ### Errori e colori (guida proiettata)
 

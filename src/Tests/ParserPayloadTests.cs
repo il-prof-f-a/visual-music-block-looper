@@ -163,6 +163,70 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
+        [TestCase("VMBL1;A;0;+", 0, TipoAccordo.Maggiore)]
+        [TestCase("VMBL1;A;5;-", 5, TipoAccordo.Minore)]
+        [TestCase("VMBL1;A;2;7", 2, TipoAccordo.Settima)]
+        [TestCase("VMBL1;A;7;m7", 7, TipoAccordo.MinoreSettima)]
+        [TestCase("VMBL1;A;9;M7", 9, TipoAccordo.MaggioreSettima)]
+        [TestCase("VMBL1;A;11;dim", 11, TipoAccordo.Diminuito)]
+        [TestCase("VMBL1;A;4;dim7", 4, TipoAccordo.DiminuitoSettima)]
+        [TestCase("VMBL1;A;1;aug", 1, TipoAccordo.Aumentato)]
+        [TestCase("VMBL1;A;3;sus2", 3, TipoAccordo.SospesaSeconda)]
+        [TestCase("VMBL1;A;6;sus4", 6, TipoAccordo.SospesaQuarta)]
+        [TestCase("VMBL1;A;8;6", 8, TipoAccordo.Sesta)]
+        [TestCase("VMBL1;A;10;m6", 10, TipoAccordo.MinoreSesta)]
+        public void Accordo_CodificaCompatta(string testo, int fondamentale, TipoAccordo tipo)
+        {
+            bool ok = ParserPayload.TryParse(testo, out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Tipo, Is.EqualTo(TipoCartoncino.Accordo));
+            Assert.That(payload.Fondamentale, Is.EqualTo(fondamentale));
+            Assert.That(payload.Accordo, Is.EqualTo(tipo));
+        }
+
+        [TestCase("VMBL1;A;12;+")]
+        [TestCase("VMBL1;A;-1;+")]
+        [TestCase("VMBL1;A;0;sconosciuto")]
+        [TestCase("VMBL1;A;0")]
+        public void Accordo_NonValidoRifiutato(string testo)
+        {
+            Assert.That(ParserPayload.TryParse(testo, out _), Is.False);
+        }
+
+        [TestCase(1)]
+        [TestCase(16)]
+        public void Canale_Valido(int canale)
+        {
+            bool ok = ParserPayload.TryParse($"VMBL1;S;CANALE;{canale}", out PayloadCartoncino payload);
+
+            Assert.That(ok, Is.True);
+            Assert.That(payload.Impostazione, Is.EqualTo(TipoImpostazione.Canale));
+            Assert.That(payload.Valore, Is.EqualTo(canale));
+        }
+
+        [TestCase("VMBL1;S;CANALE;0")]
+        [TestCase("VMBL1;S;CANALE;17")]
+        [TestCase("VMBL1;S;CANALE")]
+        public void Canale_NonValidoRifiutato(string testo)
+        {
+            Assert.That(ParserPayload.TryParse(testo, out _), Is.False);
+        }
+
+        [Test]
+        public void Strumento_Valido()
+        {
+            Assert.That(ParserPayload.TryParse("VMBL1;S;STRUMENTO;Piano", out PayloadCartoncino payload), Is.True);
+            Assert.That(payload.Impostazione, Is.EqualTo(TipoImpostazione.Strumento));
+            Assert.That(payload.Strumento, Is.EqualTo("Piano"));
+        }
+
+        [Test]
+        public void Strumento_VuotoRifiutato()
+        {
+            Assert.That(ParserPayload.TryParse("VMBL1;S;STRUMENTO;", out _), Is.False);
+        }
+
         [Test]
         public void Fuzz_ConPrefissoValido_RaggiungeRamiNotaComandoSpeciale()
         {

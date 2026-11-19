@@ -70,6 +70,7 @@ namespace VisualMusicBlockLooper.Core
             IReadOnlyList<ComandoRilevato> comandiGrezzi = grezzo?.Comandi ?? new List<ComandoRilevato>();
             IReadOnlyList<ErroreTavolo> errori = grezzo?.Errori ?? new List<ErroreTavolo>();
             IReadOnlyList<CartoncinoSpeciale> speciali = grezzo?.Speciali ?? new List<CartoncinoSpeciale>();
+            IReadOnlyList<AssegnazioneRiga> assegnazioni = grezzo?.AssegnazioniRiga ?? new List<AssegnazioneRiga>();
 
             AggiornaNote(noteGrezze);
             List<ComandoRilevato> comandiEsposti = AggiornaComandi(comandiGrezzi);
@@ -95,7 +96,8 @@ namespace VisualMusicBlockLooper.Core
                 comandiEsposti,
                 errori,
                 strutturaStabile,
-                speciali);
+                speciali,
+                assegnazioni);
         }
 
         /// <summary>Interrompe le conferme candidate senza interpretare un frame incerto come rimozione.</summary>
@@ -151,9 +153,9 @@ namespace VisualMusicBlockLooper.Core
             var viste = new Dictionary<string, CartoncinoNota>();
             foreach (CartoncinoNota nota in noteGrezze.Where(n => n != null))
             {
-                if (!viste.ContainsKey(nota.Chiave))
+                if (!viste.ContainsKey(nota.Identita))
                 {
-                    viste[nota.Chiave] = nota;
+                    viste[nota.Identita] = nota;
                 }
             }
 
@@ -171,6 +173,17 @@ namespace VisualMusicBlockLooper.Core
                 if (presenze >= framePresenza)
                 {
                     presenzeNote.Remove(coppia.Key);
+                    // Stessa cella, contenuto nuovo (per esempio Do+ diventato Do-): la carta
+                    // precedente esce subito, così non suonano due accordi insieme.
+                    foreach (string chiavePrecedente in noteStabili
+                        .Where(c => c.Value.Ultima.Chiave == coppia.Value.Chiave
+                            && c.Value.Ultima.Identita != coppia.Value.Identita)
+                        .Select(c => c.Key).ToList())
+                    {
+                        noteStabili.Remove(chiavePrecedente);
+                        ordineNoteStabili.Remove(chiavePrecedente);
+                    }
+
                     noteStabili[coppia.Key] = new NotaStabile { Ultima = coppia.Value, Assenze = 0 };
                     ordineNoteStabili.Add(coppia.Key);
                 }

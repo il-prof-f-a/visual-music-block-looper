@@ -11,12 +11,55 @@ namespace VisualMusicBlockLooper.Tests
     {
         private sealed class Mappa : IMappaturaMidi
         { public int Canale(int t) => t; public int Nota(int clip) => clip + 36; public int Velocity => 100; }
+
+        private sealed class MappaRiga : IMappaturaMidi, IMappaturaCanaliRiga
+        {
+            public int Canale(int t) => t;
+            public int Nota(int clip) => clip + 36;
+            public int Velocity => 100;
+            public bool TryCanaleRiga(int riga, out int canale)
+            {
+                canale = riga == 2 ? 9 : -1;
+                return riga == 2;
+            }
+        }
         private static CartoncinoNota Nota(int riga, int step, int durata, int clip = 40) =>
             new CartoncinoNota { Riga = riga, StepIniziale = step, DurataStep = durata, IdClip = clip, Traccia = 0 };
         private static StrutturaTavolo Struttura(int misura = 4, int link = 1, int a = 1, int b = 4)
         { StrutturaTavolo s; Assert.That(StrutturaTavolo.TryCrea(misura, link, a, b, out s)); return s; }
         private static PartituraMidi Compila(IEnumerable<CartoncinoNota> note, StrutturaTavolo s) =>
             new CompilatorePartitura(new ConfigGriglia(), new Mappa()).Compila(new StatoTavolo(note, null, null, s), 8, 3, 12);
+
+        [Test]
+        public void Accordo_ProduceNoteContemporaneeSulloStessoCanale()
+        {
+            CartoncinoNota accordo = Nota(0, 0, 2);
+            accordo.NoteMidi = new[] { 48, 52, 55 };
+            var p = Compila(new[] { accordo }, Struttura());
+
+            Assert.That(p.Eventi.Where(e => e.NoteOn).Select(e => $"{e.Tick}:{e.Nota}:{e.Canale}"),
+                Is.EqualTo(new[] { "0:48:0", "0:52:0", "0:55:0" }));
+            Assert.That(p.Eventi.Where(e => !e.NoteOn).Select(e => $"{e.Tick}:{e.Nota}"),
+                Is.EqualTo(new[] { "12:48", "12:52", "12:55" }));
+        }
+
+        [Test]
+        public void CanalePerRiga_VinceSullaMappaturaDellaTraccia()
+        {
+            var partitura = new CompilatorePartitura(new ConfigGriglia(), new MappaRiga())
+                .Compila(new StatoTavolo(new[] { Nota(2, 0, 1) }, null, null, Struttura()), 1, 1);
+            var nota = partitura.Eventi.First(e => e.NoteOn);
+            Assert.That(nota.Canale, Is.EqualTo(9));
+        }
+
+        [Test]
+        public void RigaSenzaOverride_UsaLaMappaturaDellaTraccia()
+        {
+            var partitura = new CompilatorePartitura(new ConfigGriglia(), new MappaRiga())
+                .Compila(new StatoTavolo(new[] { Nota(1, 0, 1) }, null, null, Struttura()), 1, 1);
+            var nota = partitura.Eventi.First(e => e.NoteOn);
+            Assert.That(nota.Canale, Is.EqualTo(0));
+        }
 
         [Test]
         public void EventiSonoProntiInTickConReleasePrimaDelNuovoAttacco()

@@ -133,6 +133,10 @@ namespace VisualMusicBlockLooper.App
             if(compositore.Video!=null)preparatoreAnteprima=new PreparatoreAnteprima(compositore.Video.Registro,()=>rilevatore.CalibrazioneAttiva);
 
             CostruisciInterfaccia();
+            if (compositore.ComandiRapidi != null)
+            {
+                compositore.ComandiRapidi.AssegnazioniRilevate = ApplicaAssegnazioniRiga;
+            }
             PopolaElencoWebcam(elencoWebcam ?? new List<InfoWebcam>());
             timerInterfaccia.Tick += (mittente, argomenti) => AggiornaInterfaccia();
             timerRisoluzione.Tick += (mittente, argomenti) => ApplicaRisoluzione();

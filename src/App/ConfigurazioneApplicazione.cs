@@ -199,6 +199,26 @@ namespace VisualMusicBlockLooper.App
         public ParametriRilevatoreVariazioni AnalisiVariazioni { get; set; } = new ParametriRilevatoreVariazioni();
 
         /// <summary>
+        /// Canale MIDI assegnato a ogni riga (0-based, -1 = usa la mappatura per traccia).
+        /// Viene scritto dai cartoncini CANALE posti nella fascia destra, solo a sistema fermo.
+        /// </summary>
+        public int[] CanaliRiga { get; set; } = NuoviCanaliRiga();
+
+        /// <summary>Strumento breve assegnato a ogni riga (null = nessuna richiesta).</summary>
+        public string[] StrumentiRiga { get; set; } = new string[StrutturaTavolo.RigheTotali];
+
+        private static int[] NuoviCanaliRiga()
+        {
+            int[] canali = new int[StrutturaTavolo.RigheTotali];
+            for (int i = 0; i < canali.Length; i++)
+            {
+                canali[i] = -1;
+            }
+
+            return canali;
+        }
+
+        /// <summary>
         /// Carica la configurazione. Se il file non esiste restituisce i valori di default; se non è un
         /// JSON valido lancia <see cref="InvalidDataException"/>.
         /// </summary>
@@ -258,6 +278,28 @@ namespace VisualMusicBlockLooper.App
                 configurazione.TolleranzaQrCelle=0.35;
             if(configurazione.NumeroThreadOpenCv<1||configurazione.NumeroThreadOpenCv>4)
                 configurazione.NumeroThreadOpenCv=2;
+
+            int[] canali = new int[StrutturaTavolo.RigheTotali];
+            for (int i = 0; i < canali.Length; i++)
+            {
+                int valore = configurazione.CanaliRiga != null && i < configurazione.CanaliRiga.Length
+                    ? configurazione.CanaliRiga[i]
+                    : -1;
+                canali[i] = valore < 0 || valore > 15 ? -1 : valore;
+            }
+
+            configurazione.CanaliRiga = canali;
+
+            string[] strumenti = new string[StrutturaTavolo.RigheTotali];
+            for (int i = 0; i < strumenti.Length; i++)
+            {
+                string valore = configurazione.StrumentiRiga != null && i < configurazione.StrumentiRiga.Length
+                    ? configurazione.StrumentiRiga[i]
+                    : null;
+                strumenti[i] = string.IsNullOrWhiteSpace(valore) ? null : valore.Trim();
+            }
+
+            configurazione.StrumentiRiga = strumenti;
 
             if (configurazione.Webcam.Indice < 0)
             {

@@ -50,6 +50,7 @@ namespace VisualMusicBlockLooper.Core
             var comandi = new List<ComandoRilevato>();
             var errori = new List<ErroreTavolo>();
             var impostazioni = new List<(PayloadCartoncino Payload, RettangoloTavolo Area, ZonaSpeciale Zona)>();
+            var assegnazioni = new List<AssegnazioneRiga>();
 
             IEnumerable<CartoncinoRilevato> validi = rilevati?
                 .Where(r => r != null)
@@ -81,11 +82,14 @@ namespace VisualMusicBlockLooper.Core
                     case ZonaSpeciale.Misura:
                     case ZonaSpeciale.Collegamento:
                     case ZonaSpeciale.Ab:
-                        if (payload.Tipo == TipoCartoncino.Nota)
+                        if (payload.Tipo == TipoCartoncino.Nota || payload.Tipo == TipoCartoncino.Accordo)
                         {
                             AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato, diagnostica, zona);
                         }
-                        else if (payload.Tipo == TipoCartoncino.Impostazione)
+                        else if (payload.Tipo == TipoCartoncino.Impostazione
+                            && (payload.Impostazione == TipoImpostazione.Misura
+                                || payload.Impostazione == TipoImpostazione.Collegamento
+                                || payload.Impostazione == TipoImpostazione.IntervalloAb))
                         {
                             impostazioni.Add((payload, rilevato.Area, zona));
                             diagnostica?.Associa(payload, rilevato);
@@ -98,18 +102,48 @@ namespace VisualMusicBlockLooper.Core
                         break;
 
                     case ZonaSpeciale.Comandi:
-                        if (payload.Tipo != TipoCartoncino.Comando)
+                        if (payload.Tipo == TipoCartoncino.Comando)
                         {
-                            AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona, "ZonaIncompatibile");
+                            comandi.Add(new ComandoRilevato { Tipo = payload.Comando, Parametro = payload.Parametro });
+                            diagnostica?.RegistraInterpretazione(rilevato, zona, true, "ComandoAccettato",
+                                $"Comando {payload.Comando}, parametro {payload.Parametro}.");
                             break;
                         }
 
-                        comandi.Add(new ComandoRilevato { Tipo = payload.Comando, Parametro = payload.Parametro });
-                        diagnostica?.RegistraInterpretazione(rilevato, zona, true, "ComandoAccettato",
-                            $"Comando {payload.Comando}, parametro {payload.Parametro}.");
+                        if (payload.Tipo == TipoCartoncino.Impostazione
+                            && (payload.Impostazione == TipoImpostazione.Canale
+                                || payload.Impostazione == TipoImpostazione.Strumento))
+                        {
+                            int riga = layout.RigaNellaZonaComandi(rilevato.Area, StrutturaTavolo.RigheTotali);
+                            if (riga < 0)
+                            {
+                                AggiungiErrore(errori, TipoErrore.FuoriGriglia, rilevato, diagnostica, zona);
+                                break;
+                            }
+
+                            assegnazioni.Add(new AssegnazioneRiga
+                            {
+                                Riga = riga,
+                                Canale = payload.Impostazione == TipoImpostazione.Canale ? payload.Valore - 1 : -1,
+                                Strumento = payload.Impostazione == TipoImpostazione.Strumento ? payload.Strumento : null
+                            });
+                            diagnostica?.RegistraInterpretazione(rilevato, zona, true, "AssegnazioneRiga",
+                                payload.Impostazione == TipoImpostazione.Canale
+                                    ? $"Riga {riga + 1}, canale MIDI {payload.Valore}."
+                                    : $"Riga {riga + 1}, strumento {payload.Strumento}.");
+                            break;
+                        }
+
+                        AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona, "ZonaIncompatibile");
                         break;
 
                     default:
+                        if (payload.Tipo == TipoCartoncino.Accordo)
+                        {
+                            note.Add((rilevato, payload));
+                            break;
+                        }
+
                         if (payload.Tipo != TipoCartoncino.Nota)
                         {
                             AggiungiErrore(errori, TipoErrore.PayloadNonValido, rilevato, diagnostica, zona, "ZonaIncompatibile");
@@ -173,19 +207,35 @@ namespace VisualMusicBlockLooper.Core
 
             foreach (NotaDaRisolvere n in accettate)
             {
+                bool accordo = n.Payload.Tipo == TipoCartoncino.Accordo;
+                int[] noteMidi = null;
+                int idClip = n.Payload.IdClip;
+                if (accordo)
+                {
+                    // Il cartoncino porta la classe di altezza; la voce parte da Do3 e il colore
+                    // resta quello del terzo registro, come richiesto per il materiale stampato.
+                    noteMidi = Accordi.Note(n.Payload.Fondamentale, n.Payload.Accordo).ToArray();
+                    idClip = Accordi.MidiBase + n.Payload.Fondamentale - 36;
+                }
+
                 notaStato.Add(new CartoncinoNota
                 {
                     Riga = n.Riga,
                     Traccia = n.Traccia,
                     StepIniziale = n.Step,
                     DurataStep = n.Durata,
-                    IdClip = n.Payload.IdClip,
+                    IdClip = idClip,
+                    NoteMidi = noteMidi,
                     Colore = (ColoreTraccia)(n.Riga % 6)
                 });
                 string aggancio = n.Rilevato.AreaQr.HasValue
                     ? $" Aggancio QR x={n.Rilevato.AreaQr.Value.X:0.00000}, fine colore={n.Rilevato.FineEstensioneX:0.00000}." : "";
-                diagnostica?.RegistraInterpretazione(n.Rilevato, ZonaSpeciale.Nessuna, true, "NotaAccettata",
-                    $"Nota {n.Payload.IdClip}, riga {n.Riga + 1}, gruppo {n.Traccia + 1}, step {n.Step}, durata {n.Durata}." + aggancio + n.Troncamento);
+                diagnostica?.RegistraInterpretazione(n.Rilevato, ZonaSpeciale.Nessuna, true,
+                    accordo ? "AccordoAccettato" : "NotaAccettata",
+                    (accordo
+                        ? $"Accordo {n.Payload.Fondamentale}/{Accordi.Codice(n.Payload.Accordo)} su riga {n.Riga + 1}, gruppo {n.Traccia + 1}, step {n.Step}, durata {n.Durata}."
+                        : $"Nota {n.Payload.IdClip}, riga {n.Riga + 1}, gruppo {n.Traccia + 1}, step {n.Step}, durata {n.Durata}.")
+                    + aggancio + n.Troncamento);
             }
 
             if (diagnostica != null)
@@ -195,7 +245,7 @@ namespace VisualMusicBlockLooper.Core
                 diagnostica.NoteGrezze = notaStato.Count;
                 diagnostica.ComandiGrezzi = comandi.Count;
             }
-            return new StatoTavolo(notaStato, comandi, errori, struttura, risoluzione.Speciali);
+            return new StatoTavolo(notaStato, comandi, errori, struttura, risoluzione.Speciali, assegnazioni);
         }
 
         private static void AggiungiErrore(List<ErroreTavolo> errori, TipoErrore tipo, CartoncinoRilevato rilevato,

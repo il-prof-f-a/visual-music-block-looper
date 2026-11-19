@@ -53,6 +53,10 @@ namespace VisualMusicBlockLooper.Core
         }
         public StatoTavolo CopiaStato() => new StatoTavolo(note.Select(CopiaNota), null, null, Struttura);
         internal static CartoncinoNota CopiaNota(CartoncinoNota n) => new CartoncinoNota
-        { Riga = n.Riga, Traccia = n.Traccia, StepIniziale = n.StepIniziale, DurataStep = n.DurataStep, IdClip = n.IdClip, Colore = n.Colore };
+        {
+            Riga = n.Riga, Traccia = n.Traccia, StepIniziale = n.StepIniziale, DurataStep = n.DurataStep,
+            IdClip = n.IdClip, Colore = n.Colore,
+            NoteMidi = n.NoteMidi == null ? null : (int[])n.NoteMidi.Clone()
+        };
     }
 }

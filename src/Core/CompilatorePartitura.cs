@@ -33,10 +33,22 @@ namespace VisualMusicBlockLooper.Core
         }
         private EventoMidiProgrammato Converti(int tick, EventoNota evento,int fineTick=-1)
         {
-            int canale = mappatura.Canale(evento.Traccia), nota = mappatura.Nota(evento.IdClip), velocity = mappatura.Velocity;
+            int canale = Canale(evento), nota = evento.NotaMidi >= 0 ? evento.NotaMidi : mappatura.Nota(evento.IdClip), velocity = mappatura.Velocity;
             if (canale < 0 || canale > 15 || nota < 0 || nota > 127 || velocity < 0 || velocity > 127)
                 throw new ArgumentOutOfRangeException(nameof(evento), "Mappatura MIDI fuori intervallo.");
             return new EventoMidiProgrammato(tick, canale, nota, velocity, evento.NoteOn,fineTick,evento.Identita);
+        }
+
+        /// <summary>Il canale per riga, se impostato, vince sulla mappatura per gruppo di righe.</summary>
+        private int Canale(EventoNota evento)
+        {
+            if (mappatura is IMappaturaCanaliRiga perRiga
+                && perRiga.TryCanaleRiga(evento.Riga, out int canaleRiga))
+            {
+                return canaleRiga;
+            }
+
+            return mappatura.Canale(evento.Traccia);
         }
     }
 }

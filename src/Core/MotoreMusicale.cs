@@ -356,8 +356,8 @@ namespace VisualMusicBlockLooper.Core
         {
             foreach (EventoNota evento in sequencer.Tick(noteCorrenti, struttura))
             {
-                int canale = mappatura.Canale(evento.Traccia);
-                int nota = mappatura.Nota(evento.IdClip);
+                int canale = Canale(evento);
+                int nota = evento.NotaMidi >= 0 ? evento.NotaMidi : mappatura.Nota(evento.IdClip);
                 var chiave = (canale, nota);
                 noteSonanti.TryGetValue(chiave, out int conteggio);
                 if (evento.NoteOn)
@@ -389,10 +389,22 @@ namespace VisualMusicBlockLooper.Core
             sequencer.Ferma(out IReadOnlyList<EventoNota> noteOff);
             foreach (EventoNota evento in noteOff)
             {
-                uscita.NotaOff(mappatura.Canale(evento.Traccia), mappatura.Nota(evento.IdClip));
+                uscita.NotaOff(Canale(evento), evento.NotaMidi >= 0 ? evento.NotaMidi : mappatura.Nota(evento.IdClip));
             }
 
             noteSonanti.Clear();
+        }
+
+        /// <summary>Il canale per riga, se impostato, vince sulla mappatura per gruppo di righe.</summary>
+        private int Canale(EventoNota evento)
+        {
+            if (mappatura is IMappaturaCanaliRiga perRiga
+                && perRiga.TryCanaleRiga(evento.Riga, out int canaleRiga))
+            {
+                return canaleRiga;
+            }
+
+            return mappatura.Canale(evento.Traccia);
         }
 
         private void OnClockRicevuto()

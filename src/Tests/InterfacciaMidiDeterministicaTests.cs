@@ -69,8 +69,18 @@ namespace VisualMusicBlockLooper.Tests
                 Assert.That(configApp.MisureAnticipoScansione,Is.EqualTo(16));
                 Assert.That(c.Analizzatore.MisureAnticipoScansione,Is.EqualTo(16));
                 Assert.That(c.Analizzatore.PulsazioniPerOsservazione,Is.EqualTo(2),"Il menu dell’anticipo preserva la cadenza configurata.");
+                var modalita=(ComboBox)f.Controls.Find("comboModalitaLettura",true).Single();
+                modalita.SelectedIndex=3;
+                Assert.That(configApp.ModalitaLettura,Is.EqualTo("CompletaPeriodica"));
+                Assert.That(c.Analizzatore.LetturaCompletaPeriodica,Is.True);
+                Assert.That(c.Analizzatore.PeriodoLetturaCompleta,Is.EqualTo(4));
+                typeof(FormControllo).GetMethod("AggiornaStatoMidi",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(f,null);
+                Assert.That(combo.Enabled,Is.False,"Con lettura completa l'anticipo progressivo non serve.");
                 typeof(FormControllo).GetMethod("SalvaDaTimer",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(f,null);
-                Assert.That(ConfigurazioneApplicazione.Carica(percorso).MisureAnticipoScansione,Is.EqualTo(16));
+                var salvata=ConfigurazioneApplicazione.Carica(percorso);
+                Assert.That(salvata.MisureAnticipoScansione,Is.EqualTo(16));
+                Assert.That(salvata.ModalitaLettura,Is.EqualTo("CompletaPeriodica"));
+                Assert.That(salvata.PeriodoLetturaCompleta,Is.EqualTo(4));
             }
             }
             finally

@@ -18,6 +18,7 @@ namespace VisualMusicBlockLooper.App
         private bool salvataggioTempi;
         private string messaggioTempi;
         private NumericUpDown campoBpm;
+        private ComboBox comboOsservazione, comboModalitaLettura;
         private bool aggiornamentoBpm;
         private readonly PresentatoreScansione presentatoreScansione=new PresentatoreScansione();
 
@@ -44,24 +45,52 @@ namespace VisualMusicBlockLooper.App
             rileggi.Click+=(m,a)=>compositore.RileggiFoglio();
             pulsanteSalvaTempiMidi=new Button {Name="pulsanteSalvaTempiMidi",Text="Salva tempi MIDI",Left=200,Top=714,Width=145,Height=28,TabIndex=33};
             pulsanteSalvaTempiMidi.Click+=async(m,a)=>await SalvaTempiMidi();
-            var combo=new ComboBox {Name="comboOsservazione",AccessibleName="Celle in anticipo per analisi",Left=360,Top=716,Width=385,DropDownStyle=ComboBoxStyle.DropDownList,TabIndex=34};
-            combo.Items.AddRange(new object[]{"1 cella in anticipo","2 celle in anticipo","4 celle in anticipo","8 celle in anticipo","16 celle in anticipo"});
+            comboOsservazione=new ComboBox {Name="comboOsservazione",AccessibleName="Celle in anticipo per analisi",Left=360,Top=716,Width=200,DropDownStyle=ComboBoxStyle.DropDownList,TabIndex=34};
+            comboOsservazione.Items.AddRange(new object[]{"1 cella in anticipo","2 celle in anticipo","4 celle in anticipo","8 celle in anticipo","16 celle in anticipo"});
             if(compositore.Analizzatore!=null)compositore.Analizzatore.PulsazioniPerOsservazione=configurazione.PulsazioniPerOsservazione;
             int[] anticipi={1,2,4,8,16};
             int indice=Array.IndexOf(anticipi,configurazione.MisureAnticipoScansione);
-            combo.SelectedIndex=indice<0?2:indice;
-            if(compositore.Analizzatore!=null)compositore.Analizzatore.MisureAnticipoScansione=anticipi[combo.SelectedIndex];
-            combo.SelectedIndexChanged+=(m,a)=>
+            comboOsservazione.SelectedIndex=indice<0?2:indice;
+            if(compositore.Analizzatore!=null)compositore.Analizzatore.MisureAnticipoScansione=anticipi[comboOsservazione.SelectedIndex];
+            comboOsservazione.SelectedIndexChanged+=(m,a)=>
             {
-                configurazione.MisureAnticipoScansione=anticipi[combo.SelectedIndex];
-                if(compositore.Analizzatore!=null)compositore.Analizzatore.MisureAnticipoScansione=anticipi[combo.SelectedIndex];
+                configurazione.MisureAnticipoScansione=anticipi[comboOsservazione.SelectedIndex];
+                if(compositore.Analizzatore!=null)compositore.Analizzatore.MisureAnticipoScansione=anticipi[comboOsservazione.SelectedIndex];
+                AggiornaProiezioneMidi();
+                Riavvia(timerSalvaConfigurazione);
+            };
+            comboModalitaLettura=new ComboBox {Name="comboModalitaLettura",AccessibleName="Modalità lettura foglio",Left=570,Top=716,Width=175,DropDownStyle=ComboBoxStyle.DropDownList,TabIndex=35};
+            comboModalitaLettura.Items.AddRange(new object[]{"Progressiva","Completa 1 misura","Completa 2 misure","Completa 4 misure","Completa 8 misure"});
+            int[] periodi={1,2,4,8};
+            int indicePeriodo=Array.IndexOf(periodi,configurazione.PeriodoLetturaCompleta);
+            if(indicePeriodo<0)indicePeriodo=2;
+            bool completaIniziale=string.Equals(configurazione.ModalitaLettura,"CompletaPeriodica",StringComparison.OrdinalIgnoreCase);
+            comboModalitaLettura.SelectedIndex=completaIniziale?indicePeriodo+1:0;
+            if(compositore.Analizzatore!=null)
+            {
+                compositore.Analizzatore.LetturaCompletaPeriodica=completaIniziale;
+                compositore.Analizzatore.PeriodoLetturaCompleta=periodi[indicePeriodo];
+            }
+            comboModalitaLettura.SelectedIndexChanged+=(m,a)=>
+            {
+                int scelta=comboModalitaLettura.SelectedIndex;
+                bool completa=scelta>0;
+                int periodo=completa?periodi[Math.Min(periodi.Length-1,scelta-1)]:4;
+                configurazione.ModalitaLettura=completa?"CompletaPeriodica":"Progressiva";
+                configurazione.PeriodoLetturaCompleta=periodo;
+                if(compositore.Analizzatore!=null)
+                {
+                    compositore.Analizzatore.LetturaCompletaPeriodica=completa;
+                    compositore.Analizzatore.PeriodoLetturaCompleta=periodo;
+                }
                 AggiornaProiezioneMidi();
                 Riavvia(timerSalvaConfigurazione);
             };
             etichettaVersioniFoglio=new Label {Name="etichettaVersioniFoglio",Left=10,Top=750,Width=735,Height=70,AutoEllipsis=true,ForeColor=Color.DarkBlue};
             suggerimentiDebug.SetToolTip(rileggi,"Forza una nuova scansione completa del foglio. Durante l'esecuzione la nuova partitura entrerà alla prossima frontiera del giro.");
-            suggerimentiDebug.SetToolTip(combo,"Scegli 1, 2, 4, 8 o 16 celle in anticipo anche durante Play. Arancio: posizione prevista; si leggono tre celle vicine per ogni voce parallela. Azzurro: ultima cella confermata da tutte le voci. Il salto riparte sul primo frame nuovo.");
-            Controls.AddRange(new Control[]{rileggi,pulsanteSalvaTempiMidi,combo,etichettaVersioniFoglio});
+            suggerimentiDebug.SetToolTip(comboOsservazione,"Scegli 1, 2, 4, 8 o 16 celle in anticipo anche durante Play. Arancio: posizione prevista; si leggono tre celle vicine per ogni voce parallela. Azzurro: ultima cella confermata da tutte le voci. Il salto riparte sul primo frame nuovo.");
+            suggerimentiDebug.SetToolTip(comboModalitaLettura,"Progressiva: finestre di tre celle sulle righe attive. Completa ogni N misure: rilegge tutto il foglio come «Rileggi foglio»; utile se le modifiche ai cartoncini compaiono in ritardo.");
+            Controls.AddRange(new Control[]{rileggi,pulsanteSalvaTempiMidi,comboOsservazione,comboModalitaLettura,etichettaVersioniFoglio});
         }
         private void AggiornaStatoMidi()
         {
@@ -88,12 +117,19 @@ namespace VisualMusicBlockLooper.App
                 +$" | letture scena/zone: {compositore.Analizzatore?.NumeroLetture??0}";
             testo+=Environment.NewLine+(errore??messaggioTempi??compositore.Analizzatore?.UltimoEsito??"Preparazione del foglio");
             var analisi=compositore.Analizzatore;
+            bool completa=analisi?.LetturaCompletaPeriodica==true;
+            if(comboOsservazione!=null)comboOsservazione.Enabled=!inCalibrazione&&!completa;
+            if(comboModalitaLettura!=null)comboModalitaLettura.Enabled=!inCalibrazione;
             if(analisi?.IndicatoriScansioneAttivi==true)
             {
                 var scansione=analisi.Scansione;var letta=scansione.UltimaCompletata;
                 testo+=Environment.NewLine+"Arancio: scansione prevista +"+analisi.MisureAnticipoScansione+" celle | Azzurro: ";
                 testo+=letta==null?scansione.Esito:
                     $"letta m{letta.MisuraAssoluta+1}, frame {letta.FrameId}, {letta.FineMs-letta.InizioMs} ms (età frame {Math.Max(0,orologioMs()-letta.IstanteFrameMs)} ms) | {scansione.Esito}";
+            }
+            else if(completa)
+            {
+                testo+=Environment.NewLine+$"Lettura completa periodica ogni {analisi.PeriodoLetturaCompleta} misure: nessuna finestra progressiva.";
             }
             etichettaVersioniFoglio.Text=testo;
             etichettaVersioniFoglio.ForeColor=errore==null?Color.DarkBlue:Color.DarkRed;

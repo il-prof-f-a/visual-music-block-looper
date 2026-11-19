@@ -195,7 +195,7 @@ namespace VisualMusicBlockLooper.Core
                 diagnostica.NoteGrezze = notaStato.Count;
                 diagnostica.ComandiGrezzi = comandi.Count;
             }
-            return new StatoTavolo(notaStato, comandi, errori, struttura);
+            return new StatoTavolo(notaStato, comandi, errori, struttura, risoluzione.Speciali);
         }
 
         private static void AggiungiErrore(List<ErroreTavolo> errori, TipoErrore tipo, CartoncinoRilevato rilevato,

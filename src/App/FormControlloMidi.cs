@@ -158,7 +158,7 @@ namespace VisualMusicBlockLooper.App
             if(!ReferenceEquals(attiva,partituraDisegnata)||!ReferenceEquals(osservato,osservatoDisegnato))
             {
                 var baseAttiva=attiva?.CopiaStato()??new StatoTavolo(null,null,null);
-                var stato=new StatoTavolo(baseAttiva.Note,null,osservato.Errori,baseAttiva.Struttura);
+                var stato=new StatoTavolo(baseAttiva.Note,null,osservato.Errori,baseAttiva.Struttura,osservato.Speciali);
                 proiettore.Aggiorna(stato,posizione,trasporto.InEsecuzione);
                 var attesa=osservato.Note.Where(n=>!baseAttiva.Note.Any(a=>a.Chiave==n.Chiave&&a.DurataStep==n.DurataStep)).ToArray();
                 proiettore.MostraInAttesa(new StatoTavolo(attesa,null,null,osservato.Struttura));

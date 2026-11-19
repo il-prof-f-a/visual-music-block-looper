@@ -110,7 +110,7 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void NotaRiconosciutaVerde()
+        public void NotaRiconosciutaConColoreDellaNota()
         {
             var nota = new CartoncinoNota
             {
@@ -121,6 +121,7 @@ namespace VisualMusicBlockLooper.Tests
                 IdClip = 7,
                 Colore = ColoreTraccia.Arancione
             };
+            Color atteso = ColoriNote.DaIdClip(nota.IdClip);
 
             using (Bitmap bmp = Disegna(ConfigPiena(), StatoCon(nota), 0, false))
             {
@@ -131,8 +132,9 @@ namespace VisualMusicBlockLooper.Tests
                 foreach (Point p in new[] { sinistra, destra })
                 {
                     Color c = bmp.GetPixel(p.X, p.Y);
-                    Assert.That(c.G, Is.GreaterThan(c.R), $"bordo {p}");
-                    Assert.That(c.G, Is.GreaterThan(c.B), $"bordo {p}");
+                    Assert.That(c.R, Is.EqualTo(atteso.R).Within(12), $"bordo {p}");
+                    Assert.That(c.G, Is.EqualTo(atteso.G).Within(12), $"bordo {p}");
+                    Assert.That(c.B, Is.EqualTo(atteso.B).Within(12), $"bordo {p}");
                 }
 
                 foreach (int step in new[] { 2, 3, 4 })
@@ -143,6 +145,30 @@ namespace VisualMusicBlockLooper.Tests
 
                 Point fuori = CentroPieno(1, 5);
                 Assert.That(bmp.GetPixel(fuori.X, fuori.Y).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
+            }
+        }
+
+        [Test]
+        public void RipetizioneAbDisegnataViola()
+        {
+            var stato = new StatoTavolo(null, null, null, null, new[]
+            {
+                new CartoncinoSpeciale
+                {
+                    Tipo = TipoImpostazione.IntervalloAb,
+                    Area = new RettangoloTavolo(0.01, 0.68, 0.12, 0.28)
+                }
+            });
+            using (Bitmap bmp = new Bitmap(Dimensione.Width, Dimensione.Height))
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                new RenderGuida(ConfigPiena()).Disegna(g, Dimensione, stato,
+                    new PosizioneGiro(0, 0, new[] { 0 }), false);
+                Color bordo = bmp.GetPixel((int)(0.01 * Dimensione.Width) + 2, (int)(0.80 * Dimensione.Height));
+                Assert.That(bordo.R, Is.EqualTo(130).Within(15));
+                Assert.That(bordo.G, Is.EqualTo(50).Within(15));
+                Assert.That(bordo.B, Is.EqualTo(170).Within(15));
             }
         }
 
@@ -202,9 +228,11 @@ namespace VisualMusicBlockLooper.Tests
                 // Griglia: x 128..1152, y 72..648; cella 64x96.
                 Assert.That(bmp.GetPixel(0, 0).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
 
+                Color atteso = ColoriNote.DaIdClip(nota.IdClip);
                 Color bordo = bmp.GetPixel(128 + 2 * 64 + 1, 72 + 1 * 96 + 48);
-                Assert.That(bordo.G, Is.GreaterThan(bordo.R));
-                Assert.That(bordo.G, Is.GreaterThan(bordo.B));
+                Assert.That(bordo.R, Is.EqualTo(atteso.R).Within(12));
+                Assert.That(bordo.G, Is.EqualTo(atteso.G).Within(12));
+                Assert.That(bordo.B, Is.EqualTo(atteso.B).Within(12));
                 Assert.That(bmp.GetPixel(128 + 2 * 64 + 32, 72 + 1 * 96 + 48).ToArgb(), Is.EqualTo(Color.White.ToArgb()), "Il centro non va colorato");
             }
         }
@@ -235,10 +263,12 @@ namespace VisualMusicBlockLooper.Tests
 
             using (bmp)
             {
-                // Ultima colonna della griglia (step 15, x 1088..1152): il bordo destro, dentro la griglia, è verde.
+                // Ultima colonna della griglia (step 15, x 1088..1152): il bordo destro usa il colore del QR.
+                Color atteso = ColoriNote.DaIdClip(nota.IdClip);
                 Color dentro = bmp.GetPixel(1152 - 2, 216);
-                Assert.That(dentro.G, Is.GreaterThan(dentro.R));
-                Assert.That(dentro.G, Is.GreaterThan(dentro.B));
+                Assert.That(dentro.R, Is.EqualTo(atteso.R).Within(12));
+                Assert.That(dentro.G, Is.EqualTo(atteso.G).Within(12));
+                Assert.That(dentro.B, Is.EqualTo(atteso.B).Within(12));
 
                 // Appena a destra del bordo della griglia la nota non deve dipingere nulla.
                 Assert.That(bmp.GetPixel(1152 + 4, 216).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
@@ -420,7 +450,7 @@ namespace VisualMusicBlockLooper.Tests
                 Traccia = traccia,
                 StepIniziale = step,
                 DurataStep = durata,
-                IdClip = 1,
+                IdClip = 30,
                 Colore = ColoreTraccia.Arancione
             };
         }
@@ -476,7 +506,7 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(StrutturaTavolo.TryCrea(3, 6, 1, 18, out StrutturaTavolo s), Is.True);
             using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 10, 6)))
             {
-                Point ultimo = new Point((int)(GrigliaX + 16 * CellaL) - 3, CentroTavolo(1, 15).Y), oltre = CentroTavolo(1, 16);
+                Point ultimo = new Point((int)(GrigliaX + 16 * CellaL) - 1, CentroTavolo(1, 15).Y), oltre = CentroTavolo(1, 16);
                 Assert.That(EVerde(bmp.GetPixel(ultimo.X, ultimo.Y)), Is.True);
                 Assert.That(EVerde(bmp.GetPixel(oltre.X, oltre.Y)), Is.False);
             }

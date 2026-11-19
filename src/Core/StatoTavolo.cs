@@ -28,6 +28,13 @@ namespace VisualMusicBlockLooper.Core
         public string Chiave => $"{IdClip}:{Traccia}:{Riga}:{StepIniziale}";
     }
 
+    /// <summary>Cartoncino di struttura valido, con la sua area sul tavolo (solo per la guida).</summary>
+    public class CartoncinoSpeciale
+    {
+        public TipoImpostazione Tipo { get; set; }
+        public RettangoloTavolo Area { get; set; }
+    }
+
     /// <summary>Comando richiesto da un cartoncino posto nella zona comandi.</summary>
     public class ComandoRilevato
     {
@@ -69,11 +76,13 @@ namespace VisualMusicBlockLooper.Core
             IEnumerable<CartoncinoNota> note,
             IEnumerable<ComandoRilevato> comandi,
             IEnumerable<ErroreTavolo> errori,
-            StrutturaTavolo struttura = null)
+            StrutturaTavolo struttura = null,
+            IEnumerable<CartoncinoSpeciale> speciali = null)
         {
             Note = note?.ToList() ?? new List<CartoncinoNota>();
             Comandi = comandi?.ToList() ?? new List<ComandoRilevato>();
             Errori = errori?.ToList() ?? new List<ErroreTavolo>();
+            Speciali = speciali?.ToList() ?? new List<CartoncinoSpeciale>();
             Struttura = struttura ?? StrutturaTavolo.Default;
         }
 
@@ -88,5 +97,8 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Cartoncini scartati, mai null.</summary>
         public IReadOnlyList<ErroreTavolo> Errori { get; }
+
+        /// <summary>Cartoncini di struttura validi, con area per la guida; mai null.</summary>
+        public IReadOnlyList<CartoncinoSpeciale> Speciali { get; }
     }
 }

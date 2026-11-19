@@ -21,7 +21,8 @@ namespace VisualMusicBlockLooper.Core
         private static string Chiave(CartoncinoNota n) => n == null ? "null" : n.Chiave + ":" + n.DurataStep + ":" + (int)n.Colore;
         private static StatoTavolo Copia(StatoTavolo s) => new StatoTavolo(
             s.Note.Where(n => n != null).Select(PartituraMidi.CopiaNota), null,
-            s.Errori.Where(e => e != null).Select(e => new ErroreTavolo { Tipo = e.Tipo, Area = e.Area }), s.Struttura);
+            s.Errori.Where(e => e != null).Select(e => new ErroreTavolo { Tipo = e.Tipo, Area = e.Area }), s.Struttura,
+            s.Speciali.Where(x => x != null).Select(x => new CartoncinoSpeciale { Tipo = x.Tipo, Area = x.Area }));
     }
 
     /// <summary>Un produttore di osservazioni confermate; istantanee immutabili leggibili dalla UI.</summary>

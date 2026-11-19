@@ -96,11 +96,11 @@ Riferimenti per il controllo, tutti sulla guida proiettata:
 
 - La griglia è di **6 righe x 16 colonne**. La riga è determinata dal centro verticale del QR; lo strumento dipende dal gruppo di righe collegate. Il colore del cartoncino serve a misurare l'estensione della nota.
 - Lo step iniziale è determinato dal bordo sinistro del QR nero, senza aggiungere cornice bianca o ingombro del corpo. La durata dipende dal corpo contiguo verso destra nel tavolo, con fine agganciata al confine di cella più vicino.
-- La nota viene riconosciuta (verde sulla guida) dopo circa 3 frame consecutivi e rimossa dopo circa 5 frame di assenza.
+- La nota viene riconosciuta (bordo del colore della nota) dopo circa 3 frame consecutivi e rimossa dopo circa 5 frame di assenza.
 
 Procedura:
 
-1. Posare un cartoncino rosso `nota-rosso-0.png` nel primo step della riga 1. La guida lo mostra verde.
+1. Posare un cartoncino rosso `nota-rosso-0.png` nel primo step della riga 1. La guida lo mostra con il bordo del colore della nota.
 2. Premere **Avvia** (modo Master). Ad ogni passaggio del playhead la nota viene inviata: in Ableton il clip deve partire e la nota MIDI 36 canale 1 deve apparire nel monitor MIDI.
 3. Rimuovere il cartoncino: la nota si spegne (note-off) alla fine della sua durata.
 4. Ripetere la verifica nei diversi gruppi di righe: ogni gruppo usa uno strumento. Con il default le sei righe suonano in sequenza; per sentire più righe insieme posare il cartoncino «1 riga» (sezione 12).
@@ -112,7 +112,7 @@ Posare l'inizio nero del QR nella cella desiderata. Il bordo bianco o colorato p
 
 Un QR senza colore che lo prolunga dura almeno una cella. Un corpo contiguo prolunga la nota verso destra; un vuoto mantiene la pausa. Se nella stessa riga compare un altro QR, la nota precedente termina al più nella cella prima del nuovo attacco. Anche due QR con la stessa altezza avviano due note distinte. Se iniziano realmente nella stessa cella, il conflitto viene segnalato in rosso: separarli in celle diverse.
 
-Il verde descrive le celle effettivamente suonate. Per la prova con cartoncini sovrapposti, contare i QR visibili e confrontarli con `AggancioQr` e `NotaAccettata` nel debugger. La fotografia di riferimento ha cinque note sul rigo 3 e cinque sul rigo 4, alle celle 1, 4, 7, 12 e 14. Un QR fisicamente coperto resta non leggibile.
+Il bordo colorato descrive le celle effettivamente suonate. Per la prova con cartoncini sovrapposti, contare i QR visibili e confrontarli con `AggancioQr` e `NotaAccettata` nel debugger. La fotografia di riferimento ha cinque note sul rigo 3 e cinque sul rigo 4, alle celle 1, 4, 7, 12 e 14. Un QR fisicamente coperto resta non leggibile.
 
 ## 8. Modo Master e Slave
 
@@ -176,7 +176,7 @@ Latenza attesa, dalla struttura del codice (da verificare sul banco):
 Misura suggerita (con registrazione audio):
 
 1. Registrare contemporaneamente con uno smartphone il tavolo (per il momento di ingresso del cartoncino) e l'uscita audio di Ableton (per il momento del suono).
-2. Calcolare la differenza tra il primo fotogramma in cui il cartoncino è verde sulla guida (o il primo frame in cui appare nel video) e il suono del clip.
+2. Calcolare la differenza tra il primo fotogramma in cui il cartoncino mostra il bordo del colore della nota sulla guida (o il primo frame in cui appare nel video) e il suono del clip.
 3. Ripetere 5 volte e annotare la mediana. Il ritardo strutturale del riconoscimento è di circa 200 ms più il ciclo di cattura; valori molto superiori al totale stimato indicano un problema da indagare (uscita audio, latenza della webcam, buffer MIDI).
 
 ## 11. Risoluzione dei problemi
@@ -244,7 +244,7 @@ La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step pro
 - **Numeri di riga** da 1 a 6, a sinistra della griglia, per leggere A-B.
 - **Colonne oltre la misura** in grigio chiaro (note non utilizzabili); **righe fuori da A-B** in grigio chiaro (non suonano).
 - **Playhead** (colonna arancione) solo sulle righe attive: una per gruppo. Da fermo è un contorno.
-- **Note riconosciute** in verde; **cartoncini scartati** con contorno rosso (anche `ImpostazioneNonValida` e `FuoriMisura`).
+- **Note riconosciute** con bordo del colore della nota; **cartoncini scartati** con contorno rosso (anche `ImpostazioneNonValida` e `FuoriMisura`).
 
 ## 13. Problemi noti
 
@@ -259,14 +259,14 @@ La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step pro
 Con illuminazione sufficiente e la calibrazione esistente, verificare i punti seguenti senza cambiare porte o impostazioni ottiche per ottenere un esito positivo:
 
 1. Foglio fermo: dopo le conferme iniziali, versioni e conteggio delle letture delle zone restano stabili. Il controllo leggero e la camera proseguono.
-2. Spostare una delle dieci note a metà giro: il verde conserva la partitura in uso; la nuova posizione blu entra soltanto alla frontiera ammessa. Le altre zone non richiedono nuova decodifica.
+2. Spostare una delle dieci note a metà giro: la nota attiva conserva la partitura in uso; la nuova posizione tratteggiata entra soltanto alla frontiera ammessa. Le altre zone non richiedono nuova decodifica.
 3. Rimuovere un cartoncino: servono due frame affidabili di zona vuota. Coprire/oscureggiare il QR deve conservare la versione valida e indicare incertezza.
 4. Modificare dopo la scadenza dell'ultima misura: il prossimo giro conserva la versione già preparata; l'aggiornamento successivo entra interamente più tardi.
 5. Premere Ferma durante lettura e preparazione: il trasporto non aspetta il decoder. Ripetere durante lo stato «in preparazione» prima della prima lettura: la richiesta Play deve essere annullata.
 6. Provare separatamente STOP/TAP ottici: il timestamp TAP proviene dal frame, ma il ritardo ottico comprende la conferma. Un cartoncino tenuto non deve riemettere il comando dopo un'occlusione.
 7. Eseguire il [banco temporale](esecuzione-midi.md#banco-temporale-isolato) per dieci minuti a 60/120/180 BPM, base e con carico, sulla porta isolata «VMBL Test». Conservare JSON e TRX; misurare audio DAW separatamente. Riportare tutti gli overrun e i target falliti.
 
-La proiezione verde indica la partitura in uso; le modifiche osservate in attesa sono blu tratteggiate. Lo stato riporta le versioni letto/pronto/in uso. «Salva tempi MIDI» e «Salva debug» producono rapporti locali distinti.
+La proiezione mostra le note in uso con il loro colore; le modifiche osservate in attesa sono tratteggiate con lo stesso colore. Lo stato riporta le versioni letto/pronto/in uso. «Salva tempi MIDI» e «Salva debug» producono rapporti locali distinti.
 
 ## Esito della prova
 

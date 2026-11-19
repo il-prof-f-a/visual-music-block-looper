@@ -17,7 +17,7 @@ namespace VisualMusicBlockLooper.App
         private static readonly Color ColoreContornoPlayhead = Color.Gray;
         public static readonly Color ColoreScansionePrevista=Color.DarkOrange;
         public static readonly Color ColoreScansioneCompletata=Color.RoyalBlue;
-        private static readonly Color ColoreNota = Color.FromArgb(255, 60, 179, 75);
+
         private static readonly Color ColoreErrore = Color.FromArgb(255, 220, 30, 30);
 
         private static readonly Color ColoreColonnaOltreMisura = Color.FromArgb(255, 215, 215, 215);
@@ -98,6 +98,7 @@ namespace VisualMusicBlockLooper.App
             DisegnaBarreGruppo(g, griglia, struttura);
             DisegnaPlayhead(g, griglia, posizione, inEsecuzione);
             DisegnaNote(g, griglia, stato, struttura);
+            DisegnaSpeciali(g, dimensione, stato, false);
             DisegnaErrori(g, dimensione, stato);
         }
 
@@ -272,13 +273,14 @@ namespace VisualMusicBlockLooper.App
         public void DisegnaLettura(Graphics g,Size dimensione,IReadOnlyList<RettangoloTavolo> regioni,bool attiva)
         {
             if(!attiva||regioni==null||regioni.Count==0)return;
-            using(var penna=new Pen(Color.LimeGreen,3))
+            using(var pennello=new SolidBrush(Color.LimeGreen))
                 foreach(var regione in regioni)
                 {
                     if(regione.Larghezza<=0||regione.Altezza<=0)continue;
                     Rectangle area=InPixel(regione,dimensione);
-                    int y=Math.Max(area.Top+1,area.Bottom-3);
-                    g.DrawLine(penna,area.Left+2,y,area.Right-2,y);
+                    int altezza=Math.Max(4,Math.Min(8,area.Height/8));
+                    g.FillRectangle(pennello,area.Left+2,area.Bottom-altezza-1,
+                        Math.Max(0,area.Width-4),altezza);
                 }
         }
 
@@ -292,10 +294,24 @@ namespace VisualMusicBlockLooper.App
                         g.DrawLine(penna,x,BordoY(griglia,riga)+2,x,BordoY(griglia,riga+1)-2);
         }
 
-        /// <summary>Bordi blu tratteggiati: osservazioni che non fanno ancora parte della partitura attiva.</summary>
+        /// <summary>Bordi tratteggiati del colore della nota: osservazioni non ancora nella partitura attiva.</summary>
         public void DisegnaInAttesa(Graphics g,Size dimensione,StatoTavolo osservato)
         {
             DisegnaNote(g,InPixel(config.Area,dimensione),osservato,osservato?.Struttura??StrutturaTavolo.Default,true);
+            DisegnaSpeciali(g,dimensione,osservato,true);
+        }
+
+        private void DisegnaSpeciali(Graphics g,Size dimensione,StatoTavolo stato,bool attesa)
+        {
+            if(stato?.Speciali==null)return;
+            foreach(CartoncinoSpeciale speciale in stato.Speciali)
+            {
+                if(speciale==null||speciale.Area.Larghezza<=0||speciale.Area.Altezza<=0)continue;
+                Rectangle area=InPixel(speciale.Area,dimensione);
+                using(var penna=new Pen(ColoriNote.DaSpeciale(speciale.Tipo),attesa?1.5f:2f)
+                    {Alignment=PenAlignment.Inset,DashStyle=attesa?DashStyle.Dash:DashStyle.Solid})
+                    g.DrawRectangle(penna,area);
+            }
         }
 
         private void DisegnaNote(Graphics g, Rectangle griglia, StatoTavolo stato, StrutturaTavolo struttura,bool attesa=false)
@@ -305,27 +321,27 @@ namespace VisualMusicBlockLooper.App
                 return;
             }
 
-            // Solo il bordo: il proiettore illumina il tavolo, un riempimento colorerebbe il cartoncino sotto.
-            using (var penna = new Pen(attesa?Color.RoyalBlue:ColoreNota, attesa?3:4)
-                { Alignment = PenAlignment.Inset,DashStyle=attesa?DashStyle.Dash:DashStyle.Solid })
+            // Solo il bordo: il colore viene dal QR (nota/frequenza), non dai pixel del tavolo.
+            foreach (CartoncinoNota nota in stato.Note)
             {
-                foreach (CartoncinoNota nota in stato.Note)
+                if (nota == null
+                    || nota.Riga < 0 || nota.Riga >= config.Tracce
+                    || nota.StepIniziale < 0 || nota.StepIniziale >= Math.Min(config.Step, struttura.StepPerMisura))
                 {
-                    if (nota == null
-                        || nota.Riga < 0 || nota.Riga >= config.Tracce
-                        || nota.StepIniziale < 0 || nota.StepIniziale >= Math.Min(config.Step, struttura.StepPerMisura))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    // La sagoma può attraversare una battuta, ma la guida resta dentro la griglia visibile.
-                    int durata = Math.Min(Math.Max(nota.DurataStep, 1), config.Step - nota.StepIniziale);
-                    var area = Rectangle.FromLTRB(
-                        BordoX(griglia, nota.StepIniziale),
-                        BordoY(griglia, nota.Riga),
-                        BordoX(griglia, nota.StepIniziale + durata),
-                        BordoY(griglia, nota.Riga + 1));
+                // La sagoma può attraversare una battuta, ma la guida resta dentro la griglia visibile.
+                int durata = Math.Min(Math.Max(nota.DurataStep, 1), config.Step - nota.StepIniziale);
+                var area = Rectangle.FromLTRB(
+                    BordoX(griglia, nota.StepIniziale),
+                    BordoY(griglia, nota.Riga),
+                    BordoX(griglia, nota.StepIniziale + durata),
+                    BordoY(griglia, nota.Riga + 1));
 
+                using (var penna = new Pen(ColoriNote.DaIdClip(nota.IdClip), attesa ? 1.8f : 2.5f)
+                    { Alignment = PenAlignment.Inset, DashStyle = attesa ? DashStyle.Dash : DashStyle.Solid })
+                {
                     g.DrawRectangle(penna, area);
                 }
             }

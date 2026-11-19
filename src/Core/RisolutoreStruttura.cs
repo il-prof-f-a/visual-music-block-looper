@@ -7,10 +7,12 @@ namespace VisualMusicBlockLooper.Core
     /// <summary>Esito della risoluzione della struttura: struttura effettiva ed errori dei cartoncini scartati.</summary>
     public sealed class RisoluzioneStruttura
     {
-        public RisoluzioneStruttura(StrutturaTavolo struttura, IReadOnlyList<ErroreTavolo> errori)
+        public RisoluzioneStruttura(StrutturaTavolo struttura, IReadOnlyList<ErroreTavolo> errori,
+            IReadOnlyList<CartoncinoSpeciale> speciali = null)
         {
             Struttura = struttura;
             Errori = errori ?? new List<ErroreTavolo>();
+            Speciali = speciali ?? new List<CartoncinoSpeciale>();
         }
 
         /// <summary>Struttura risultante, sempre valida.</summary>
@@ -18,6 +20,9 @@ namespace VisualMusicBlockLooper.Core
 
         /// <summary>Cartoncini scartati, mai null.</summary>
         public IReadOnlyList<ErroreTavolo> Errori { get; }
+
+        /// <summary>Cartoncini di struttura accettati, con area per la guida.</summary>
+        public IReadOnlyList<CartoncinoSpeciale> Speciali { get; }
     }
 
     /// <summary>
@@ -36,6 +41,7 @@ namespace VisualMusicBlockLooper.Core
             TracciaCartoncini traccia)
         {
             var errori = new List<ErroreTavolo>();
+            var speciali = new List<CartoncinoSpeciale>();
             if (impostazioni == null)
             {
                 return new RisoluzioneStruttura(StrutturaTavolo.Default, errori);
@@ -65,6 +71,12 @@ namespace VisualMusicBlockLooper.Core
             // Prima si risolvono misura e collegamento: l'A-B va validato contro le righe effettive.
             int battiti = ValoreMisura(misura, errori, traccia);
             int righe = ValoreCollegamento(collegamento, errori, traccia);
+            if (misura.HasValue && IsImpostazione(misura.Value.Payload, TipoImpostazione.Misura)
+                && BattitiAmmessi.Contains(misura.Value.Payload.Valore))
+                speciali.Add(new CartoncinoSpeciale { Tipo = TipoImpostazione.Misura, Area = misura.Value.Area });
+            if (collegamento.HasValue && IsImpostazione(collegamento.Value.Payload, TipoImpostazione.Collegamento)
+                && RigheCollegateAmmesse.Contains(collegamento.Value.Payload.Valore))
+                speciali.Add(new CartoncinoSpeciale { Tipo = TipoImpostazione.Collegamento, Area = collegamento.Value.Area });
             int aInizio = 1;
             int aFine = righe * battiti;
 
@@ -77,6 +89,7 @@ namespace VisualMusicBlockLooper.Core
                 {
                     aInizio = payload.Valore;
                     aFine = payload.ValoreB;
+                    speciali.Add(new CartoncinoSpeciale { Tipo = TipoImpostazione.IntervalloAb, Area = area });
                     traccia?.RegistraImpostazione(payload, area, ZonaSpeciale.Ab, true, "AbAccettato",
                         $"A-B {aInizio}-{aFine}; MISURA {battiti}/4, LINK {righe}, limite {righe * battiti} battute.");
                 }
@@ -90,7 +103,7 @@ namespace VisualMusicBlockLooper.Core
             }
 
             StrutturaTavolo.TryCrea(battiti, righe, aInizio, aFine, out var struttura);
-            return new RisoluzioneStruttura(struttura, errori);
+            return new RisoluzioneStruttura(struttura, errori, speciali);
         }
 
         /// <summary>Restituisce il primo cartoncino della zona (per Y, poi X) e segnala gli altri come sovrapposti.</summary>

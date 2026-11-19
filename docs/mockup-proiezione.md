@@ -34,7 +34,10 @@ La guida è disegnata da `RenderGuida.Disegna` sull'intero schermo del proiettor
 | Barre di gruppo | per ogni gruppo di righe collegate | blu (70, 130, 180) e blu chiaro (120, 170, 210), alternati | Barra sul lato sinistro della griglia, larga 6 px, che unisce le righe del gruppo. |
 | Numeri di riga | sempre | grigio ardesia scuro (47, 79, 79) | 1..6, da sinistra a destra nella colonna a sinistra della griglia. |
 | Playhead | sulle righe attive, nella colonna `stepInMisura` | arancio (255, 140, 0) con opacità circa 35% quando in esecuzione | Una riga per gruppo. Fermo: solo contorno grigio (128, 128, 128). |
-| Nota riconosciuta | per ogni nota stabile | riempimento verde (60, 179, 75), bordo verde scuro (30, 110, 45) spessore 2 | Da step iniziale per la durata in step (troncata a fine misura). |
+| Nota riconosciuta | per ogni nota stabile | solo bordo, colore calcolato dal QR/frequenza (vedi sotto), spessore 2,5 px | Da step iniziale per la durata in step. Il centro resta bianco: nessun riempimento che colori il cartoncino. |
+| Nota in attesa | per ogni nota osservata non ancora attiva | stesso colore della nota, tratteggiato, spessore 1,8 px | Nessun riempimento. |
+| Cartoncino speciale | per ogni MISURA/COLLEGA/A-B valido | MISURA blu (70, 130, 180), COLLEGA verde (40, 160, 70), A-B/ripetizione violetto (130, 50, 170), spessore 2 px | Contorno dell'area reale del cartoncino nella zona laterale. |
+| Barra di lettura | mentre il foglio è in analisi | barra verde piena, altezza 6–8 px, disegnata per ultima | Progressiva: sotto ciascuna delle tre finestre. Completa: lungo il bordo inferiore di tutto il tavolo. Scompare dopo circa 250 ms. |
 | Errore | per ogni cartoncino scartato | riempimento rosso chiaro (255, 120, 120) con opacità circa 24%, bordo rosso (220, 30, 30) spessore 3 | Disegnato sull'area reale del cartoncino, non sulla cella. |
 
 ## Elementi fisici (non disegnati dalla guida)
@@ -51,7 +54,20 @@ La guida è disegnata da `RenderGuida.Disegna` sull'intero schermo del proiettor
 - **Righe fuori da A-B**: con A-B 2-3 la prima riga di ogni gruppo, cioè le righe 1 e 4, è in grigio chiaro e non suona.
 - **Colonne oltre la misura**: con 3/4 le colonne 13-16 sono in grigio. Una nota che inizia lì sarebbe scartata come `FuoriMisura`.
 - **Playhead** sulla colonna 6 (indice 5) solo nelle righe attive: la riga 2 e la riga 5, una per gruppo. Le altre righe della colonna non sono evidenziate.
-- **Nota verde**: il cartoncino è sulla riga 2, parte dal secondo passo e dura 3 passi. Il colore del cartoncino non è più legato alla riga: il canale MIDI dipende dal colore.
+- **Nota colorata**: il cartoncino è sulla riga 2, parte dal secondo passo e dura 3 passi. Il bordo usa il colore della nota ricavato dal QR; il canale MIDI dipende dal gruppo di righe, non dal colore.
+
+## Colore delle note
+
+Il colore non viene letto dai pixel. `src/App/ColoriNote.cs` riproduce la formula di `tools/genera_note_cromatiche.py`:
+
+```text
+midi = 36 + idClip
+t = (midi - 21) / 87
+λ = 700 - 300·t          (nm)
+RGB = spettro(λ)         (approssimazione sRGB del generatore)
+```
+
+`spettro` è la stessa spezzata del generatore, con correzione `c^0,8 · 0,72`. La formula diretta nota → colore è quindi deterministica. L'inversa colore → nota non è unica: più lunghezze d'onda possono produrre RGB simili, quindi non viene usata. Per i cartoncini speciali il colore dipende dal tipo: MISURA blu, COLLEGA verde, A-B/ripetizione violetto.
 - **Contorno rosso** nella riga 6: un cartoncino scartato, per esempio per `Sovrapposto` o `FuoriMisura`. Il motivo dello scarto è nella tabella della prova hardware (`docs/prova-hardware.md`, sezione 9).
 - **Zona comandi** a destra: i cartoncini comando (PLAY, STOP, TAP, MODO, ONESHOT) sono letti dalla zona e non diventano note.
 

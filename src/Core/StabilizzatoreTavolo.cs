@@ -69,6 +69,7 @@ namespace VisualMusicBlockLooper.Core
             IReadOnlyList<CartoncinoNota> noteGrezze = grezzo?.Note ?? new List<CartoncinoNota>();
             IReadOnlyList<ComandoRilevato> comandiGrezzi = grezzo?.Comandi ?? new List<ComandoRilevato>();
             IReadOnlyList<ErroreTavolo> errori = grezzo?.Errori ?? new List<ErroreTavolo>();
+            IReadOnlyList<CartoncinoSpeciale> speciali = grezzo?.Speciali ?? new List<CartoncinoSpeciale>();
 
             AggiornaNote(noteGrezze);
             List<ComandoRilevato> comandiEsposti = AggiornaComandi(comandiGrezzi);
@@ -93,7 +94,8 @@ namespace VisualMusicBlockLooper.Core
                 OutputNote(),
                 comandiEsposti,
                 errori,
-                strutturaStabile);
+                strutturaStabile,
+                speciali);
         }
 
         /// <summary>Interrompe le conferme candidate senza interpretare un frame incerto come rimozione.</summary>

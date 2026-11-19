@@ -227,7 +227,8 @@ namespace VisualMusicBlockLooper.App
                 new List<CartoncinoNota>(origine.Note),
                 new List<ComandoRilevato>(origine.Comandi),
                 new List<ErroreTavolo>(origine.Errori),
-                origine.Struttura);
+                origine.Struttura,
+                new List<CartoncinoSpeciale>(origine.Speciali));
         }
     }
 }

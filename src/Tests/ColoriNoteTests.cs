@@ -1,3 +1,4 @@
+using System.Drawing;
 using NUnit.Framework;
 using VisualMusicBlockLooper.App;
 using VisualMusicBlockLooper.Core;
@@ -17,6 +18,17 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(colore.R, Is.EqualTo(r).Within(1));
             Assert.That(colore.G, Is.EqualTo(g).Within(1));
             Assert.That(colore.B, Is.EqualTo(b).Within(1));
+        }
+
+        [Test]
+        public void RiquadriAlCinquantaPercento()
+        {
+            Color pieno = ColoriNote.DaIdClip(24);
+            Color sfumato = ColoriNote.Sfumato(pieno);
+            Assert.That(sfumato.A, Is.EqualTo(128));
+            Assert.That(sfumato.R, Is.EqualTo(pieno.R));
+            Assert.That(sfumato.G, Is.EqualTo(pieno.G));
+            Assert.That(sfumato.B, Is.EqualTo(pieno.B));
         }
 
         [Test]

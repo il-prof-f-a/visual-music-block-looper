@@ -308,7 +308,7 @@ namespace VisualMusicBlockLooper.App
             {
                 if(speciale==null||speciale.Area.Larghezza<=0||speciale.Area.Altezza<=0)continue;
                 Rectangle area=InPixel(speciale.Area,dimensione);
-                using(var penna=new Pen(ColoriNote.DaSpeciale(speciale.Tipo),attesa?1.5f:2f)
+                using(var penna=new Pen(ColoriNote.Sfumato(ColoriNote.DaSpeciale(speciale.Tipo)),attesa?1.5f:2f)
                     {Alignment=PenAlignment.Inset,DashStyle=attesa?DashStyle.Dash:DashStyle.Solid})
                     g.DrawRectangle(penna,area);
             }
@@ -339,7 +339,7 @@ namespace VisualMusicBlockLooper.App
                     BordoX(griglia, nota.StepIniziale + durata),
                     BordoY(griglia, nota.Riga + 1));
 
-                using (var penna = new Pen(ColoriNote.DaIdClip(nota.IdClip), attesa ? 1.8f : 2.5f)
+                using (var penna = new Pen(ColoriNote.Sfumato(ColoriNote.DaIdClip(nota.IdClip)), attesa ? 1.8f : 2.5f)
                     { Alignment = PenAlignment.Inset, DashStyle = attesa ? DashStyle.Dash : DashStyle.Solid })
                 {
                     g.DrawRectangle(penna, area);

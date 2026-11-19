@@ -121,7 +121,7 @@ namespace VisualMusicBlockLooper.Tests
                 IdClip = 7,
                 Colore = ColoreTraccia.Arancione
             };
-            Color atteso = ColoriNote.DaIdClip(nota.IdClip);
+            Color atteso = SuBianco(ColoriNote.DaIdClip(nota.IdClip));
 
             using (Bitmap bmp = Disegna(ConfigPiena(), StatoCon(nota), 0, false))
             {
@@ -166,9 +166,10 @@ namespace VisualMusicBlockLooper.Tests
                 new RenderGuida(ConfigPiena()).Disegna(g, Dimensione, stato,
                     new PosizioneGiro(0, 0, new[] { 0 }), false);
                 Color bordo = bmp.GetPixel((int)(0.01 * Dimensione.Width) + 2, (int)(0.80 * Dimensione.Height));
-                Assert.That(bordo.R, Is.EqualTo(130).Within(15));
-                Assert.That(bordo.G, Is.EqualTo(50).Within(15));
-                Assert.That(bordo.B, Is.EqualTo(170).Within(15));
+                Color atteso = SuBianco(Color.FromArgb(130, 50, 170));
+                Assert.That(bordo.R, Is.EqualTo(atteso.R).Within(15));
+                Assert.That(bordo.G, Is.EqualTo(atteso.G).Within(15));
+                Assert.That(bordo.B, Is.EqualTo(atteso.B).Within(15));
             }
         }
 
@@ -228,7 +229,7 @@ namespace VisualMusicBlockLooper.Tests
                 // Griglia: x 128..1152, y 72..648; cella 64x96.
                 Assert.That(bmp.GetPixel(0, 0).ToArgb(), Is.EqualTo(Color.White.ToArgb()));
 
-                Color atteso = ColoriNote.DaIdClip(nota.IdClip);
+                Color atteso = SuBianco(ColoriNote.DaIdClip(nota.IdClip));
                 Color bordo = bmp.GetPixel(128 + 2 * 64 + 1, 72 + 1 * 96 + 48);
                 Assert.That(bordo.R, Is.EqualTo(atteso.R).Within(12));
                 Assert.That(bordo.G, Is.EqualTo(atteso.G).Within(12));
@@ -264,7 +265,7 @@ namespace VisualMusicBlockLooper.Tests
             using (bmp)
             {
                 // Ultima colonna della griglia (step 15, x 1088..1152): il bordo destro usa il colore del QR.
-                Color atteso = ColoriNote.DaIdClip(nota.IdClip);
+                Color atteso = SuBianco(ColoriNote.DaIdClip(nota.IdClip));
                 Color dentro = bmp.GetPixel(1152 - 2, 216);
                 Assert.That(dentro.R, Is.EqualTo(atteso.R).Within(12));
                 Assert.That(dentro.G, Is.EqualTo(atteso.G).Within(12));
@@ -431,9 +432,24 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
-        private static bool EVerde(Color c)
+        // Il riquadro è disegnato al 50% di opacità: sul bianco il pixel risulta schiarito.
+        private static Color SuBianco(Color colore)
         {
-            return c.G > c.R && c.G > c.B;
+            int a = ColoriNote.OpacitaRiquadri;
+            return Color.FromArgb(
+                255 - (255 - colore.R) * a / 255,
+                255 - (255 - colore.G) * a / 255,
+                255 - (255 - colore.B) * a / 255);
+        }
+
+        // Il bordo sottile può cadere sopra una linea della griglia: la media con lo sfondo
+        // sposta i canali di qualche unità, quindi qui interessa soprattutto la posizione.
+        private static void AssertColoreNota(Color c, int idClip, string messaggio)
+        {
+            Color atteso = SuBianco(ColoriNote.DaIdClip(idClip));
+            Assert.That(c.R, Is.EqualTo(atteso.R).Within(35), messaggio);
+            Assert.That(c.G, Is.EqualTo(atteso.G).Within(35), messaggio);
+            Assert.That(c.B, Is.EqualTo(atteso.B).Within(35), messaggio);
         }
 
         private static Bitmap DisegnaTavoloConNote(StrutturaTavolo struttura, params CartoncinoNota[] note)
@@ -461,8 +477,8 @@ namespace VisualMusicBlockLooper.Tests
             using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(3, 0, 2, 2)))
             {
                 Point dentro = BordoSinistroNota(3, 2), sbagliata = CentroTavolo(0, 2);
-                Assert.That(EVerde(bmp.GetPixel(dentro.X, dentro.Y)), Is.True);
-                Assert.That(EVerde(bmp.GetPixel(sbagliata.X, sbagliata.Y)), Is.False);
+                AssertColoreNota(bmp.GetPixel(dentro.X, dentro.Y), 30, "riga 3");
+                Assert.That(bmp.GetPixel(sbagliata.X, sbagliata.Y).ToArgb(), Is.EqualTo(Bianco));
             }
         }
 
@@ -472,8 +488,8 @@ namespace VisualMusicBlockLooper.Tests
             using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(0, 4, 2, 2)))
             {
                 Point dentro = BordoSinistroNota(0, 2), sbagliata = CentroTavolo(4, 2);
-                Assert.That(EVerde(bmp.GetPixel(dentro.X, dentro.Y)), Is.True);
-                Assert.That(EVerde(bmp.GetPixel(sbagliata.X, sbagliata.Y)), Is.False);
+                AssertColoreNota(bmp.GetPixel(dentro.X, dentro.Y), 30, "riga 0");
+                Assert.That(bmp.GetPixel(sbagliata.X, sbagliata.Y).ToArgb(), Is.EqualTo(Bianco));
             }
         }
 
@@ -483,8 +499,8 @@ namespace VisualMusicBlockLooper.Tests
             using (Bitmap bmp = DisegnaTavoloConNote(StrutturaTavolo.Default, Nota(2, 0, 1, 2), Nota(2, 3, 6, 2)))
             {
                 Point a = BordoSinistroNota(2, 1), b = BordoSinistroNota(2, 6);
-                Assert.That(EVerde(bmp.GetPixel(a.X, a.Y)), Is.True);
-                Assert.That(EVerde(bmp.GetPixel(b.X, b.Y)), Is.True);
+                AssertColoreNota(bmp.GetPixel(a.X, a.Y), 30, "nota a");
+                AssertColoreNota(bmp.GetPixel(b.X, b.Y), 30, "nota b");
             }
         }
 
@@ -507,8 +523,8 @@ namespace VisualMusicBlockLooper.Tests
             using (Bitmap bmp = DisegnaTavoloConNote(s, Nota(1, 1, 10, 6)))
             {
                 Point ultimo = new Point((int)(GrigliaX + 16 * CellaL) - 1, CentroTavolo(1, 15).Y), oltre = CentroTavolo(1, 16);
-                Assert.That(EVerde(bmp.GetPixel(ultimo.X, ultimo.Y)), Is.True);
-                Assert.That(EVerde(bmp.GetPixel(oltre.X, oltre.Y)), Is.False);
+                AssertColoreNota(bmp.GetPixel(ultimo.X, ultimo.Y), 30, "ultima colonna");
+                Assert.That(bmp.GetPixel(oltre.X, oltre.Y).ToArgb(), Is.EqualTo(Bianco));
             }
         }
 

@@ -34,9 +34,9 @@ La guida è disegnata da `RenderGuida.Disegna` sull'intero schermo del proiettor
 | Barre di gruppo | per ogni gruppo di righe collegate | blu (70, 130, 180) e blu chiaro (120, 170, 210), alternati | Barra sul lato sinistro della griglia, larga 6 px, che unisce le righe del gruppo. |
 | Numeri di riga | sempre | grigio ardesia scuro (47, 79, 79) | 1..6, da sinistra a destra nella colonna a sinistra della griglia. |
 | Playhead | sulle righe attive, nella colonna `stepInMisura` | arancio (255, 140, 0) con opacità circa 35% quando in esecuzione | Una riga per gruppo. Fermo: solo contorno grigio (128, 128, 128). |
-| Nota riconosciuta | per ogni nota stabile | solo bordo, colore calcolato dal QR/frequenza (vedi sotto), spessore 2,5 px | Da step iniziale per la durata in step. Il centro resta bianco: nessun riempimento che colori il cartoncino. |
-| Nota in attesa | per ogni nota osservata non ancora attiva | stesso colore della nota, tratteggiato, spessore 1,8 px | Nessun riempimento. |
-| Cartoncino speciale | per ogni MISURA/COLLEGA/A-B valido | MISURA blu (70, 130, 180), COLLEGA verde (40, 160, 70), A-B/ripetizione violetto (130, 50, 170), spessore 2 px | Contorno dell'area reale del cartoncino nella zona laterale. |
+| Nota riconosciuta | per ogni nota stabile | solo bordo, colore calcolato dal QR/frequenza (vedi sotto), spessore 2,5 px, opacità 50% | Da step iniziale per la durata in step. Il centro resta bianco: nessun riempimento che colori il cartoncino. |
+| Nota in attesa | per ogni nota osservata non ancora attiva | stesso colore della nota, tratteggiato, spessore 1,8 px, opacità 50% | Nessun riempimento. |
+| Cartoncino speciale | per ogni MISURA/COLLEGA/A-B valido | MISURA blu (70, 130, 180), COLLEGA verde (40, 160, 70), A-B/ripetizione violetto (130, 50, 170), spessore 2 px, opacità 50% | Contorno dell'area reale del cartoncino nella zona laterale. |
 | Barra di lettura | mentre il foglio è in analisi | barra verde piena, altezza 6–8 px, disegnata per ultima | Progressiva: sotto ciascuna delle tre finestre. Completa: lungo il bordo inferiore di tutto il tavolo. Scompare dopo circa 250 ms. |
 | Errore | per ogni cartoncino scartato | riempimento rosso chiaro (255, 120, 120) con opacità circa 24%, bordo rosso (220, 30, 30) spessore 3 | Disegnato sull'area reale del cartoncino, non sulla cella. |
 
@@ -68,6 +68,8 @@ RGB = spettro(λ)              (approssimazione sRGB del generatore)
 ```
 
 L'interpolazione è sulla **frequenza ottica**, non sulla lunghezza d'onda: per questo Do5 è ciano e non verde. `spettro` è la stessa spezzata del generatore, con correzione `c^0,8 · 0,72`. La formula diretta nota → colore è quindi deterministica. L'inversa colore → nota non è unica: più lunghezze d'onda possono produrre RGB simili, quindi non viene usata. Per i cartoncini speciali il colore dipende dal tipo: MISURA blu, COLLEGA verde, A-B/ripetizione violetto.
+
+Tutti i riquadri (note, note in attesa, cartoncini speciali) sono disegnati con **opacità 50%** (`ColoriNote.OpacitaRiquadri = 128`): il colore resta leggero, si vedono le linee della griglia sotto e il proiettore non copre il cartoncino con una tinta piena. La barra verde di lettura resta invece piena, perché deve essere ben visibile.
 - **Contorno rosso** nella riga 6: un cartoncino scartato, per esempio per `Sovrapposto` o `FuoriMisura`. Il motivo dello scarto è nella tabella della prova hardware (`docs/prova-hardware.md`, sezione 9).
 - **Zona comandi** a destra: i cartoncini comando (PLAY, STOP, TAP, MODO, ONESHOT) sono letti dalla zona e non diventano note.
 

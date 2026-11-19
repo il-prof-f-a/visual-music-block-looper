@@ -10,7 +10,14 @@ namespace VisualMusicBlockLooper.App
     /// </summary>
     public static class ColoriNote
     {
+        /// <summary>Opacità dei riquadri-guida: 50%, così il colore resta leggero sul proiettore.</summary>
+        public const int OpacitaRiquadri = 128;
+
         public static Color DaIdClip(int idClip) => DaMidi(36 + idClip);
+
+        /// <summary>Stesso colore con l'opacità dei riquadri, senza schiarirlo in modo fisso.</summary>
+        public static Color Sfumato(Color colore) =>
+            Color.FromArgb(OpacitaRiquadri, colore.R, colore.G, colore.B);
 
         public static Color DaMidi(int midi)
         {

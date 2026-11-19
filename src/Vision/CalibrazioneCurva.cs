@@ -11,6 +11,8 @@ namespace VisualMusicBlockLooper.Vision
     public sealed partial class Calibrazione
     {
         private DeformazioneCalibrazione deformazione;
+        private DeformazioneSferica sferica;
+        private ModelloCorrezioneBordo modello;
         private PuntoImmagine[] riferimentiCamera;
         private PuntoTavolo[] riferimentiTavolo;
         private readonly object sincronizzazioneMappe = new object();
@@ -44,12 +46,25 @@ namespace VisualMusicBlockLooper.Vision
         public Calibrazione ConParametriBordo(ParametriCorrezioneBordo nuovi)
         {
             if (!Curva) return this;
+            ParametriCorrezioneBordo parametri = (nuovi ?? new ParametriCorrezioneBordo()).Clona().Normalizzati();
             var copia = new Calibrazione(matrice, Larghezza, Altezza);
-            copia.deformazione = deformazione.ClonaConParametri(nuovi);
+            copia.deformazione = deformazione.ClonaConParametri(parametri);
             copia.riferimentiCamera = (PuntoImmagine[])riferimentiCamera.Clone();
             copia.riferimentiTavolo = (PuntoTavolo[])riferimentiTavolo.Clone();
+            copia.modello = parametri.Modello;
+            if (parametri.Modello == ModelloCorrezioneBordo.Sferico)
+                copia.sferica = DeformazioneSferica.Calcola(copia.riferimentiTavolo, copia.riferimentiCamera,
+                    Larghezza, Altezza, parametri);
+            else
+                copia.sferica = sferica;
             return copia;
         }
+
+        public ModelloCorrezioneBordo ModelloCorrente => modello;
+        public double FocaleSferica => sferica?.Focale ?? 0;
+        public double CentroSfericoX => sferica?.Centro.X ?? 0;
+        public double CentroSfericoY => sferica?.Centro.Y ?? 0;
+        public TipoProiezioneSferica TipoSferico => sferica?.Tipo ?? Calibrazione.ParametriBordo.TipoSferico;
 
         public static Calibrazione CalcolaCurva(PuntoImmagine[] camera, PuntoTavolo[] tavolo,
             int larghezza, int altezza)
@@ -85,12 +100,32 @@ namespace VisualMusicBlockLooper.Vision
             deformazione = candidata;
             riferimentiCamera = (PuntoImmagine[])camera.Clone();
             riferimentiTavolo = (PuntoTavolo[])tavolo.Clone();
+            modello = Calibrazione.ParametriBordo.Modello;
+            sferica = null;
+            try
+            {
+                sferica = DeformazioneSferica.Calcola(riferimentiTavolo, riferimentiCamera, Larghezza, Altezza,
+                    Calibrazione.ParametriBordo);
+            }
+            catch (ArgumentException)
+            {
+                // Se la sfera non è compatibile si resta sul modello di bordo.
+                if (modello == ModelloCorrezioneBordo.Sferico) modello = ModelloCorrezioneBordo.Bordo;
+            }
         }
 
         /// <summary>Mappa inversa della medesima calibrazione, per il ricampionamento del frame.</summary>
         public PuntoImmagine DaTavoloACamera(PuntoTavolo p)
         {
-            if (Curva) p = deformazione.ApplicaMisto(p);
+            if (Curva)
+            {
+                if (modello == ModelloCorrezioneBordo.Sferico && sferica != null)
+                {
+                    PuntoImmagine sfera = sferica.Applica(p);
+                    return sfera;
+                }
+                p = deformazione.ApplicaMisto(p);
+            }
             PuntoTavolo camera = Proietta(inversa, p.X, p.Y);
             return new PuntoImmagine(camera.X, camera.Y);
         }

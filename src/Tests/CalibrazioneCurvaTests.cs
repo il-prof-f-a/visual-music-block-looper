@@ -58,6 +58,19 @@ namespace VisualMusicBlockLooper.Tests
             return new PuntoImmagine(cx, cy);
         }
 
+        internal static PuntoImmagine CameraSferica(PuntoTavolo p)
+        {
+            const double focale = 700, cx = 640, cy = 360;
+            double ix = 900 * p.X + 20 * p.Y + 100;
+            double iy = 15 * p.X + 640 * p.Y + 50;
+            double dx = ix - cx, dy = iy - cy;
+            double r = Math.Sqrt(dx * dx + dy * dy);
+            if (r < 1e-12) return new PuntoImmagine(cx, cy);
+            double theta = Math.Atan2(r, focale);
+            double rd = 2 * focale * Math.Sin(theta / 2);
+            return new PuntoImmagine(cx + dx * rd / r, cy + dy * rd / r);
+        }
+
         private static double Distanza(PuntoTavolo p, PuntoTavolo q) =>
             Math.Sqrt((p.X - q.X) * (p.X - q.X) + (p.Y - q.Y) * (p.Y - q.Y));
 
@@ -153,6 +166,34 @@ namespace VisualMusicBlockLooper.Tests
             var prova = new PuntoTavolo(0.10, 0.10);
             Assert.That(Distanza(originale.DaCameraATavolo(CameraBordo(prova)),
                 nuova.DaCameraATavolo(CameraBordo(prova))), Is.GreaterThan(1e-6));
+        }
+
+        [Test]
+        public void ModelloSferico_RicostruisceLaProiezioneEquisolida()
+        {
+            Calibrazione.ParametriBordo = new ParametriCorrezioneBordo
+            {
+                Modello = ModelloCorrezioneBordo.Sferico,
+                TipoSferico = TipoProiezioneSferica.Equisolido,
+                Focale = 700,
+                CentroX = 640,
+                CentroY = 360
+            };
+            var camera = SchemaCalibrazione.Punti.Select(CameraSferica).ToArray();
+            var curva = Calibrazione.CalcolaCurva(camera, SchemaCalibrazione.Punti.ToArray(), 1280, 720);
+
+            Assert.That(curva.ModelloCorrente, Is.EqualTo(ModelloCorrezioneBordo.Sferico));
+            for (int i = 0; i < camera.Length; i++)
+                Assert.That(Distanza(curva.DaCameraATavolo(camera[i]), SchemaCalibrazione.Punti[i]),
+                    Is.LessThan(1e-6), "Riferimento " + (i + 1));
+
+            foreach (double x in new[] { 0.10, 0.30, 0.50, 0.70, 0.90 })
+                foreach (double y in new[] { 0.10, 0.30, 0.50, 0.70, 0.90 })
+                {
+                    var p = new PuntoTavolo(x, y);
+                    Assert.That(Distanza(curva.DaCameraATavolo(CameraSferica(p)), p),
+                        Is.LessThan(1e-6), "Inversa " + x + "," + y);
+                }
         }
 
         [Test]

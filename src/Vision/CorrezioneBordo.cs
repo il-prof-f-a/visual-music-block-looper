@@ -9,7 +9,23 @@ namespace VisualMusicBlockLooper.Vision
         Bordo,
 
         /// <summary>Distanza smussata (softmin) e fattori di anisotropia per lato.</summary>
-        BordoSmussato
+        BordoSmussato,
+
+        /// <summary>Proiezione sferica globale (lente assimilata a una sfera).</summary>
+        Sferico
+    }
+
+    /// <summary>Proiezione sferica usata dal modello globale.</summary>
+    public enum TipoProiezioneSferica
+    {
+        /// <summary>r = 2f·sin(θ/2): conserva l'angolo solido.</summary>
+        Equisolido,
+
+        /// <summary>r = f·θ: distanza proporzionale all'angolo.</summary>
+        Equidistante,
+
+        /// <summary>r = 2f·tan(θ/2): conserva localmente forme e angoli.</summary>
+        Stereografico
     }
 
     /// <summary>
@@ -35,6 +51,18 @@ namespace VisualMusicBlockLooper.Vision
         /// <summary>Intensità della softmin; 0 usa il minimo netto.</summary>
         public double Smussamento { get; set; } = 0.0;
 
+        /// <summary>Proiezione sferica (usata solo con Modello = Sferico).</summary>
+        public TipoProiezioneSferica TipoSferico { get; set; } = TipoProiezioneSferica.Equisolido;
+
+        /// <summary>Focale in pixel; 0 = stimata dai dodici punti.</summary>
+        public double Focale { get; set; } = 0.0;
+
+        /// <summary>Centro ottico X in pixel; 0 = stimato dai dodici punti.</summary>
+        public double CentroX { get; set; } = 0.0;
+
+        /// <summary>Centro ottico Y in pixel; 0 = stimato dai dodici punti.</summary>
+        public double CentroY { get; set; } = 0.0;
+
         public ParametriCorrezioneBordo Clona() => new ParametriCorrezioneBordo
         {
             Modello = Modello,
@@ -42,7 +70,11 @@ namespace VisualMusicBlockLooper.Vision
             Esterno = Esterno,
             FattoreX = FattoreX,
             FattoreY = FattoreY,
-            Smussamento = Smussamento
+            Smussamento = Smussamento,
+            TipoSferico = TipoSferico,
+            Focale = Focale,
+            CentroX = CentroX,
+            CentroY = CentroY
         };
 
         /// <summary>Riporta i valori fuori intervallo ai default e mantiene Esterno &gt; Pieno.</summary>
@@ -65,6 +97,12 @@ namespace VisualMusicBlockLooper.Vision
                 p.FattoreY = 1.0;
                 p.Smussamento = 0.0;
             }
+            if (double.IsNaN(p.Focale) || double.IsInfinity(p.Focale) || p.Focale < 0 || p.Focale > 20000)
+                p.Focale = 0.0;
+            if (double.IsNaN(p.CentroX) || double.IsInfinity(p.CentroX) || p.CentroX < 0 || p.CentroX > 20000)
+                p.CentroX = 0.0;
+            if (double.IsNaN(p.CentroY) || double.IsInfinity(p.CentroY) || p.CentroY < 0 || p.CentroY > 20000)
+                p.CentroY = 0.0;
             return p;
         }
 
@@ -76,7 +114,9 @@ namespace VisualMusicBlockLooper.Vision
                 && FattoreY >= 0.25 && FattoreY <= 4.0
                 && Smussamento >= 0 && Smussamento <= 200
                 && !double.IsNaN(Pieno) && !double.IsNaN(Esterno)
-                && !double.IsNaN(FattoreX) && !double.IsNaN(FattoreY) && !double.IsNaN(Smussamento);
+                && !double.IsNaN(FattoreX) && !double.IsNaN(FattoreY) && !double.IsNaN(Smussamento)
+                && Focale >= 0 && Focale <= 20000
+                && CentroX >= 0 && CentroX <= 20000 && CentroY >= 0 && CentroY <= 20000;
         }
     }
 }

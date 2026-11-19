@@ -161,6 +161,8 @@ namespace VisualMusicBlockLooper.Vision
 
         public PuntoTavolo DaCameraATavolo(PuntoImmagine p)
         {
+            if (Curva && modello == ModelloCorrezioneBordo.Sferico && sferica != null)
+                return sferica.Inverti(p);
             PuntoTavolo tavolo = Proietta(matrice, p.X, p.Y);
             return Curva ? deformazione.InvertiMisto(tavolo) : tavolo;
         }

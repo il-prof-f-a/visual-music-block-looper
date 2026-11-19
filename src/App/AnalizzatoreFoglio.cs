@@ -485,7 +485,7 @@ namespace VisualMusicBlockLooper.App
             finally
             {
                 Volatile.Write(ref letturaInCorso,0);
-                Volatile.Write(ref mostraLetturaFinoA,orologio()+150);
+                Volatile.Write(ref mostraLetturaFinoA,orologio()+250);
             }
             Interlocked.Increment(ref letture);
             if(vita.InChiusura||Sospesa()||!ReferenceEquals(calibrazione(),c)||immagini.GenerazioneCorrente!=f.Generazione)

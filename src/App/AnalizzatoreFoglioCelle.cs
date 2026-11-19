@@ -102,7 +102,7 @@ namespace VisualMusicBlockLooper.App
             finally
             {
                 Volatile.Write(ref letturaInCorso,0);
-                Volatile.Write(ref mostraLetturaFinoA,orologio()+150);
+                Volatile.Write(ref mostraLetturaFinoA,orologio()+250);
             }
             Volatile.Write(ref ultimeRegioni,piano.Zone);
             Volatile.Write(ref durataCelleMs,tempo.Elapsed.TotalMilliseconds);

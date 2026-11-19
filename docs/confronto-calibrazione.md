@@ -41,8 +41,59 @@ Il programma esegue anche una prova sintetica indipendente, con dodici punti di 
 
 Questo risultato indica candidati promettenti per quel tipo di distorsione, non una misura della webcam reale. Un solo perimetro non identifica univocamente la deformazione interna: piu mappe diverse possono rispettare gli stessi dodici click.
 
-## Validazione sul tavolo ancora necessaria
+## Esito misurato e modello adottato
 
-Prima di cambiare il modello usato dall'app occorre acquisire una vista corretta attuale e un frame grezzo della stessa scena. La misura utile e lo scostamento delle linee temporali interne rispetto alle rette dopo ciascun raddrizzamento, insieme a larghezza delle celle, coerenza delle inverse e assenza di pieghe. Il solo rettangolo esterno non e una verifica sufficiente.
+La prova sul frame reale ha mostrato che le linee orizzontali interne sono gia dritte nella camera, mentre il bordo proiettato e curvo. Il TPS che passa per i dodici click incurva quindi le linee interne per raggiungere il bordo: e l'effetto bolla osservato. L'omografia conserva le rette ma lascia il bordo curvo. La soluzione adottata e un **blend**:
 
-I dati CAL3 originali restano invariati. Nessuna nuova raccolta di punti e necessaria per eseguire il confronto; la cattura serve a scegliere e verificare il modello, non a sostituire i dodici riferimenti.
+- al centro si usa l'omografia;
+- nella fascia di bordo (0,04–0,22 dalla cornice) si usa il TPS, con transizione smoothstep;
+- i dodici riferimenti restano esatti perché si trovano a 0,03 dal bordo, dentro la fascia piena.
+
+Misura sul frame reale, linee centrali (curvatura residua in unita normalizzate del tavolo, equivalente in pixel sull'uscita 655x368):
+
+| Modello | RMS sui 12 punti | Curvatura linee centrali |
+| --- | ---: | ---: |
+| Omografia | 19,6 px | circa 0,0005 (0,2 px) |
+| TPS | 0 px | circa 0,0092 (3,4 px) |
+| Radiale k1+k2 | 5,7 px | circa 0,0095 (3,5 px) |
+| Blend 0,04–0,22 | 0 px | circa 0,0016 (0,6 px) |
+
+Il blend e quindi il modello usato da `CalibrazioneCurva`/`DeformazioneCalibrazione`. La mappa diretta e usata dal remap; l'inversa si ottiene con Newton e, in ripiego, con un punto fisso. Il formato `VMBL-CAL3` resta invariato: i file esistenti applicano la nuova correzione senza rifare i dodici click. Il remap usa la cache gia presente e costruisce la mappa solo nella fascia di bordo; l'inversa aggiunge pochi passi di Newton per i singoli centri dei cartoncini, non per tutti i pixel.
+
+La fascia è configurabile in `configurazione.json`:
+
+```json
+"CorrezioneBordo": {
+  "Modello": "Bordo",
+  "Pieno": 0.04,
+  "Esterno": 0.22,
+  "FattoreX": 1.0,
+  "FattoreY": 1.0,
+  "Smussamento": 0.0
+}
+```
+
+`Pieno` deve restare almeno 0,03 per rispettare i dodici click. Valori utili di `Esterno`: 0,18–0,26. Con 0,12 i cartoncini ai bordi si deformano ancora molto; con 0,22–0,24 diventano quasi rettangolari e le linee centrali restano entro circa 0,6 px. Oltre 0,26 la correzione si distribuisce troppo e le linee centrali iniziano a incurvarsi.
+
+### Modello «BordoSmussato»
+
+Il secondo modello sostituisce il minimo netto con una **softmin** delle quattro distanze dal bordo. I parametri `FattoreX` e `FattoreY` allargano o restringono la fascia in orizzontale e in verticale; `Smussamento` controlla la morbidezza dell'angolo. Un punto di partenza è:
+
+```json
+"CorrezioneBordo": {
+  "Modello": "BordoSmussato",
+  "Pieno": 0.04,
+  "Esterno": 0.24,
+  "FattoreX": 0.9,
+  "FattoreY": 1.1,
+  "Smussamento": 20
+}
+```
+
+Con `Smussamento = 0` il modello usa ancora il minimo netto, ma con i fattori di anisotropia. Il calcolo resta O(1) per pixel; la mappa continua a essere costruita una volta e memorizzata nella cache. Il modello e i parametri si possono cambiare dal vivo dal pulsante **Correzione bordo...** della finestra di controllo; **Salva** li scrive in `configurazione.json` per il prossimo avvio.
+
+Il test sintetico `CalibrazioneCurvaTests.BordoCurvo_LineeInterneDritteE12PuntiRispettati` riproduce il caso reale: bordo curvo, centro omografico, linee orizzontali e verticali interne rette. Il vecchio caso sintetico con distorsione radiale resta utile per studiare una lente reale, ma non rappresenta il tavolo attuale.
+
+## Limiti
+
+I dodici punti descrivono solo il perimetro. Se anche le linee interne sono realmente curve (distorsione radiale della lente, superficie non piana), il blend non basta: servono il modello radiale stimato dai dodici punti oppure una calibrazione guidata dalle linee proiettate. In quel caso la verifica va fatta su un frame grezzo e sulle linee interne, non solo sul rettangolo esterno. I dati CAL3 originali restano invariati; la cattura serve a scegliere e verificare il modello, non a sostituire i dodici riferimenti.

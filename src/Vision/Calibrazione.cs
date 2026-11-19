@@ -26,6 +26,26 @@ namespace VisualMusicBlockLooper.Vision
     /// </summary>
     public sealed partial class Calibrazione
     {
+        /// <summary>
+        /// Parametri usati dalle nuove calibrazioni e dal caricamento CAL3. Vengono copiati
+        /// nella calibrazione, quindi modifiche successive non alterano una mappa già costruita.
+        /// </summary>
+        public static ParametriCorrezioneBordo ParametriBordo { get; set; } = new ParametriCorrezioneBordo();
+
+        /// <summary>Scorciatoia compatibile per la distanza in cui il TPS vale al 100%.</summary>
+        public static double BordoPieno
+        {
+            get => ParametriBordo.Pieno;
+            set => ParametriBordo.Pieno = value;
+        }
+
+        /// <summary>Scorciatoia compatibile per la distanza oltre cui vale la sola omografia.</summary>
+        public static double BordoEsterno
+        {
+            get => ParametriBordo.Esterno;
+            set => ParametriBordo.Esterno = value;
+        }
+
         private const string Intestazione = "VMBL-CAL2";
         private const string IntestazioneVecchia = "VMBL-CAL1";
         private const int NumeroPuntiMinimi = 4;
@@ -142,7 +162,7 @@ namespace VisualMusicBlockLooper.Vision
         public PuntoTavolo DaCameraATavolo(PuntoImmagine p)
         {
             PuntoTavolo tavolo = Proietta(matrice, p.X, p.Y);
-            return Curva ? deformazione.Inverti(tavolo) : tavolo;
+            return Curva ? deformazione.InvertiMisto(tavolo) : tavolo;
         }
 
         /// <summary>

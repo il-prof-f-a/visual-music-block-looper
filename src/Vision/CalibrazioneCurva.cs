@@ -36,6 +36,21 @@ namespace VisualMusicBlockLooper.Vision
         /// <summary>True quando ai dati prospettici si aggiunge la correzione curva dei dodici riferimenti.</summary>
         public bool Curva => deformazione != null;
 
+        /// <summary>
+        /// Copia la calibrazione cambiando solo i parametri della correzione di bordo.
+        /// La nuova istanza ha un riferimento distinto, così analizzatore e anteprima
+        /// ricostruiscono le rispettive mappe senza fermare il trasporto.
+        /// </summary>
+        public Calibrazione ConParametriBordo(ParametriCorrezioneBordo nuovi)
+        {
+            if (!Curva) return this;
+            var copia = new Calibrazione(matrice, Larghezza, Altezza);
+            copia.deformazione = deformazione.ClonaConParametri(nuovi);
+            copia.riferimentiCamera = (PuntoImmagine[])riferimentiCamera.Clone();
+            copia.riferimentiTavolo = (PuntoTavolo[])riferimentiTavolo.Clone();
+            return copia;
+        }
+
         public static Calibrazione CalcolaCurva(PuntoImmagine[] camera, PuntoTavolo[] tavolo,
             int larghezza, int altezza)
         {
@@ -58,7 +73,7 @@ namespace VisualMusicBlockLooper.Vision
             for (int y = 0; y <= 40; y++)
                 for (int x = 0; x <= 40; x++)
                 {
-                    var p = candidata.Applica(new PuntoTavolo(x / 40.0, y / 40.0));
+                    var p = candidata.ApplicaMisto(new PuntoTavolo(x / 40.0, y / 40.0));
                     double w = inversa[6] * p.X + inversa[7] * p.Y + inversa[8];
                     if (!Finito(w) || Math.Abs(w) < SogliaW || (segno != 0 && Math.Sign(w) != segno))
                         throw new ArgumentException("La calibrazione attraversa un punto all'infinito.");
@@ -75,7 +90,7 @@ namespace VisualMusicBlockLooper.Vision
         /// <summary>Mappa inversa della medesima calibrazione, per il ricampionamento del frame.</summary>
         public PuntoImmagine DaTavoloACamera(PuntoTavolo p)
         {
-            if (Curva) p = deformazione.Applica(p);
+            if (Curva) p = deformazione.ApplicaMisto(p);
             PuntoTavolo camera = Proietta(inversa, p.X, p.Y);
             return new PuntoImmagine(camera.X, camera.Y);
         }

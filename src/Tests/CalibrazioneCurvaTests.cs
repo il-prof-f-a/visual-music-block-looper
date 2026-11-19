@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
@@ -13,6 +13,21 @@ namespace VisualMusicBlockLooper.Tests
     [TestFixture]
     public class CalibrazioneCurvaTests
     {
+        private ParametriCorrezioneBordo parametriPrecedenti;
+
+        [SetUp]
+        public void PrimaDiOgniTest()
+        {
+            parametriPrecedenti = Calibrazione.ParametriBordo;
+            Calibrazione.ParametriBordo = new ParametriCorrezioneBordo();
+        }
+
+        [TearDown]
+        public void DopoOgniTest()
+        {
+            Calibrazione.ParametriBordo = parametriPrecedenti;
+        }
+
         // Distorsione radiale indipendente dal modello di interpolazione usato in produzione.
         internal static PuntoImmagine Camera(PuntoTavolo p, bool capovolta = false, double coefficiente = -0.3)
         {
@@ -25,8 +40,37 @@ namespace VisualMusicBlockLooper.Tests
             return capovolta ? new PuntoImmagine(1280 - cx, 720 - cy) : new PuntoImmagine(cx, cy);
         }
 
+        // Caso reale osservato: linee interne giÃ  dritte e bordo proiettato curvo.
+        // L'omografia governa il centro; il TPS corregge solo la fascia perimetrale.
+        internal static PuntoImmagine CameraBordo(PuntoTavolo p)
+        {
+            double x = p.X, y = p.Y;
+            double w = 1 + 0.15 * x + 0.08 * y;
+            double cx = (80 + 950 * x + 120 * y) / w;
+            double cy = (60 + 30 * x + 620 * y) / w;
+            double distanza = Math.Min(Math.Min(x, 1 - x), Math.Min(y, 1 - y));
+            if (distanza < 0.10)
+            {
+                double f = (0.10 - distanza) * (0.10 - distanza) / 0.01;
+                cx += f * 60 * (x - 0.5);
+                cy += f * 40 * (y - 0.5);
+            }
+            return new PuntoImmagine(cx, cy);
+        }
+
         private static double Distanza(PuntoTavolo p, PuntoTavolo q) =>
             Math.Sqrt((p.X - q.X) * (p.X - q.X) + (p.Y - q.Y) * (p.Y - q.Y));
+
+        private static double ScostamentoDaRetta(double[] ascisse, double[] ordinate, out double pendenza)
+        {
+            double mediaX = ascisse.Average(), mediaY = ordinate.Average();
+            double numeratore = ascisse.Zip(ordinate, (x, y) => (x - mediaX) * (y - mediaY)).Sum();
+            double denominatore = ascisse.Sum(x => (x - mediaX) * (x - mediaX));
+            double coefficiente = Math.Abs(denominatore) < 1e-15 ? 0 : numeratore / denominatore;
+            double intercetta = mediaY - coefficiente * mediaX;
+            pendenza = Math.Abs(coefficiente);
+            return ascisse.Zip(ordinate, (x, y) => Math.Abs(y - (coefficiente * x + intercetta))).Max();
+        }
 
         [TestCase(false)]
         [TestCase(true)]
@@ -43,21 +87,120 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
-        public void Curvatura_MiglioraAnchePuntiInterniNonUsatiNelFit()
+        public void FasciaBordoConfigurabileCambiaLaCorrezioneDelBordo()
         {
-            var punti = SchemaCalibrazione.Punti.Select(p => Camera(p)).ToArray();
+            var punti = SchemaCalibrazione.Punti.Select(CameraBordo).ToArray();
+            Calibrazione.BordoEsterno = 0.12;
+            var stretta = SchemaCalibrazione.Calcola(punti, 1280, 720, out _);
+            Calibrazione.BordoEsterno = 0.24;
+            var larga = SchemaCalibrazione.Calcola(punti, 1280, 720, out _);
+
+            var p = new PuntoTavolo(0.10, 0.10);
+            double differenza = Distanza(stretta.DaCameraATavolo(CameraBordo(p)),
+                larga.DaCameraATavolo(CameraBordo(p)));
+            Assert.That(differenza, Is.GreaterThan(1e-6));
+        }
+
+        [Test]
+        public void ModelloSmussato_RispettaIDodiciPuntiEInversa()
+        {
+            Calibrazione.ParametriBordo = new ParametriCorrezioneBordo
+            {
+                Modello = ModelloCorrezioneBordo.BordoSmussato,
+                Pieno = 0.04,
+                Esterno = 0.24,
+                FattoreX = 0.8,
+                FattoreY = 1.2,
+                Smussamento = 20
+            };
+            var punti = SchemaCalibrazione.Punti.Select(CameraBordo).ToArray();
             var curva = SchemaCalibrazione.Calcola(punti, 1280, 720, out _);
-            var omografia = Calibrazione.Calcola(punti, SchemaCalibrazione.Punti.ToArray(), 1280, 720);
-            double vecchio = 0, nuovo = 0;
-            foreach (double x in new[] { 0.15, 0.35, 0.5, 0.65, 0.85 })
-                foreach (double y in new[] { 0.15, 0.35, 0.5, 0.65, 0.85 })
+
+            for (int i = 0; i < punti.Length; i++)
+                Assert.That(Distanza(curva.DaCameraATavolo(punti[i]), SchemaCalibrazione.Punti[i]),
+                    Is.LessThan(1e-7), "Riferimento " + (i + 1));
+
+            foreach (double x in new[] { 0.06, 0.15, 0.35, 0.65, 0.85, 0.94 })
+                foreach (double y in new[] { 0.06, 0.15, 0.35, 0.65, 0.85, 0.94 })
                 {
-                    var atteso = new PuntoTavolo(x, y);
-                    var camera = Camera(atteso);
-                    vecchio += Distanza(omografia.DaCameraATavolo(camera), atteso);
-                    nuovo += Distanza(curva.DaCameraATavolo(camera), atteso);
+                    var p = new PuntoTavolo(x, y);
+                    PuntoImmagine camera = curva.DaTavoloACamera(p);
+                    Assert.That(Distanza(curva.DaCameraATavolo(camera), p), Is.LessThan(1e-6),
+                        "Inversa " + x + "," + y);
                 }
-            Assert.That(nuovo, Is.LessThan(vecchio * 0.65));
+        }
+
+        [Test]
+        public void CopiaConParametriBordo_CambiaLaMappaSenzaPerdereIRiferimenti()
+        {
+            var punti = SchemaCalibrazione.Punti.Select(CameraBordo).ToArray();
+            var originale = SchemaCalibrazione.Calcola(punti, 1280, 720, out _);
+            var nuova = originale.ConParametriBordo(new ParametriCorrezioneBordo
+            {
+                Modello = ModelloCorrezioneBordo.BordoSmussato,
+                Pieno = 0.04,
+                Esterno = 0.24,
+                FattoreX = 0.8,
+                FattoreY = 1.2,
+                Smussamento = 20
+            });
+
+            Assert.That(nuova, Is.Not.SameAs(originale));
+            for (int i = 0; i < punti.Length; i++)
+                Assert.That(Distanza(nuova.DaCameraATavolo(punti[i]), SchemaCalibrazione.Punti[i]),
+                    Is.LessThan(1e-7), "Riferimento " + (i + 1));
+
+            var prova = new PuntoTavolo(0.10, 0.10);
+            Assert.That(Distanza(originale.DaCameraATavolo(CameraBordo(prova)),
+                nuova.DaCameraATavolo(CameraBordo(prova))), Is.GreaterThan(1e-6));
+        }
+
+        [Test]
+        public void BordoCurvo_LineeInterneDritteE12PuntiRispettati()
+        {
+            var punti = SchemaCalibrazione.Punti.Select(CameraBordo).ToArray();
+            var curva = SchemaCalibrazione.Calcola(punti, 1280, 720, out _);
+
+            // Il bordo resta agganciato ai dodici click.
+            for (int i = 0; i < punti.Length; i++)
+                Assert.That(Distanza(curva.DaCameraATavolo(punti[i]), SchemaCalibrazione.Punti[i]),
+                    Is.LessThan(1e-7), "Riferimento " + (i + 1));
+
+            // Al centro la mappa Ã¨ omografica: le linee interne restano rette anche
+            // se l'omografia stimata dai click puÃ² traslarle o ruotarle leggermente.
+            foreach (double y in new[] { 0.25, 0.35, 0.50, 0.65, 0.75 })
+            {
+                var ascisse = new double[21];
+                var ordinate = new double[21];
+                for (int i = 0; i <= 20; i++)
+                {
+                    var atteso = new PuntoTavolo(0.15 + 0.70 * i / 20.0, y);
+                    PuntoTavolo letto = curva.DaCameraATavolo(CameraBordo(atteso));
+                    ascisse[i] = letto.X;
+                    ordinate[i] = letto.Y;
+                }
+                double pendenza;
+                double scostamento = ScostamentoDaRetta(ascisse, ordinate, out pendenza);
+                Assert.That(scostamento, Is.LessThan(1e-4), "Linea orizzontale y=" + y);
+                Assert.That(pendenza, Is.LessThan(0.02), "Pendenza linea orizzontale y=" + y);
+            }
+
+            foreach (double x in new[] { 0.25, 0.35, 0.50, 0.65, 0.75 })
+            {
+                var ascisse = new double[21];
+                var ordinate = new double[21];
+                for (int i = 0; i <= 20; i++)
+                {
+                    var atteso = new PuntoTavolo(x, 0.15 + 0.70 * i / 20.0);
+                    PuntoTavolo letto = curva.DaCameraATavolo(CameraBordo(atteso));
+                    ascisse[i] = letto.Y;
+                    ordinate[i] = letto.X;
+                }
+                double pendenza;
+                double scostamento = ScostamentoDaRetta(ascisse, ordinate, out pendenza);
+                Assert.That(scostamento, Is.LessThan(1e-4), "Linea verticale x=" + x);
+                Assert.That(pendenza, Is.LessThan(0.02), "Pendenza linea verticale x=" + x);
+            }
         }
 
         [Test]
@@ -178,7 +321,9 @@ namespace VisualMusicBlockLooper.Tests
                 using(var a=c.Raddrizza(f,640,360))
                     Assert.That(a.At<byte>(180,320),Is.EqualTo(71),"La cache riguarda la geometria, non il contenuto del frame.");
                 long allocate=AppDomain.CurrentDomain.MonitoringTotalAllocatedMemorySize-prima;
-                Assert.That(allocate,Is.LessThan(100000),"Il formato giÃ  preparato deve evitare nuove matrici gestite per ogni pixel.");
+                // Resta molto sotto una mappa ricostruita (640x360x4x2 = 1,8 MB): copre solo
+                // le piccole allocazioni dei wrapper Mat/Remap, non nuovi array per pixel.
+                Assert.That(allocate,Is.LessThan(250000),"Il formato giÃƒÂ  preparato deve evitare nuove matrici gestite per ogni pixel.");
             }
         }
 
@@ -208,7 +353,7 @@ namespace VisualMusicBlockLooper.Tests
         [Test]
         public void BordiCurvi_IncludonoEstremiFraGliAngoli()
         {
-            // Con il cuscinetto, l'estremo del bordo raddrizzato puÃ² essere a metÃ  del lato.
+            // Con il cuscinetto, l'estremo del bordo raddrizzato puÃƒÂ² essere a metÃƒÂ  del lato.
             var curva = SchemaCalibrazione.Calcola(SchemaCalibrazione.Punti.Select(p => Camera(p, false, 0.3)).ToArray(),
                 1280, 720, out _);
             var r = new Rect(200, 200, 800, 200);
@@ -299,3 +444,4 @@ namespace VisualMusicBlockLooper.Tests
         }
     }
 }
+

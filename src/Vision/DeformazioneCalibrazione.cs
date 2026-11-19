@@ -4,18 +4,28 @@ using OpenCvSharp;
 namespace VisualMusicBlockLooper.Vision
 {
     /// <summary>
-    /// Spline TPS tavolo ideale → tavolo visto attraverso l'omografia. L'inversa è ricavata
-    /// dalla stessa funzione, evitando fit separati e coordinate discordanti nel riconoscimento.
+    /// Correzione della calibrazione: TPS sui dodici riferimenti perimetrali, attenuato verso
+    /// l'omografia al centro per non incurvare le linee che nella camera sono già dritte.
+    /// L'inversa è ricavata dalla stessa mappa, evitando fit separati e coordinate discordanti.
     /// </summary>
     internal sealed class DeformazioneCalibrazione
     {
+        // Il TPS passa esattamente per i dodici click, ma al centro può incurvare linee
+        // che nella camera sono già dritte. Nella fascia di bordo si usa il TPS per
+        // rispettare i riferimenti; al centro si usa l'omografia, che conserva le rette.
+        private readonly ParametriCorrezioneBordo parametri;
         private readonly PuntoTavolo[] riferimenti;
         private readonly double[,] coefficienti;
 
-        public DeformazioneCalibrazione(PuntoTavolo[] riferimenti, PuntoTavolo[] osservati)
+        public DeformazioneCalibrazione(PuntoTavolo[] riferimenti, PuntoTavolo[] osservati,
+            ParametriCorrezioneBordo parametri = null)
         {
             if (riferimenti.Length != 12 || osservati.Length != 12)
                 throw new ArgumentException("Servono dodici riferimenti perimetrali.");
+            this.parametri = (parametri ?? Calibrazione.ParametriBordo ?? new ParametriCorrezioneBordo())
+                .Clona().Normalizzati();
+            if (!this.parametri.Validi())
+                throw new ArgumentException("La fascia di correzione del bordo non è valida.");
             ControllaPerimetro(riferimenti);
             ControllaPerimetro(osservati);
             this.riferimenti = (PuntoTavolo[])riferimenti.Clone();
@@ -63,12 +73,147 @@ namespace VisualMusicBlockLooper.Vision
                     if (!Finito(det) || det < 0.05 || det > 20)
                         throw new ArgumentException("La deformazione contiene pieghe o zone troppo compresse: ricontrolla i riferimenti.");
                 }
+            ValidaMisto();
         }
 
         public PuntoTavolo Applica(PuntoTavolo p)
         {
             Valuta(p.X, p.Y, out double x, out double y, out _, out _, out _, out _);
             return new PuntoTavolo(x, y);
+        }
+
+        /// <summary>
+        /// TPS nella fascia di bordo e omografia al centro. Il peso vale 1 sui dodici
+        /// riferimenti (distanza 0,03 dal bordo) e 0 quando la distanza supera 0,12.
+        /// </summary>
+        public PuntoTavolo ApplicaMisto(PuntoTavolo p)
+        {
+            double w = PesoBordo(p.X, p.Y);
+            if (w <= 0) return new PuntoTavolo(p.X, p.Y);
+            PuntoTavolo tps = Applica(p);
+            if (w >= 1) return tps;
+            return new PuntoTavolo(p.X + w * (tps.X - p.X), p.Y + w * (tps.Y - p.Y));
+        }
+
+        /// <summary>Inversa della mappa mista; al centro coincide con l'omografia.</summary>
+        public PuntoTavolo InvertiMisto(PuntoTavolo p)
+        {
+            double x = p.X, y = p.Y;
+            for (int iterazione = 0; iterazione < 30; iterazione++)
+            {
+                PuntoTavolo f = ApplicaMisto(new PuntoTavolo(x, y));
+                double ex = f.X - p.X, ey = f.Y - p.Y, errore = ex * ex + ey * ey;
+                if (errore < 1e-20) return new PuntoTavolo(x, y);
+
+                const double passoDerivata = 1e-5;
+                PuntoTavolo fx = ApplicaMisto(new PuntoTavolo(x + passoDerivata, y));
+                PuntoTavolo fy = ApplicaMisto(new PuntoTavolo(x, y + passoDerivata));
+                double a = (fx.X - f.X) / passoDerivata, b = (fy.X - f.X) / passoDerivata;
+                double c = (fx.Y - f.Y) / passoDerivata, d = (fy.Y - f.Y) / passoDerivata;
+                double det = a * d - b * c;
+                if (!Finito(det) || Math.Abs(det) < 1e-10) break;
+                double dx = (d * ex - b * ey) / det, dy = (a * ey - c * ex) / det;
+                bool migliora = false;
+                for (double passo = 1; passo >= 1.0 / 128; passo /= 2)
+                {
+                    double nx = x - passo * dx, ny = y - passo * dy;
+                    PuntoTavolo nf = ApplicaMisto(new PuntoTavolo(nx, ny));
+                    double nuovo = (nf.X - p.X) * (nf.X - p.X) + (nf.Y - p.Y) * (nf.Y - p.Y);
+                    if (nuovo < errore) { x = nx; y = ny; migliora = true; break; }
+                }
+                if (!migliora) break;
+            }
+
+            // Ripiego a punto fisso: observed = p + w(p) * (TPS(p) - p).
+            double px = p.X, py = p.Y;
+            for (int iterazione = 0; iterazione < 80; iterazione++)
+            {
+                double peso = PesoBordo(px, py);
+                PuntoTavolo tps = Applica(new PuntoTavolo(px, py));
+                double nx = p.X - peso * (tps.X - px), ny = p.Y - peso * (tps.Y - py);
+                if ((nx - px) * (nx - px) + (ny - py) * (ny - py) < 1e-24)
+                    return new PuntoTavolo(nx, ny);
+                px = nx; py = ny;
+            }
+            throw new InvalidOperationException("Impossibile invertire la calibrazione curva in questo punto.");
+        }
+
+        private double PesoBordo(double x, double y)
+        {
+            double dx = x * parametri.FattoreX;
+            double dx2 = (1 - x) * parametri.FattoreX;
+            double dy = y * parametri.FattoreY;
+            double dy2 = (1 - y) * parametri.FattoreY;
+            double distanza;
+            if (parametri.Modello == ModelloCorrezioneBordo.BordoSmussato && parametri.Smussamento > 0)
+            {
+                double minimo = Math.Min(Math.Min(dx, dx2), Math.Min(dy, dy2));
+                double k = parametri.Smussamento;
+                double somma = Math.Exp(-k * (dx - minimo)) + Math.Exp(-k * (dx2 - minimo))
+                    + Math.Exp(-k * (dy - minimo)) + Math.Exp(-k * (dy2 - minimo));
+                distanza = minimo - Math.Log(somma) / k;
+            }
+            else
+            {
+                distanza = Math.Min(Math.Min(dx, dx2), Math.Min(dy, dy2));
+            }
+
+            if (distanza <= parametri.Pieno) return 1;
+            if (distanza >= parametri.Esterno) return 0;
+            double t = (distanza - parametri.Pieno) / (parametri.Esterno - parametri.Pieno);
+            return 1 - t * t * (3 - 2 * t);
+        }
+
+        private DeformazioneCalibrazione(DeformazioneCalibrazione origine, ParametriCorrezioneBordo nuovi)
+        {
+            parametri = (nuovi ?? origine.parametri).Clona().Normalizzati();
+            if (!parametri.Validi())
+                throw new ArgumentException("La fascia di correzione del bordo non è valida.");
+            riferimenti = (PuntoTavolo[])origine.riferimenti.Clone();
+            coefficienti = (double[,])origine.coefficienti.Clone();
+            ValidaMisto();
+        }
+
+        /// <summary>Copia la spline e cambia solo i parametri della fascia di bordo.</summary>
+        public DeformazioneCalibrazione ClonaConParametri(ParametriCorrezioneBordo nuovi)
+            => new DeformazioneCalibrazione(this, nuovi);
+
+        /// <summary>Controlla che la mappa mista non contenga pieghe e che l'inversa converga.</summary>
+        private void ValidaMisto()
+        {
+            const double h = 1e-4;
+            for (int y = 1; y < 40; y++)
+                for (int x = 1; x < 40; x++)
+                {
+                    double px = x / 40.0, py = y / 40.0;
+                    double w = PesoBordo(px, py);
+                    Valuta(px, py, out double tx, out double ty, out double a, out double b, out double c, out double d);
+                    double gx = (PesoBordo(px + h, py) - PesoBordo(px - h, py)) / (2 * h);
+                    double gy = (PesoBordo(px, py + h) - PesoBordo(px, py - h)) / (2 * h);
+                    double j00 = 1 + w * (a - 1) + (tx - px) * gx;
+                    double j01 = w * b + (tx - px) * gy;
+                    double j10 = w * c + (ty - py) * gx;
+                    double j11 = 1 + w * (d - 1) + (ty - py) * gy;
+                    double det = j00 * j11 - j01 * j10;
+                    if (!Finito(det) || det < 0.05 || det > 20)
+                        throw new ArgumentException("La correzione di bordo contiene pieghe o zone troppo compresse: ricontrolla i riferimenti.");
+                }
+
+            // Verifica pratica dell'inversa, compresi i punti nella fascia di transizione.
+            double[] campioni = { 0.03, 0.06, 0.09, 0.20, 0.50, 0.80, 0.97 };
+            foreach (double cx in campioni)
+                foreach (double cy in campioni)
+                {
+                    var p = new PuntoTavolo(cx, cy);
+                    PuntoTavolo camera = ApplicaMisto(p);
+                    PuntoTavolo riletto;
+                    try { riletto = InvertiMisto(camera); }
+                    catch (InvalidOperationException)
+                    { throw new ArgumentException("La correzione di bordo non è invertibile in modo stabile."); }
+                    double ex = riletto.X - p.X, ey = riletto.Y - p.Y;
+                    if (ex * ex + ey * ey > 1e-16)
+                        throw new ArgumentException("La correzione di bordo non è invertibile in modo stabile.");
+                }
         }
 
         public PuntoTavolo Inverti(PuntoTavolo p)

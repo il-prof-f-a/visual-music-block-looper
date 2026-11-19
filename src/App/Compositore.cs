@@ -45,7 +45,8 @@ namespace VisualMusicBlockLooper.App
             ParametriRilevatoreVariazioni parametriVariazioni = null,
             bool scansioneABlocchiAnticipata = false,
             int misureAnticipoScansione = 1,
-            double bpmIniziale = 120)
+            double bpmIniziale = 120,
+            ModoSincronia modoIniziale = ModoSincronia.Master)
         {
             this.rilevatore = rilevatore ?? throw new ArgumentNullException(nameof(rilevatore));
             if (uscita == null)
@@ -71,7 +72,7 @@ namespace VisualMusicBlockLooper.App
             interprete = new InterpreteTavolo(new Griglia(config), Layout);
             if(esecuzioneDeterministica)
             {
-                Esecutore=new EsecutoreMidi(uscita,ingresso,mappatura,config,orologioMs,bpmIniziale);Motore=Esecutore;
+                Esecutore=new EsecutoreMidi(uscita,ingresso,mappatura,config,orologioMs,bpmIniziale,modoIniziale);Motore=Esecutore;
                 Preparatore=new PreparatoreFoglio(Esecutore);
                 if(fonteVideo!=null)
                 {

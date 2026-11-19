@@ -128,7 +128,7 @@ Nota: lo stesso nome di porta è usato in uscita e in ingresso, quindi ciò che 
 
 ### Slave (Ableton guida il clock)
 
-1. Premere una volta **Master / Slave**: è un pulsante unico che alterna i due modi. Verificare che la riga di stato mostri **Slave** (il cambio di modo ferma la riproduzione).
+1. All'avvio l'app è già in **Slave**: la riga di stato lo mostra senza premere altro. Il pulsante **Master / Slave** alterna i due modi (il cambio ferma la riproduzione).
 2. In Ableton, preferenze MIDI: abilitare l'**uscita** verso **VMBL** con sincronizzazione (Sync On). Ableton invia clock e Start/Stop alla porta.
 3. Avviare la riproduzione in Ableton: l'app riceve Start e segue i tick (6 tick = 1 step).
 4. Fermare la riproduzione in Ableton: l'app riceve Stop e spegne le note.

@@ -29,11 +29,12 @@ namespace VisualMusicBlockLooper.App
         private double intervalloEsternoMs = 60000.0 / (120 * 24);
         private int proprietario, stopUrgente, stopEsternoUrgente, eliminato;
         private string ultimoErrore;
-        public EsecutoreMidi(IUscitaMidi uscita, IIngressoMidi ingresso, IMappaturaMidi mappatura, ConfigGriglia config, Func<long> orologioMs, double bpmIniziale = 120)
+        public EsecutoreMidi(IUscitaMidi uscita, IIngressoMidi ingresso, IMappaturaMidi mappatura, ConfigGriglia config, Func<long> orologioMs, double bpmIniziale = 120,
+            ModoSincronia modoIniziale = ModoSincronia.Master)
         {
             this.uscita = uscita ?? throw new ArgumentNullException(nameof(uscita));
             this.ingresso = ingresso; this.orologioMs = orologioMs ?? throw new ArgumentNullException(nameof(orologioMs));
-            Stato = new MotorePartitura(uscita, mappatura, bpmIniziale, orologioMs);
+            Stato = new MotorePartitura(uscita, mappatura, bpmIniziale, orologioMs, modoIniziale);
             intervalloEsternoMs = Tempo.IntervalloTickMs(Stato.Bpm);
             compilatore = new CompilatorePartitura(config, mappatura);
             clockRicevuto = () =>

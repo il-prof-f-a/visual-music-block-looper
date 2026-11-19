@@ -114,13 +114,16 @@ namespace VisualMusicBlockLooper.Core
         private int revisioneTrasporto;
         private long esecuzione;
 
-        public MotorePartitura(IUscitaMidi uscita, IMappaturaMidi mappatura, double bpm = 120, Func<long> orologioMs = null)
+        public MotorePartitura(IUscitaMidi uscita, IMappaturaMidi mappatura, double bpm = 120, Func<long> orologioMs = null,
+            ModoSincronia modoIniziale = ModoSincronia.Master)
         {
             if (uscita == null) throw new ArgumentNullException(nameof(uscita));
             if (mappatura == null) throw new ArgumentNullException(nameof(mappatura));
             this.bpm = Tempo.Limita(bpm);
             if (orologioMs == null) { var t = Stopwatch.StartNew(); orologioMs = () => t.ElapsedMilliseconds; }
             this.orologioMs = orologioMs;
+            modo = modoIniziale;
+            ultimoClock = orologioMs();
             if (uscita is IUscitaMidiPreparabile p)
             { clock = p.PreparaClock(); start = p.PreparaStart(); stop = p.PreparaStop(); }
             else { clock = uscita.Clock; start = uscita.Start; stop = uscita.Stop; }

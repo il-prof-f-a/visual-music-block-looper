@@ -67,7 +67,8 @@ namespace VisualMusicBlockLooper.App
                 parametriVariazioni:configurazione.AnalisiVariazioni,
                 scansioneABlocchiAnticipata:configurazione.ScansioneABlocchiAnticipata,
                 misureAnticipoScansione:configurazione.MisureAnticipoScansione,
-                bpmIniziale:configurazione.BpmIniziale);
+                bpmIniziale:configurazione.BpmIniziale,
+                modoIniziale:ModoSincronia.Slave);
             if (compositore.Analizzatore != null)
             {
                 compositore.Analizzatore.LetturaCompletaPeriodica = string.Equals(

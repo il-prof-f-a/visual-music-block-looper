@@ -16,6 +16,19 @@ namespace VisualMusicBlockLooper.Tests
             public void Stop() => StopRicevuto?.Invoke(); public void Continue() => ContinueRicevuto?.Invoke();
         }
         [Test]
+        public void CostruttoreAvviaInSlaveSeRichiesto()
+        {
+            var u = new EsecutorePartituraTests.Uscita();
+            using (var e = new EsecutoreMidi(u, null, new EsecutorePartituraTests.Mappa(),
+                new ConfigGriglia(), () => 0, 120, ModoSincronia.Slave))
+            {
+                Assert.That(e.Modo, Is.EqualTo(ModoSincronia.Slave));
+                e.TickInterno();
+                Assert.That(u.Eventi, Is.Empty, "In Slave il clock interno non deve partire");
+            }
+        }
+
+        [Test]
         public void ClockEsternoArretratoNonVieneRecuperatoConAttacchiARaffica()
         {
             long ora = 0; var u = new EsecutorePartituraTests.Uscita(); var i = new Ingresso();

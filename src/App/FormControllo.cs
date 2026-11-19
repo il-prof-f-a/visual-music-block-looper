@@ -56,6 +56,8 @@ namespace VisualMusicBlockLooper.App
         private bool immagineRaddrizzata;
         private PictureBox anteprima;
         private Button pulsanteCalibra;
+        private Button pulsanteCorrezioneBordo;
+        private FormCorrezioneBordo formCorrezione;
         private Button pulsanteAvviaFerma;
         private Button pulsanteModo;
         private Button pulsanteTap;
@@ -269,6 +271,7 @@ namespace VisualMusicBlockLooper.App
             }
 
             chiusuraEseguita = true;
+            if (formCorrezione != null && !formCorrezione.IsDisposed) formCorrezione.Close();
             timerInterfaccia.Stop();
             timerProiezione.Stop();
             timerRisoluzione.Stop();
@@ -323,10 +326,11 @@ namespace VisualMusicBlockLooper.App
             //  - fascia alta x 10..750: stato (y 10), porte (y 38);
             //  - anteprima x 10..530, y 64..454; sotto di lei, larghe come lei (520) e a capo, la descrizione
             //    dell'anteprima (y 458..510) e gli avvisi (y 514..664), così non toccano la colonna destra;
-            //  - colonna destra x 545..745 (larghezza 200): pulsanti fino a «Salva frame» (y 394..422), poi
-            //    Risoluzione (etichetta y 428, regolo y 446..476), Messa a fuoco (etichetta y 484,
-            //    «Auto» + regolo y 504..534), Esposizione (etichetta y 542, «Auto» + regolo y 562..592)
-            //    e l'etichetta dei fps (y 598..662, va a capo). Diagnostica nella fascia y 674..708.
+            //  - colonna destra x 545..745 (larghezza 200): Calibra (64), Avvia (108), Master/Slave (152),
+            //    Tap (196), Correzione bordo (236..262); poi Monitor (276/298), Webcam (334/356),
+            //    Aggiorna elenco (386), Salva frame (420); Risoluzione (etichetta 454, regolo 472..502),
+            //    Messa a fuoco (etichetta 510, «Auto» 533, regolo 530..560), Esposizione (etichetta 568,
+            //    «Auto» 591, regolo 588..618) e fps (624..688). Diagnostica nella fascia y 674..708.
             ClientSize = new Size(760, 716);
             StartPosition = FormStartPosition.CenterScreen;
 
@@ -348,9 +352,15 @@ namespace VisualMusicBlockLooper.App
             pulsanteAvviaFerma = CreaPulsante("Avvia", 545, 108, (m, a) => AvviaFerma());
             pulsanteModo = CreaPulsante("Master / Slave", 545, 152, (m, a) => compositore.Motore.CambiaModo());
             pulsanteTap = CreaPulsante("Tap", 545, 196, (m, a) => compositore.Motore.Tap(orologioMs()));
+            pulsanteCorrezioneBordo = new Button
+            {
+                Text = "Correzione bordo...", Left = 545, Top = 236, Width = 200, Height = 26,
+                Name = "pulsanteCorrezioneBordo", AccessibleName = "Correzione bordo"
+            };
+            pulsanteCorrezioneBordo.Click += (m, a) => ApriCorrezioneBordo();
 
-            Label etichettaMonitor = new Label { Left = 545, Top = 250, Width = 200, Height = 18, Text = "Monitor proiettore" };
-            comboMonitor = new ComboBox { Left = 545, Top = 272, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            Label etichettaMonitor = new Label { Left = 545, Top = 276, Width = 200, Height = 18, Text = "Monitor proiettore" };
+            comboMonitor = new ComboBox { Left = 545, Top = 298, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
             schermi = Screen.AllScreens;
             for (int i = 0; i < schermi.Length; i++)
             {
@@ -361,12 +371,12 @@ namespace VisualMusicBlockLooper.App
 
             comboMonitor.SelectedIndexChanged += OnMonitorSelezionato;
 
-            Label etichettaWebcam = new Label { Left = 545, Top = 308, Width = 200, Height = 18, Text = "Webcam" };
-            comboWebcam = new ComboBox { Left = 545, Top = 330, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            Label etichettaWebcam = new Label { Left = 545, Top = 334, Width = 200, Height = 18, Text = "Webcam" };
+            comboWebcam = new ComboBox { Left = 545, Top = 356, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
             comboWebcam.SelectedIndexChanged += OnWebcamSelezionata;
-            pulsanteAggiornaWebcam = new Button { Text = "Aggiorna elenco", Left = 545, Top = 360, Width = 200, Height = 28 };
+            pulsanteAggiornaWebcam = new Button { Text = "Aggiorna elenco", Left = 545, Top = 386, Width = 200, Height = 28 };
             pulsanteAggiornaWebcam.Click += (m, a) => AggiornaElencoWebcam();
-            pulsanteSalvaFrame = new Button { Text = "Salva frame", Left = 545, Top = 394, Width = 200, Height = 28 };
+            pulsanteSalvaFrame = new Button { Text = "Salva frame", Left = 545, Top = 420, Width = 200, Height = 28 };
             pulsanteSalvaFrame.Click += (m, a) => SalvaFrame();
 
             etichettaAnteprima = new Label
@@ -380,26 +390,26 @@ namespace VisualMusicBlockLooper.App
                 Left = 10, Top = 514, Width = 520, Height = 150, ForeColor = Color.DarkRed
             };
 
-            etichettaRisoluzione = new Label { Left = 545, Top = 428, Width = 200, Height = 18 };
-            regoloRisoluzione = CreaRegolo(545, 446, 200, 0, PresetRisoluzione.Elenco.Count - 1, 1, 1);
+            etichettaRisoluzione = new Label { Left = 545, Top = 454, Width = 200, Height = 18 };
+            regoloRisoluzione = CreaRegolo(545, 472, 200, 0, PresetRisoluzione.Elenco.Count - 1, 1, 1);
             regoloRisoluzione.Scroll += OnScrollRisoluzione;
 
-            etichettaFuoco = new Label { Left = 545, Top = 484, Width = 200, Height = 18 };
-            casellaFuocoAuto = new CheckBox { Text = "Auto", Left = 545, Top = 507, Width = 58, Height = 22 };
-            regoloFuoco = CreaRegolo(605, 504, 140, 0, PresentatoreRegoliWebcam.RegoloFuocoMax, 1, 5);
+            etichettaFuoco = new Label { Left = 545, Top = 510, Width = 200, Height = 18 };
+            casellaFuocoAuto = new CheckBox { Text = "Auto", Left = 545, Top = 533, Width = 58, Height = 22 };
+            regoloFuoco = CreaRegolo(605, 530, 140, 0, PresentatoreRegoliWebcam.RegoloFuocoMax, 1, 5);
             casellaFuocoAuto.CheckedChanged += OnCambioFuoco;
             regoloFuoco.Scroll += OnCambioFuoco;
             regoloFuoco.MouseUp += (m, a) => RilasciaRegolo();
 
-            etichettaEsposizione = new Label { Left = 545, Top = 542, Width = 200, Height = 18 };
-            casellaEsposizioneAuto = new CheckBox { Text = "Auto", Left = 545, Top = 565, Width = 58, Height = 22 };
+            etichettaEsposizione = new Label { Left = 545, Top = 568, Width = 200, Height = 18 };
+            casellaEsposizioneAuto = new CheckBox { Text = "Auto", Left = 545, Top = 591, Width = 58, Height = 22 };
             regoloEsposizione = CreaRegolo(
-                605, 562, 140, PresentatoreRegoliWebcam.RegoloEsposizioneMin, PresentatoreRegoliWebcam.RegoloEsposizioneMax, 1, 2);
+                605, 588, 140, PresentatoreRegoliWebcam.RegoloEsposizioneMin, PresentatoreRegoliWebcam.RegoloEsposizioneMax, 1, 2);
             casellaEsposizioneAuto.CheckedChanged += OnCambioEsposizione;
             regoloEsposizione.Scroll += OnCambioEsposizione;
             regoloEsposizione.MouseUp += (m, a) => RilasciaRegolo();
 
-            etichettaFps = new Label { Left = 545, Top = 598, Width = 200, Height = 64 };
+            etichettaFps = new Label { Left = 545, Top = 620, Width = 200, Height = 48 };
 
             casellaDebugCartoncini = new CheckBox
             {
@@ -431,7 +441,7 @@ namespace VisualMusicBlockLooper.App
             Controls.AddRange(new Control[]
             {
                 etichettaStato, etichettaPorte, anteprima, pulsanteCalibra, pulsanteAvviaFerma,
-                pulsanteModo, pulsanteTap, etichettaMonitor, comboMonitor,
+                pulsanteModo, pulsanteTap, pulsanteCorrezioneBordo, etichettaMonitor, comboMonitor,
                 etichettaWebcam, comboWebcam, pulsanteAggiornaWebcam, pulsanteSalvaFrame, etichettaAnteprima, etichettaAvviso,
                 etichettaRisoluzione, regoloRisoluzione, etichettaFuoco, casellaFuocoAuto, regoloFuoco,
                 etichettaEsposizione, casellaEsposizioneAuto, regoloEsposizione, etichettaFps,
@@ -677,6 +687,58 @@ namespace VisualMusicBlockLooper.App
             }
 
             return AnteprimaTavolo.AspettoPredefinito;
+        }
+
+        private void ApriCorrezioneBordo()
+        {
+            if (inCalibrazione) return;
+            if (formCorrezione != null && !formCorrezione.IsDisposed)
+            {
+                formCorrezione.Activate();
+                return;
+            }
+            var iniziali = configurazione.CorrezioneBordo.Converti();
+            formCorrezione = new FormCorrezioneBordo(iniziali, ApplicaCorrezioneBordo, SalvaCorrezioneBordo);
+            formCorrezione.FormClosed += (m, a) => formCorrezione = null;
+            formCorrezione.Show(this);
+        }
+
+        /// <summary>Applica subito i parametri alla calibrazione attiva, senza fermare il trasporto.</summary>
+        private void ApplicaCorrezioneBordo(ParametriCorrezioneBordo parametri)
+        {
+            ParametriCorrezioneBordo normalizzati = (parametri ?? new ParametriCorrezioneBordo()).Clona().Normalizzati();
+            Calibrazione.ParametriBordo = normalizzati;
+            Calibrazione attuale = rilevatore.CalibrazioneAttiva;
+            if (attuale == null || !attuale.Curva) return;
+            try
+            {
+                Calibrazione aggiornata = attuale.ConParametriBordo(normalizzati);
+                rilevatore.Imposta(new RilevatoreCartoncini(webcam, aggiornata, compositore.ConfigurazioneGriglia));
+                calibrazionePresente = true;
+                avvisi.RemoveAll(a => a.StartsWith("Correzione bordo: parametri"));
+            }
+            catch (ArgumentException eccezione)
+            {
+                avvisi.RemoveAll(a => a.StartsWith("Correzione bordo: parametri"));
+                avvisi.Add("Correzione bordo: parametri non applicabili (" + eccezione.Message + ").");
+            }
+        }
+
+        /// <summary>Scrive i parametri in configurazione.json; le modifiche restano attive anche se il salvataggio fallisce.</summary>
+        private void SalvaCorrezioneBordo(ParametriCorrezioneBordo parametri)
+        {
+            configurazione.CorrezioneBordo.Imposta(parametri);
+            try
+            {
+                configurazione.Salva(percorsoConfigurazione);
+                avvisi.RemoveAll(a => a.StartsWith("Correzione bordo: "));
+            }
+            catch (Exception eccezione)
+            {
+                avvisi.RemoveAll(a => a.StartsWith("Correzione bordo: "));
+                avvisi.Add("Correzione bordo: non salvata (" + eccezione.Message + ").");
+            }
+            AggiornaInterfaccia();
         }
 
         private void AvviaCalibrazione()
@@ -1032,6 +1094,7 @@ namespace VisualMusicBlockLooper.App
             }
 
             regoloRisoluzione.Enabled = conWebcam && !inCalibrazione;
+            pulsanteCorrezioneBordo.Enabled = calibrazionePresente && !inCalibrazione;
             AggiornaTestiRegoli();
         }
 
@@ -1225,3 +1288,4 @@ namespace VisualMusicBlockLooper.App
         }
     }
 }
+

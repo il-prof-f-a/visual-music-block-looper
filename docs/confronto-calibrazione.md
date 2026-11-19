@@ -84,13 +84,13 @@ Il secondo modello sostituisce il minimo netto con una **softmin** delle quattro
   "Modello": "BordoSmussato",
   "Pieno": 0.04,
   "Esterno": 0.24,
-  "FattoreX": 0.9,
-  "FattoreY": 1.1,
+  "FattoreX": 1.0,
+  "FattoreY": 0.8,
   "Smussamento": 20
 }
 ```
 
-Con `Smussamento = 0` il modello usa ancora il minimo netto, ma con i fattori di anisotropia. Il calcolo resta O(1) per pixel; la mappa continua a essere costruita una volta e memorizzata nella cache. Il modello e i parametri si possono cambiare dal vivo dal pulsante **Correzione bordo...** della finestra di controllo; **Salva** li scrive in `configurazione.json` per il prossimo avvio.
+Un fattore **minore di 1** allarga la fascia in quella direzione: `FattoreY = 0,8` corregge di più sopra e sotto, `FattoreX = 0,9` di più a sinistra e a destra. Con `Smussamento = 0` il modello usa ancora il minimo netto, ma con i fattori di anisotropia. Il calcolo resta O(1) per pixel; la mappa continua a essere costruita una volta e memorizzata nella cache. Il modello e i parametri si possono cambiare dal vivo dal pulsante **Correzione bordo...** della finestra di controllo; **Salva** li scrive in `configurazione.json` per il prossimo avvio.
 
 Il test sintetico `CalibrazioneCurvaTests.BordoCurvo_LineeInterneDritteE12PuntiRispettati` riproduce il caso reale: bordo curvo, centro omografico, linee orizzontali e verticali interne rette. Il vecchio caso sintetico con distorsione radiale resta utile per studiare una lente reale, ma non rappresenta il tavolo attuale.
 

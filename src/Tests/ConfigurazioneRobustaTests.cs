@@ -40,6 +40,77 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void CorrezioneBordoHaIDefaultAttesi()
+        {
+            var configurazione = new ConfigurazioneApplicazione();
+
+            Assert.That(configurazione.CorrezioneBordo.Pieno, Is.EqualTo(0.04).Within(1e-9));
+            Assert.That(configurazione.CorrezioneBordo.Esterno, Is.EqualTo(0.22).Within(1e-9));
+        }
+
+        [Test]
+        public void CorrezioneBordoNonValidaRipristinaIDefault()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"CorrezioneBordo\":{\"Pieno\":0.20,\"Esterno\":0.22}}");
+                var configurazione = ConfigurazioneApplicazione.Carica(percorso);
+
+                Assert.That(configurazione.CorrezioneBordo.Pieno, Is.EqualTo(0.04).Within(1e-9));
+                Assert.That(configurazione.CorrezioneBordo.Esterno, Is.EqualTo(0.22).Within(1e-9));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
+        public void CorrezioneBordoValidaVieneConservata()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"CorrezioneBordo\":{\"Pieno\":0.05,\"Esterno\":0.26}}");
+                var configurazione = ConfigurazioneApplicazione.Carica(percorso);
+
+                Assert.That(configurazione.CorrezioneBordo.Pieno, Is.EqualTo(0.05).Within(1e-9));
+                Assert.That(configurazione.CorrezioneBordo.Esterno, Is.EqualTo(0.26).Within(1e-9));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
+        public void ModelloSmussatoVieneConservato()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"CorrezioneBordo\":{\"Modello\":\"BordoSmussato\",\"Pieno\":0.05,\"Esterno\":0.26,"
+                    + "\"FattoreX\":0.8,\"FattoreY\":1.2,\"Smussamento\":20}}");
+                var parametri = ConfigurazioneApplicazione.Carica(percorso).CorrezioneBordo.Converti();
+
+                Assert.That(parametri.Modello, Is.EqualTo(VisualMusicBlockLooper.Vision.ModelloCorrezioneBordo.BordoSmussato));
+                Assert.That(parametri.Pieno, Is.EqualTo(0.05).Within(1e-9));
+                Assert.That(parametri.Esterno, Is.EqualTo(0.26).Within(1e-9));
+                Assert.That(parametri.FattoreX, Is.EqualTo(0.8).Within(1e-9));
+                Assert.That(parametri.FattoreY, Is.EqualTo(1.2).Within(1e-9));
+                Assert.That(parametri.Smussamento, Is.EqualTo(20).Within(1e-9));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
         public void BpmNonFinitoRipristinaIlDefaultApplicativo()
         {
             string percorso = Path.GetTempFileName();

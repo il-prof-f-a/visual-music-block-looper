@@ -37,6 +37,7 @@ namespace VisualMusicBlockLooper.App
             string percorsoConfigurazione = Path.Combine(cartella, ConfigurazioneApplicazione.NomeFile);
             ConfigurazioneApplicazione configurazione = CaricaConfigurazione(percorsoConfigurazione, avvisi);
             config.TolleranzaQrCelle = configurazione.TolleranzaQrCelle;
+            Calibrazione.ParametriBordo = configurazione.CorrezioneBordo.Converti();
             Cv2.SetNumThreads(configurazione.NumeroThreadOpenCv);
 
             // L'elenco si rileva prima di aprire la webcam configurata: una webcam aperta risulterebbe occupata.

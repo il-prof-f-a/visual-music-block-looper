@@ -76,6 +76,56 @@ namespace VisualMusicBlockLooper.App
         }
     }
 
+    /// <summary>DTO JSON della correzione di bordo; la logica vive in <see cref="ParametriCorrezioneBordo"/>.</summary>
+    public class ConfigurazioneBordo
+    {
+        /// <summary>«Bordo» (smoothstep) oppure «BordoSmussato» (softmin + anisotropia).</summary>
+        public string Modello { get; set; } = "Bordo";
+
+        /// <summary>Distanza dal bordo entro cui vale il TPS al 100% (default 0,04).</summary>
+        public double Pieno { get; set; } = 0.04;
+
+        /// <summary>Distanza dal bordo oltre cui vale la sola omografia (default 0,22).</summary>
+        public double Esterno { get; set; } = 0.22;
+
+        /// <summary>Fattore di anisotropia orizzontale per la modalità smussata (default 1).</summary>
+        public double FattoreX { get; set; } = 1.0;
+
+        /// <summary>Fattore di anisotropia verticale per la modalità smussata (default 1).</summary>
+        public double FattoreY { get; set; } = 1.0;
+
+        /// <summary>Intensità della softmin; 0 usa il minimo netto (default 0).</summary>
+        public double Smussamento { get; set; } = 0.0;
+
+        public ParametriCorrezioneBordo Converti()
+        {
+            var parametri = new ParametriCorrezioneBordo
+            {
+                Modello = string.Equals(Modello, nameof(ModelloCorrezioneBordo.BordoSmussato),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? ModelloCorrezioneBordo.BordoSmussato
+                    : ModelloCorrezioneBordo.Bordo,
+                Pieno = Pieno,
+                Esterno = Esterno,
+                FattoreX = FattoreX,
+                FattoreY = FattoreY,
+                Smussamento = Smussamento
+            };
+            return parametri.Normalizzati();
+        }
+
+        public void Imposta(ParametriCorrezioneBordo parametri)
+        {
+            ParametriCorrezioneBordo p = (parametri ?? new ParametriCorrezioneBordo()).Clona().Normalizzati();
+            Modello = p.Modello.ToString();
+            Pieno = p.Pieno;
+            Esterno = p.Esterno;
+            FattoreX = p.FattoreX;
+            FattoreY = p.FattoreY;
+            Smussamento = p.Smussamento;
+        }
+    }
+
     /// <summary>
     /// Configurazione dell'applicazione (file JSON accanto all'eseguibile). Oggi contiene la webcam; viene
     /// riscritta dopo ogni calibrazione riuscita e riletta all'avvio insieme alla calibrazione.
@@ -87,6 +137,9 @@ namespace VisualMusicBlockLooper.App
 
         /// <summary>Webcam da usare.</summary>
         public ConfigurazioneWebcam Webcam { get; set; } = new ConfigurazioneWebcam();
+
+        /// <summary>Fascia di transizione della correzione di bordo (CAL3).</summary>
+        public ConfigurazioneBordo CorrezioneBordo { get; set; } = new ConfigurazioneBordo();
 
         /// <summary>0: una osservazione per misura; altrimenti intervallo in pulsazioni.</summary>
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
@@ -150,6 +203,12 @@ namespace VisualMusicBlockLooper.App
             {
                 configurazione.Webcam = new ConfigurazioneWebcam();
             }
+
+            if (configurazione.CorrezioneBordo == null)
+            {
+                configurazione.CorrezioneBordo = new ConfigurazioneBordo();
+            }
+            configurazione.CorrezioneBordo.Imposta(configurazione.CorrezioneBordo.Converti());
 
             if(configurazione.AnalisiVariazioni==null)
                 configurazione.AnalisiVariazioni=new ParametriRilevatoreVariazioni();

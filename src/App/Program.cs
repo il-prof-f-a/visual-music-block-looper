@@ -59,6 +59,12 @@ namespace VisualMusicBlockLooper.App
                 scansioneABlocchiAnticipata:configurazione.ScansioneABlocchiAnticipata,
                 misureAnticipoScansione:configurazione.MisureAnticipoScansione,
                 bpmIniziale:configurazione.BpmIniziale);
+            if (compositore.Analizzatore != null)
+            {
+                compositore.Analizzatore.LetturaCompletaPeriodica = string.Equals(
+                    configurazione.ModalitaLettura, "CompletaPeriodica", StringComparison.OrdinalIgnoreCase);
+                compositore.Analizzatore.PeriodoLetturaCompleta = configurazione.PeriodoLetturaCompleta;
+            }
             FormProiettore proiettore = new FormProiettore(config, LayoutTavolo.Default);
             string testoPorte = $"MIDI uscita: {configMidi.PortaUscita}  |  ingresso: {configMidi.PortaIngresso}"
                 + (avvisi.Exists(a => a.StartsWith("Porta MIDI")) ? "  (non disponibile)" : string.Empty);

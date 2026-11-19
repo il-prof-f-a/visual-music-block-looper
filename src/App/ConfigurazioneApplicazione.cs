@@ -183,6 +183,12 @@ namespace VisualMusicBlockLooper.App
         /// <summary>Anticipo live dell’app in celle: 1, 2, 4, 8 o 16 (default 4). Nome JSON storico conservato.</summary>
         public int MisureAnticipoScansione { get; set; } = 4;
 
+        /// <summary>«Progressiva» (finestre di celle) oppure «CompletaPeriodica» (come Rileggi ogni N misure).</summary>
+        public string ModalitaLettura { get; set; } = "Progressiva";
+
+        /// <summary>Periodo in misure della lettura completa periodica: 1, 2, 4 o 8 (default 4).</summary>
+        public int PeriodoLetturaCompleta { get; set; } = 4;
+
         /// <summary>Scarto massimo del QR dai riferimenti della griglia, come frazione di cella (0..0,49).</summary>
         public double TolleranzaQrCelle { get; set; } = 0.35;
 
@@ -242,6 +248,11 @@ namespace VisualMusicBlockLooper.App
                 ?100:Tempo.Limita(configurazione.BpmIniziale);
             if(!AnticipoScansioneValido(configurazione.MisureAnticipoScansione))
                 configurazione.MisureAnticipoScansione=4;
+            if(!string.Equals(configurazione.ModalitaLettura,"CompletaPeriodica",StringComparison.OrdinalIgnoreCase))
+                configurazione.ModalitaLettura="Progressiva";
+            if(configurazione.PeriodoLetturaCompleta!=1&&configurazione.PeriodoLetturaCompleta!=2
+                &&configurazione.PeriodoLetturaCompleta!=4&&configurazione.PeriodoLetturaCompleta!=8)
+                configurazione.PeriodoLetturaCompleta=4;
             if(double.IsNaN(configurazione.TolleranzaQrCelle)||double.IsInfinity(configurazione.TolleranzaQrCelle)
                 ||configurazione.TolleranzaQrCelle<0||configurazione.TolleranzaQrCelle>=0.5)
                 configurazione.TolleranzaQrCelle=0.35;

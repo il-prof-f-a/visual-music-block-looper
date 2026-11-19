@@ -136,6 +136,44 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void ModalitaLetturaCompletaVieneConservata()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"ModalitaLettura\":\"CompletaPeriodica\",\"PeriodoLetturaCompleta\":8}");
+                var configurazione = ConfigurazioneApplicazione.Carica(percorso);
+
+                Assert.That(configurazione.ModalitaLettura, Is.EqualTo("CompletaPeriodica"));
+                Assert.That(configurazione.PeriodoLetturaCompleta, Is.EqualTo(8));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
+        public void ModalitaLetturaNonValidaRipristinaProgressivaEQuattroMisure()
+        {
+            string percorso = Path.GetTempFileName();
+            try
+            {
+                File.WriteAllText(percorso,
+                    "{\"ModalitaLettura\":\"Sconosciuta\",\"PeriodoLetturaCompleta\":3}");
+                var configurazione = ConfigurazioneApplicazione.Carica(percorso);
+
+                Assert.That(configurazione.ModalitaLettura, Is.EqualTo("Progressiva"));
+                Assert.That(configurazione.PeriodoLetturaCompleta, Is.EqualTo(4));
+            }
+            finally
+            {
+                if (File.Exists(percorso)) File.Delete(percorso);
+            }
+        }
+
+        [Test]
         public void BpmNonFinitoRipristinaIlDefaultApplicativo()
         {
             string percorso = Path.GetTempFileName();

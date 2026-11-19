@@ -26,6 +26,12 @@ namespace VisualMusicBlockLooper.App
         private readonly bool scansioneABlocchiAnticipata;
         private int misureAnticipoScansione;
         private int ultimoAnticipoScansione;
+        private int letturaCompletaPeriodica, periodoLetturaCompleta = 4;
+        private long ultimaMisuraLetturaCompleta = long.MinValue, esecuzioneLetturaCompleta = -1;
+        private long misuraLetturaCompleta = -1;
+        private bool letturaCompletaInCorso;
+        private int tentativiLetturaCompleta;
+        private int modalitaLetturaPrecedente = -1;
         private readonly ParametriRilevatoreVariazioni parametriVariazioni;
         private RilevatoreVariazioni differenze;
         private Calibrazione corrente;
@@ -126,7 +132,32 @@ namespace VisualMusicBlockLooper.App
                 Volatile.Write(ref misureAnticipoScansione,value);
             }
         }
-        public bool IndicatoriScansioneAttivi=>analizzaSoloSeCambia&&scansioneABlocchiAnticipata;
+        public bool IndicatoriScansioneAttivi=>!LetturaCompletaPeriodica&&analizzaSoloSeCambia&&scansioneABlocchiAnticipata;
+
+        /// <summary>
+        /// True: a ogni multiplo di <see cref="PeriodoLetturaCompleta"/> misure esegue una lettura
+        /// completa del foglio come «Rileggi foglio». False: usa le finestre progressive di celle.
+        /// </summary>
+        public bool LetturaCompletaPeriodica
+        {
+            get=>Volatile.Read(ref letturaCompletaPeriodica)!=0;
+            set=>Volatile.Write(ref letturaCompletaPeriodica,value?1:0);
+        }
+
+        /// <summary>Periodo in misure della lettura completa (1, 2, 4 o 8).</summary>
+        public int PeriodoLetturaCompleta
+        {
+            get=>Volatile.Read(ref periodoLetturaCompleta);
+            set
+            {
+                if(value!=1&&value!=2&&value!=4&&value!=8)throw new ArgumentOutOfRangeException(nameof(value));
+                Volatile.Write(ref periodoLetturaCompleta,value);
+            }
+        }
+
+        public static bool DeveRileggereCompletamente(bool attiva,long misura,int periodo,long ultima)
+            =>attiva&&misura>=0&&periodo>0&&misura%periodo==0&&misura!=ultima;
+
         public int PulsazioniPerOsservazione { get; set; }
         public Func<bool> Sospesa { get; set; }=()=>false;
         public void Rileggi()
@@ -146,11 +177,36 @@ namespace VisualMusicBlockLooper.App
             var motore=preparatore.Esecutore.Stato;
             long ora=orologio();
             long segnale=scansioneCelle&&motore.InEsecuzione?motore.TickTempo/6:PulsazioniPerOsservazione>0?motore.TickTempo/(24L*PulsazioniPerOsservazione):motore.SegnaleOsservazione;
+            bool completaPeriodica=LetturaCompletaPeriodica;
+            if(completaPeriodica!=(modalitaLetturaPrecedente!=0))
+            {
+                modalitaLetturaPrecedente=completaPeriodica?1:0;
+                ultimaMisuraLetturaCompleta=long.MinValue;esecuzioneLetturaCompleta=-1;
+                letturaCompletaInCorso=false;tentativiLetturaCompleta=0;misuraLetturaCompleta=-1;
+                confermeBlocchi.Clear();blocchiIncompleti.Clear();blocchiDaConfermare.Clear();
+                destinazioniIncomplete.Clear();blocchiScansionati.Clear();candidataCelle=null;
+                Volatile.Write(ref scansione,StatoScansione.Vuoto);
+            }
+            if(completaPeriodica&&motore.Trasporto.Esecuzione!=esecuzioneLetturaCompleta)
+            {
+                esecuzioneLetturaCompleta=motore.Trasporto.Esecuzione;
+                ultimaMisuraLetturaCompleta=long.MinValue;
+                letturaCompletaInCorso=false;tentativiLetturaCompleta=0;misuraLetturaCompleta=-1;
+            }
+            if(DeveRileggereCompletamente(completaPeriodica,motore.Trasporto.MisuraAssoluta,
+                PeriodoLetturaCompleta,ultimaMisuraLetturaCompleta)&&!letturaCompletaInCorso)
+            {
+                ultimaMisuraLetturaCompleta=motore.Trasporto.MisuraAssoluta;
+                letturaCompletaInCorso=true;tentativiLetturaCompleta=0;
+                misuraLetturaCompleta=motore.Trasporto.MisuraAssoluta;
+                conferme=0;firmaCandidata=null;
+                Volatile.Write(ref ultimoEsito,"Lettura completa periodica in corso");
+            }
             bool manuale=Volatile.Read(ref forzaRilettura)!=0;
             int anticipo=MisureAnticipoScansione;
             bool cambioAnticipo=anticipo!=ultimoAnticipoScansione;
-            bool normale=(scansioneCelle&&motore.InEsecuzione&&motore.Trasporto.Esecuzione!=esecuzioneCelle)||cambioAnticipo||(motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250);
-            bool riprovaBlocchi=motore.InEsecuzione&&analizzaSoloSeCambia&&scansioneABlocchiAnticipata
+            bool normale=letturaCompletaInCorso||(!completaPeriodica&&((scansioneCelle&&motore.InEsecuzione&&motore.Trasporto.Esecuzione!=esecuzioneCelle)||cambioAnticipo||(motore.InEsecuzione?segnale!=ultimoSegnale:ora-ultimaOsservazione>=250)));
+            bool riprovaBlocchi=!completaPeriodica&&motore.InEsecuzione&&analizzaSoloSeCambia&&scansioneABlocchiAnticipata
                 &&(confermeBlocchi.Count>0||blocchiIncompleti.Count>0||candidataCelle!=null);
             if(!forza&&!manuale&&!normale&&!riprovaBlocchi&&ora<retryAt)return false;
             using(var f=immagini.Copia())
@@ -214,6 +270,18 @@ namespace VisualMusicBlockLooper.App
                 {
                     if(traccia!=null){traccia.Layout=layout;traccia.CalibrazionePresente=true;traccia.LarghezzaFrame=f.Immagine.Cols;traccia.AltezzaFrame=f.Immagine.Rows;}
                     if(!inizializzato)return PrimaIstantanea(f,c,traccia);
+                    // In modalità completa le finestre progressive non vengono eseguite:
+                    // il prossimo aggiornamento arriva dalla lettura completa periodica.
+                    if(completaPeriodica)
+                    {
+                        if(letturaCompletaInCorso)
+                        {
+                            AnalizzaScenaCompleta(f,c,traccia,true);
+                            tentativiLetturaCompleta++;
+                            if(conferme>=2||tentativiLetturaCompleta>=3)letturaCompletaInCorso=false;
+                        }
+                        return true;
+                    }
                     if(!analizzaSoloSeCambia)
                     {
                         AnalizzaScenaCompleta(f,c,traccia);
@@ -334,7 +402,7 @@ namespace VisualMusicBlockLooper.App
                 $"ultima misura destinazione={preparatore.Esecutore.Stato.UltimaMisuraDestinazione}, applicata={preparatore.Esecutore.Stato.UltimaMisuraApplicazione}, "+
                 $"rinviata={preparatore.Esecutore.Stato.UltimoAggiornamentoRinviato}; letture scena/ROI={NumeroLetture}."));
         }
-        private void AnalizzaScenaCompleta(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia)
+        private void AnalizzaScenaCompleta(FotogrammaAcquisito f,Calibrazione c,TracciaCartoncini traccia,bool programmata=false)
         {
             ultimoFrameScansioneCompleta=f.Id;
             var letta=new LettoreIstantanea(c,config).Leggi(f.Immagine,traccia);
@@ -376,7 +444,13 @@ namespace VisualMusicBlockLooper.App
                 regioniDaVerificare=incerte;
                 Volatile.Write(ref ultimeRegioni,regioniDaVerificare);
                 Volatile.Write(ref ultimoStato,stato);
-                preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
+                var trasporto=preparatore.Esecutore.Stato.Trasporto;
+                bool strutturaCambiata=trasporto.Struttura==null||!stato.Struttura.Equals(trasporto.Struttura);
+                if(programmata&&!strutturaCambiata&&preparatore.Esecutore.Stato.InEsecuzione)
+                    preparatore.AggiornaPerMisura(stato,true,generazione,f.IstanteMs,
+                        preparatore.Esecutore.Stato.MisuraAssoluta+1);
+                else
+                    preparatore.Aggiorna(stato,true,generazione,f.IstanteMs);
                 Descrivi(traccia,completa?"ScansioneCompletaConfermata":"ScansioneCompletaConIncertezze",f);
             }
             else Descrivi(traccia,completa?"ScansioneCompletaInAttesaDiConferma":"ScansioneCompletaDaConfermare",f);

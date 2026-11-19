@@ -73,6 +73,50 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         [Test]
+        public void LetturaCompletaPeriodicaRileggeSoloAlMultiplo()
+        {
+            long ora = 0;
+            var cfg = new ConfigGriglia { Area = LayoutTavolo.AreaGrigliaDefault };
+            var cal = NoteContigueVisionTests.Calibra(false);
+            using (var f = NoteContigueVisionTests.Scena(false))
+            using (var r = new RegistroFotogrammi())
+            using (var e = new EsecutoreMidi(new EsecutorePartituraTests.Uscita(), null,
+                new EsecutorePartituraTests.Mappa(), cfg, () => ora))
+            {
+                var p = new PreparatoreFoglio(e);
+                using (var a = new AnalizzatoreFoglio(r, () => cal, cfg, LayoutTavolo.Default, p,
+                    new RegistroCatture(), () => ora, true, null, true, 1))
+                {
+                    a.PulsazioniPerOsservazione = 1;
+                    a.LetturaCompletaPeriodica = true;
+                    a.PeriodoLetturaCompleta = 4;
+                    r.Pubblica(f, ora);
+                    a.Passo(true);
+                    long lettureIniziali = a.NumeroLettureZone;
+
+                    e.Avvia();
+                    e.TickInterno(); // misura 0: multiplo di 4, parte la lettura completa
+                    ora += 25; r.Pubblica(f, ora); a.Passo(true);
+                    ora += 25; r.Pubblica(f, ora); a.Passo(true);
+                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(2),
+                        "Due frame della lettura completa periodica.");
+                    Assert.That(a.UltimoEsito, Does.Contain("ScansioneCompleta"));
+
+                    for (int i = 0; i < 96; i++) { ora += 25; e.TickInterno(); } // misura 1
+                    ora += 25; r.Pubblica(f, ora); a.Passo(true);
+                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(2),
+                        "Una misura non multipla non rilegge il foglio.");
+
+                    for (int i = 0; i < 3 * 96; i++) { ora += 25; e.TickInterno(); } // misura 4
+                    ora += 25; r.Pubblica(f, ora); a.Passo(true);
+                    ora += 25; r.Pubblica(f, ora); a.Passo(true);
+                    Assert.That(a.NumeroLettureZone - lettureIniziali, Is.EqualTo(4),
+                        "Al quarto multiplo parte una nuova lettura completa.");
+                }
+            }
+        }
+
+        [Test]
         public void ScansioneAnticipataNonRileggeBlocchiGiaLettiNellaFinestraDelGiro()
         {
             long ora=0;var cfg=new ConfigGriglia{Area=LayoutTavolo.AreaGrigliaDefault};var cal=NoteContigueVisionTests.Calibra(false);

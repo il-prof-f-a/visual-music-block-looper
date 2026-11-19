@@ -57,6 +57,24 @@ La selezione sposta subito la linea; sul primo frame nuovo l'analizzatore salta 
 
 `NumeroThreadOpenCv` in `configurazione.json` limita i worker paralleli OpenCV (1–4, predefinito 2): un valore più basso riduce i picchi di CPU durante le letture, ma può allungarle.
 
+### Due modalità di lettura del foglio
+
+La combo in basso a destra, **Modalità lettura**, si cambia anche durante Play e viene salvata in `configurazione.json`:
+
+- **Progressiva**: il metodo a finestre di tre celle descritto sopra. Legge solo le righe attive e la finestra intorno alla cella anticipata; una modifica fuori da quella finestra non è visibile finché la finestra non ci arriva. La linea azzurra indica l'ultima cella confermata del gruppo, non l'intero foglio.
+- **Completa 1/2/4/8 misure**: ogni N misure esegue una lettura dell'intero foglio con lo stesso lettore di **Rileggi foglio**. Vede tutte le righe e le zone speciali; durante Play le note entrano alla misura successiva, mentre un cambio di struttura attende il confine del giro. In questa modalità le finestre progressive e le linee arancio/azzurro sono disattivate.
+
+La modalità completa è utile quando le modifiche ai cartoncini devono essere raccolte in modo prevedibile e non si vuole dipendere dalla posizione della finestra progressiva. Il costo è una lettura completa ogni N misure; con N=4 a 120 BPM sono circa ogni 8 secondi.
+
+In `configurazione.json`:
+
+```json
+"ModalitaLettura": "CompletaPeriodica",
+"PeriodoLetturaCompleta": 4
+```
+
+Per tornare al metodo progressivo: `"ModalitaLettura": "Progressiva"`.
+
 Per seguire il clock dell'app in Ableton Live, abilita Sync sull'ingresso MIDI `VMBL` e attiva `EXT`; l'app invia il clock a 100 BPM sulla porta `VMBL`. La lettura del tempo in Live può oscillare di qualche centesimo perché è una stima del clock esterno; la verifica precisa è l'intervallo dei tick, pari a 25 ms a 100 BPM.
 
 I comandi ottici hanno un worker indipendente: confronto fino a 10 Hz e decodifica solo delle zone cambiate. Il TAP conserva l'istante del primo frame della candidata. La latenza ottica comprende acquisizione, decoder e conferma: il cartoncino STOP può quindi essere più lento del pulsante o dell'ingresso MIDI. Stop/Panic ricevuti dal thread MIDI hanno un canale prioritario e non aspettano il confine del giro.

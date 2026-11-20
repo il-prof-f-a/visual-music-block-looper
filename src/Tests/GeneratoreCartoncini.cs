@@ -108,7 +108,7 @@ namespace VisualMusicBlockLooper.Tests
                 passi, passoMm, altezzaMm, ErrorCorrectionLevel.L, dettaglio);
         }
 
-        /// <summary>Crea un cartoncino CANALE per la fascia destra (payload breve, QR versione 1).</summary>
+        /// <summary>Crea un cartoncino CANALE per la fascia destra, con illustrazione per i canali 1-15.</summary>
         public static Bitmap CartoncinoCanale(int canale, int passi = 2,
             double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
         {
@@ -117,8 +117,11 @@ namespace VisualMusicBlockLooper.Tests
                 throw new ArgumentOutOfRangeException(nameof(canale));
             }
 
+            Action<Graphics, RectangleF> illustrazione = canale <= 15
+                ? (g, area) => IconeCanale.Disegna(g, canale, area)
+                : null;
             return Disegna($"VMBL1;S;CH;{canale}", ColoreComando, "Canale MIDI " + canale,
-                passi, passoMm, altezzaMm, ErrorCorrectionLevel.L);
+                passi, passoMm, altezzaMm, ErrorCorrectionLevel.L, disegnaIllustrazione: illustrazione);
         }
 
         /// <summary>Elenco degli accordi stampabili: 12 fondamentali per le qualità principali.</summary>
@@ -283,7 +286,8 @@ namespace VisualMusicBlockLooper.Tests
         /// etichetta in alto a destra del corpo, area di disegno incorniciata, contorno di taglio nero.
         /// </summary>
         public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm,
-            ErrorCorrectionLevel? livelloEcc = null, string dettaglio = null, string percorsoIcona = null)
+            ErrorCorrectionLevel? livelloEcc = null, string dettaglio = null, string percorsoIcona = null,
+            Action<Graphics, RectangleF> disegnaIllustrazione = null)
         {
             if (passi < PassiMinimi)
             {
@@ -325,7 +329,12 @@ namespace VisualMusicBlockLooper.Tests
                     g.DrawRectangle(cornice, xArea, yArea, wArea, hArea);
 
                     bool haIcona = !string.IsNullOrEmpty(percorsoIcona) && File.Exists(percorsoIcona);
-                    if (haIcona)
+                    if (disegnaIllustrazione != null)
+                    {
+                        float altezzaIllustrazione = hArea * 0.78f;
+                        disegnaIllustrazione(g, new RectangleF(xArea, yArea, wArea, altezzaIllustrazione));
+                    }
+                    else if (haIcona)
                     {
                         float altezzaIcona = hArea * 0.78f;
                         using (var icona = new Bitmap(percorsoIcona))

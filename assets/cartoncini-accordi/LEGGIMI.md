@@ -52,6 +52,28 @@ Codifica:
 VMBL1;S;CH;<canale 1..16>
 ```
 
+Nel riquadro bianco i canali 1–15 mostrano un'illustrazione vettoriale dello strumento associato:
+
+| Canale MIDI | Strumento illustrato |
+|---:|---|
+| 1 | Pianoforte |
+| 2 | Chitarra acustica |
+| 3 | Basso elettrico |
+| 4 | Archi |
+| 5 | Tromba |
+| 6 | Sax |
+| 7 | Organo |
+| 8 | Sintetizzatore |
+| 9 | Percussioni aggiuntive |
+| 10 | Batteria e percussioni |
+| 11 | Chitarra elettrica |
+| 12 | Pad sintetico |
+| 13 | Violino |
+| 14 | Flauto |
+| 15 | Effetti sonori |
+
+Il canale 16 resta senza illustrazione perché non è presente nell'associazione richiesta.
+
 Il cartoncino si posa nella **fascia destra**, nella sezione orizzontale della riga da configurare
 (sezione 1 = riga 1, in alto). Vale solo a **sistema fermo**: durante Play la lettura non cambia
 nulla. Il canale è 1-based sul cartoncino e viene inviato come canale MIDI 0-based.

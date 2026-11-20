@@ -12,3 +12,5 @@ Software per la composizione visuale di musica webcam-proiettore collegati ad un
 [Accordi e canali](assets/cartoncini-accordi/LEGGIMI.md): 96 cartoncini di accordo con codifica compatta (VMBL1;A;…) e 16 cartoncini di canale (VMBL1;S;CH;…). La fascia destra è divisa in sei sezioni, una per riga; i canali si applicano solo a sistema fermo.
 
 All'avvio l'app è in **Slave**: il trasporto e il clock arrivano dal DAW (Ableton invia clock/Start/Stop sulla porta VMBL). Il pulsante Master / Slave resta disponibile per passare al clock interno.
+
+[Batteria](assets/cartoncini-batteria/LEGGIMI.md): 47 cartoncini per drum kit (MIDI 35–81) in due stili grafici, con QR `VMBL1;N;<clip>;<midi>` e icona dello strumento al posto del pentagramma.

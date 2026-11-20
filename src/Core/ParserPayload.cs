@@ -200,12 +200,20 @@ namespace VisualMusicBlockLooper.Core
         {
             payload = null;
 
-            if (campi.Length != 3 || !TryParseNumero(campi[2], out int idClip))
+            if ((campi.Length != 3 && campi.Length != 4)
+                || !TryParseNumero(campi[2], out int idClip))
             {
                 return false;
             }
 
-            payload = new PayloadCartoncino { Tipo = TipoCartoncino.Nota, IdClip = idClip };
+            int nota = -1;
+            if (campi.Length == 4
+                && (!TryParseNumero(campi[3], out nota) || nota < NotaMinima || nota > NotaMassima))
+            {
+                return false;
+            }
+
+            payload = new PayloadCartoncino { Tipo = TipoCartoncino.Nota, IdClip = idClip, NotaMidi = nota };
             return true;
         }
 

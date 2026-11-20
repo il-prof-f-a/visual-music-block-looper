@@ -166,6 +166,15 @@ Nota: lo stesso nome di porta è usato in uscita e in ingresso, quindi ciò che 
 5. Rimuovere il cartoncino non annulla l'assegnazione: resta salvata. Per tornare alla mappatura normale si modifica `CanaliRiga` nel file (valore `-1`).
 6. Durante Play i cartoncini canale restano visibili ma non vengono applicati. Il cartoncino `ST` (strumento) viene salvato in `StrumentiRiga`, ma l'invio ad Ableton non è ancora implementato.
 
+### Batteria e drum kit
+
+1. Scegliere uno stile in `assets/cartoncini-batteria/elettroniche/` o `realistiche/`. Ci sono 47 cartoncini, dal MIDI 35 al MIDI 81.
+2. Creare in Ableton una traccia con un **Drum Rack** e portarla sul canale MIDI 10.
+3. Fermare la riproduzione e posare `canale-10.png` nella sezione della riga che vuoi usare per la batteria.
+4. Posare i cartoncini batteria su quella riga: colonna = attacco, larghezza = durata. Ogni QR contiene la nota MIDI esplicita, quindi non serve modificare `mappatura-default.json`.
+5. B0 (MIDI 35) funziona come gli altri: il QR è `VMBL1;N;0;35`, con la nota vera nel quarto campo.
+6. `indice.csv` riporta per ogni cartoncino file, nota Ableton, MIDI, nome e payload.
+
 ### Errori e colori (guida proiettata)
 
 La guida segnala in rosso (contorno e fondo chiaro) i cartoncini scartati. Il motivo dello scarto è determinato così:

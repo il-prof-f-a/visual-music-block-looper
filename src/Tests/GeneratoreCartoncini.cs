@@ -283,7 +283,7 @@ namespace VisualMusicBlockLooper.Tests
         /// etichetta in alto a destra del corpo, area di disegno incorniciata, contorno di taglio nero.
         /// </summary>
         public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm,
-            ErrorCorrectionLevel? livelloEcc = null, string dettaglio = null)
+            ErrorCorrectionLevel? livelloEcc = null, string dettaglio = null, string percorsoIcona = null)
         {
             if (passi < PassiMinimi)
             {
@@ -324,7 +324,22 @@ namespace VisualMusicBlockLooper.Tests
                     g.FillRectangle(bianco, xArea, yArea, wArea, hArea);
                     g.DrawRectangle(cornice, xArea, yArea, wArea, hArea);
 
-                    if (!string.IsNullOrEmpty(dettaglio))
+                    bool haIcona = !string.IsNullOrEmpty(percorsoIcona) && File.Exists(percorsoIcona);
+                    if (haIcona)
+                    {
+                        float altezzaIcona = hArea * 0.78f;
+                        using (var icona = new Bitmap(percorsoIcona))
+                        {
+                            DisegnaIcona(g, icona, new RectangleF(xArea, yArea, wArea, altezzaIcona));
+                        }
+
+                        if (!string.IsNullOrEmpty(dettaglio))
+                        {
+                            DisegnaDettaglio(g, dettaglio,
+                                new RectangleF(xArea, yArea + altezzaIcona, wArea, hArea - altezzaIcona));
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(dettaglio))
                     {
                         DisegnaDettaglio(g, dettaglio, new RectangleF(xArea, yArea, wArea, hArea));
                     }
@@ -430,6 +445,33 @@ namespace VisualMusicBlockLooper.Tests
                 {
                     g.DrawString(testo, font, penna, new PointF(area.X, area.Y));
                 }
+            }
+        }
+
+        /// <summary>Disegna l'icona centrata nell'area, mantenendone le proporzioni.</summary>
+        private static void DisegnaIcona(Graphics g, Bitmap icona, RectangleF area)
+        {
+            if (icona == null || area.Width <= 0 || area.Height <= 0)
+            {
+                return;
+            }
+
+            float scala = Math.Min(area.Width / icona.Width, area.Height / icona.Height);
+            float larghezza = icona.Width * scala;
+            float altezza = icona.Height * scala;
+            var destinazione = new RectangleF(
+                area.X + (area.Width - larghezza) / 2,
+                area.Y + (area.Height - altezza) / 2,
+                larghezza, altezza);
+            var stato = g.InterpolationMode;
+            try
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(icona, destinazione);
+            }
+            finally
+            {
+                g.InterpolationMode = stato;
             }
         }
 

@@ -56,6 +56,11 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Identificativo del clip (cartoncino di tipo Nota).</summary>
         public int IdClip { get; set; }
 
+        /// <summary>
+        /// Nota MIDI esplicita per i cartoncini di batteria; -1 significa «usa la mappatura del clip».
+        /// </summary>
+        public int NotaMidi { get; set; } = -1;
+
         /// <summary>Comando (cartoncino di tipo Comando).</summary>
         public TipoComando Comando { get; set; }
 

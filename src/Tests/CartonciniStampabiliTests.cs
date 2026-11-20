@@ -99,6 +99,60 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
+        [Test, Explicit("Rigenera icone e cartoncini batteria in assets/cartoncini-batteria")]
+        public void GeneraCartonciniBatteria()
+        {
+            string assets = Path.GetFullPath(Path.Combine(GeneratoreCartoncini.CartellaCartoncini(), ".."));
+            string icone = Path.Combine(assets, "icone-batteria");
+            string carte = Path.Combine(assets, "cartoncini-batteria");
+
+            GeneratoreBatteria.GeneraIcone(Path.Combine(icone, "elettroniche"), false);
+            GeneratoreBatteria.GeneraIcone(Path.Combine(icone, "realistiche"), true);
+            GeneratoreBatteria.GeneraCartoncini(Path.Combine(carte, "elettroniche"), Path.Combine(icone, "elettroniche"), false);
+            GeneratoreBatteria.GeneraCartoncini(Path.Combine(carte, "realistiche"), Path.Combine(icone, "realistiche"), true);
+
+            Assert.That(Directory.GetFiles(Path.Combine(carte, "elettroniche"), "batteria-*.png"),
+                Has.Length.EqualTo(47));
+            Assert.That(Directory.GetFiles(Path.Combine(carte, "realistiche"), "batteria-*.png"),
+                Has.Length.EqualTo(47));
+        }
+
+        // I cartoncini di batteria devono essere letti come note con la nota MIDI esplicita.
+        [Test]
+        public void Rileva_CartonciniBatteria_NotaEsplicita()
+        {
+            const int larghezza = 1600;
+            const int altezza = 1100;
+            string dir = Path.Combine(GeneratoreCartoncini.CartellaCartoncini(), "..", "cartoncini-batteria", "elettroniche");
+            Assert.IsNotNull(dir);
+
+            using (Bitmap tavolo = new Bitmap(larghezza, altezza))
+            using (Graphics g = Graphics.FromImage(tavolo))
+            {
+                g.Clear(Color.White);
+                using (Bitmap kick = new Bitmap(Path.Combine(dir, "batteria-036-kick.png")))
+                using (Bitmap b0 = new Bitmap(Path.Combine(dir, "batteria-035-grancassa-acustica.png")))
+                using (Bitmap clap = new Bitmap(Path.Combine(dir, "batteria-039-hand-clap.png")))
+                {
+                    g.DrawImage(kick, 60, 40);
+                    g.DrawImage(b0, 60, 560);
+                    g.DrawImage(clap, 800, 300);
+                }
+
+                var rilevati = RilevaSul(tavolo, larghezza, altezza);
+                var payload = rilevati.Select(r => r.Payload).ToList();
+
+                Assert.That(payload, Does.Contain("VMBL1;N;0;36"));
+                Assert.That(payload, Does.Contain("VMBL1;N;0;35"));
+                Assert.That(payload, Does.Contain("VMBL1;N;3;39"));
+                foreach (string testo in payload)
+                {
+                    Assert.That(ParserPayload.TryParse(testo, out PayloadCartoncino p), Is.True, testo);
+                    Assert.That(p.NotaMidi, Is.GreaterThanOrEqualTo(35), testo);
+                }
+            }
+        }
+
         private static IReadOnlyList<CartoncinoRilevato> RilevaSul(Bitmap tavolo, int larghezza, int altezza)
         {
             Mat mat;

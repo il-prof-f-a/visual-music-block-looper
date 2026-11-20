@@ -227,6 +227,31 @@ namespace VisualMusicBlockLooper.Tests
             Assert.That(ParserPayload.TryParse("VMBL1;S;STRUMENTO;", out _), Is.False);
         }
 
+        [TestCase("VMBL1;N;0;35", 0, 35)]
+        [TestCase("VMBL1;N;47;81", 47, 81)]
+        [TestCase("VMBL1;N;24;60", 24, 60)]
+        public void NotaConNotaMidiEsplicita(string testo, int idClip, int nota)
+        {
+            Assert.That(ParserPayload.TryParse(testo, out PayloadCartoncino payload), Is.True);
+            Assert.That(payload.IdClip, Is.EqualTo(idClip));
+            Assert.That(payload.NotaMidi, Is.EqualTo(nota));
+        }
+
+        [TestCase("VMBL1;N;0;128")]
+        [TestCase("VMBL1;N;0;-1")]
+        [TestCase("VMBL1;N;0;abc")]
+        public void NotaMidiEsplicitaNonValidaRifiutata(string testo)
+        {
+            Assert.That(ParserPayload.TryParse(testo, out _), Is.False);
+        }
+
+        [Test]
+        public void NotaSenzaQuartoCampo_UsaLaMappatura()
+        {
+            Assert.That(ParserPayload.TryParse("VMBL1;N;12", out PayloadCartoncino payload), Is.True);
+            Assert.That(payload.NotaMidi, Is.EqualTo(-1));
+        }
+
         [Test]
         public void Fuzz_ConPrefissoValido_RaggiungeRamiNotaComandoSpeciale()
         {

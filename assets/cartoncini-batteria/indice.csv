@@ -1,0 +1,48 @@
+﻿file_elettroniche;file_realistiche;midi;nota_ableton;nome;icona;payload
+batteria-035-grancassa-acustica.png;batteria-035-grancassa-acustica.png;35;B0;Grancassa acustica;grancassa-acustica.png;VMBL1;N;0;35
+batteria-036-kick.png;batteria-036-kick.png;36;C1;Grancassa / Kick;kick.png;VMBL1;N;0;36
+batteria-037-rimshot.png;batteria-037-rimshot.png;37;C#1;Rimshot / Side Stick;rimshot.png;VMBL1;N;1;37
+batteria-038-snare.png;batteria-038-snare.png;38;D1;Rullante acustico;snare.png;VMBL1;N;2;38
+batteria-039-hand-clap.png;batteria-039-hand-clap.png;39;D#1;Hand Clap;hand-clap.png;VMBL1;N;3;39
+batteria-040-rullante-elettronico.png;batteria-040-rullante-elettronico.png;40;E1;Rullante elettronico;rullante-elettronico.png;VMBL1;N;4;40
+batteria-041-floor-tom.png;batteria-041-floor-tom.png;41;F1;Timpano grave;floor-tom.png;VMBL1;N;5;41
+batteria-042-charleston-chiuso.png;batteria-042-charleston-chiuso.png;42;F#1;Charleston chiuso;charleston-chiuso.png;VMBL1;N;6;42
+batteria-043-tom-medio-grave.png;batteria-043-tom-medio-grave.png;43;G1;Timpano medio-grave;tom-medio-grave.png;VMBL1;N;7;43
+batteria-044-charleston-pedale.png;batteria-044-charleston-pedale.png;44;G#1;Charleston a pedale;charleston-pedale.png;VMBL1;N;8;44
+batteria-045-tom-grave.png;batteria-045-tom-grave.png;45;A1;Tom grave;tom-grave.png;VMBL1;N;9;45
+batteria-046-charleston-aperto.png;batteria-046-charleston-aperto.png;46;A#1;Charleston aperto;charleston-aperto.png;VMBL1;N;10;46
+batteria-047-tom-medio-basso.png;batteria-047-tom-medio-basso.png;47;B1;Tom medio-grave;tom-medio-basso.png;VMBL1;N;11;47
+batteria-048-tom-medio-alto.png;batteria-048-tom-medio-alto.png;48;C2;Tom medio-acuto;tom-medio-alto.png;VMBL1;N;12;48
+batteria-049-crash-1.png;batteria-049-crash-1.png;49;C#2;Crash 1;crash-1.png;VMBL1;N;13;49
+batteria-050-tom-acuto.png;batteria-050-tom-acuto.png;50;D2;Tom acuto;tom-acuto.png;VMBL1;N;14;50
+batteria-051-ride.png;batteria-051-ride.png;51;D#2;Ride;ride.png;VMBL1;N;15;51
+batteria-052-china.png;batteria-052-china.png;52;E2;Piatto China;china.png;VMBL1;N;16;52
+batteria-053-campana-ride.png;batteria-053-campana-ride.png;53;F2;Campana del Ride;campana-ride.png;VMBL1;N;17;53
+batteria-054-tamburello.png;batteria-054-tamburello.png;54;F#2;Tamburello;tamburello.png;VMBL1;N;18;54
+batteria-055-splash.png;batteria-055-splash.png;55;G2;Splash;splash.png;VMBL1;N;19;55
+batteria-056-cowbell.png;batteria-056-cowbell.png;56;G#2;Cowbell;cowbell.png;VMBL1;N;20;56
+batteria-057-crash-2.png;batteria-057-crash-2.png;57;A2;Crash 2;crash-2.png;VMBL1;N;21;57
+batteria-058-vibraslap.png;batteria-058-vibraslap.png;58;A#2;Vibraslap;vibraslap.png;VMBL1;N;22;58
+batteria-059-ride-2.png;batteria-059-ride-2.png;59;B2;Ride 2;ride-2.png;VMBL1;N;23;59
+batteria-060-bongo-alto.png;batteria-060-bongo-alto.png;60;C3;Bongo alto;bongo-alto.png;VMBL1;N;24;60
+batteria-061-bongo-basso.png;batteria-061-bongo-basso.png;61;C#3;Bongo basso;bongo-basso.png;VMBL1;N;25;61
+batteria-062-conga-muta.png;batteria-062-conga-muta.png;62;D3;Conga muta;conga-muta.png;VMBL1;N;26;62
+batteria-063-conga-aperta-alta.png;batteria-063-conga-aperta-alta.png;63;D#3;Conga aperta alta;conga-aperta-alta.png;VMBL1;N;27;63
+batteria-064-conga-bassa.png;batteria-064-conga-bassa.png;64;E3;Conga bassa;conga-bassa.png;VMBL1;N;28;64
+batteria-065-timbales-alto.png;batteria-065-timbales-alto.png;65;F3;Timbales alto;timbales-alto.png;VMBL1;N;29;65
+batteria-066-timbales-basso.png;batteria-066-timbales-basso.png;66;F#3;Timbales basso;timbales-basso.png;VMBL1;N;30;66
+batteria-067-agogo-alto.png;batteria-067-agogo-alto.png;67;G3;AgogÃ´ alto;agogo-alto.png;VMBL1;N;31;67
+batteria-068-agogo-basso.png;batteria-068-agogo-basso.png;68;G#3;AgogÃ´ basso;agogo-basso.png;VMBL1;N;32;68
+batteria-069-cabasa.png;batteria-069-cabasa.png;69;A3;Cabasa;cabasa.png;VMBL1;N;33;69
+batteria-070-maracas.png;batteria-070-maracas.png;70;A#3;Maracas;maracas.png;VMBL1;N;34;70
+batteria-071-fischietto-corto.png;batteria-071-fischietto-corto.png;71;B3;Fischietto corto;fischietto-corto.png;VMBL1;N;35;71
+batteria-072-fischietto-lungo.png;batteria-072-fischietto-lungo.png;72;C4;Fischietto lungo;fischietto-lungo.png;VMBL1;N;36;72
+batteria-073-guiro-corto.png;batteria-073-guiro-corto.png;73;C#4;Guiro corto;guiro-corto.png;VMBL1;N;37;73
+batteria-074-guiro-lungo.png;batteria-074-guiro-lungo.png;74;D4;Guiro lungo;guiro-lungo.png;VMBL1;N;38;74
+batteria-075-claves.png;batteria-075-claves.png;75;D#4;Claves;claves.png;VMBL1;N;39;75
+batteria-076-woodblock-alto.png;batteria-076-woodblock-alto.png;76;E4;Woodblock alto;woodblock-alto.png;VMBL1;N;40;76
+batteria-077-woodblock-basso.png;batteria-077-woodblock-basso.png;77;F4;Woodblock basso;woodblock-basso.png;VMBL1;N;41;77
+batteria-078-cuica-chiusa.png;batteria-078-cuica-chiusa.png;78;F#4;CuÃ­ca chiusa;cuica-chiusa.png;VMBL1;N;42;78
+batteria-079-cuica-aperta.png;batteria-079-cuica-aperta.png;79;G4;CuÃ­ca aperta;cuica-aperta.png;VMBL1;N;43;79
+batteria-080-triangolo-chiuso.png;batteria-080-triangolo-chiuso.png;80;G#4;Triangolo chiuso;triangolo-chiuso.png;VMBL1;N;44;80
+batteria-081-triangolo-aperto.png;batteria-081-triangolo-aperto.png;81;A4;Triangolo aperto;triangolo-aperto.png;VMBL1;N;45;81

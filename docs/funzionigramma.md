@@ -186,6 +186,7 @@ Cartoncini di nota nella zona comandi, o comandi fuori dalla zona, producono err
 | `VMBL1;A;<0..11>;<tipo>` | Griglia | Accordo: note MIDI da Do3 (48) più gli intervalli del tipo; colore del fondamentale nel terzo registro. |
 | `VMBL1;S;CH;<1..16>` | Fascia destra, sezione della riga | Override del canale MIDI della riga, applicato solo a sistema fermo. |
 | `VMBL1;S;ST;<nome>` | Fascia destra, sezione della riga | Richiesta di strumento salvata in configurazione; l'invio ad Ableton è ancora da implementare. |
+| `VMBL1;N;<clip>;<midi>` | Griglia | Nota con nota MIDI esplicita: usata dai 47 cartoncini batteria per drum kit. Il quarto campo è facoltativo per le note normali. |
 
 Tipi di accordo: `+` maggiore, `-` minore, `7` settima, `m7` minore settima, `M7` maggiore settima, `dim` diminuito, `dim7` diminuito settima, `aug` aumentato, più `sus2`, `sus4`, `6`, `m6` accettati dal parser.
 

@@ -217,6 +217,11 @@ namespace VisualMusicBlockLooper.Core
                     noteMidi = Accordi.Note(n.Payload.Fondamentale, n.Payload.Accordo).ToArray();
                     idClip = Accordi.MidiBase + n.Payload.Fondamentale - 36;
                 }
+                else if (n.Payload.NotaMidi >= 0)
+                {
+                    // Cartoncino di batteria: la nota MIDI è scritta nel QR, indipendente dalla mappatura.
+                    noteMidi = new[] { n.Payload.NotaMidi };
+                }
 
                 notaStato.Add(new CartoncinoNota
                 {

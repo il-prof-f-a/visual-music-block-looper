@@ -41,10 +41,10 @@ namespace VisualMusicBlockLooper.Tests
             new Voce(35, "Grancassa acustica", "grancassa-acustica"),
             new Voce(36, "Grancassa / Kick", "kick"),
             new Voce(37, "Rimshot / Side Stick", "rimshot"),
-            new Voce(38, "Rullante acustico", "snare"),
-            new Voce(39, "Hand Clap", "hand-clap"),
+            new Voce(38, "Rullante acustico / Snare", "snare"),
+            new Voce(39, "Hand Clap (battito mani)", "hand-clap"),
             new Voce(40, "Rullante elettronico", "rullante-elettronico"),
-            new Voce(41, "Timpano grave", "floor-tom"),
+            new Voce(41, "Timpano grave (Floor Tom)", "floor-tom"),
             new Voce(42, "Charleston chiuso", "charleston-chiuso"),
             new Voce(43, "Timpano medio-grave", "tom-medio-grave"),
             new Voce(44, "Charleston a pedale", "charleston-pedale"),
@@ -117,7 +117,7 @@ namespace VisualMusicBlockLooper.Tests
             Ombra = Color.FromArgb(235, 232, 228)
         };
 
-        /// <summary>Disegna le 25 icone della batteria base 35-59 nella cartella dello stile.</summary>
+        /// <summary>Completa le icone mancanti della batteria base 35-59 senza sovrascrivere quelle fornite.</summary>
         public static void GeneraIcone(string cartella, bool realistica)
         {
             Directory.CreateDirectory(cartella);
@@ -129,10 +129,13 @@ namespace VisualMusicBlockLooper.Tests
                     continue;
                 }
 
+                string percorso = Path.Combine(cartella, voce.Slug + ".png");
+                if (File.Exists(percorso)) continue;
+
                 using (Bitmap icona = DisegnaIcona(voce.Slug, palette))
                 using (Bitmap ritagliata = Ritaglia(icona))
                 {
-                    ritagliata.Save(Path.Combine(cartella, voce.Slug + ".png"), ImageFormat.Png);
+                    ritagliata.Save(percorso, ImageFormat.Png);
                 }
             }
         }
@@ -163,7 +166,7 @@ namespace VisualMusicBlockLooper.Tests
 
         private static string NomeNota(int midi)
         {
-            string[] nomi = { "Do", "Do♯", "Re", "Re♯", "Mi", "Fa", "Fa♯", "Sol", "Sol♯", "La", "La♯", "Si" };
+            string[] nomi = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
             // Ottave in convenzione Ableton: C1 = MIDI 36, C3 = MIDI 60.
             return nomi[midi % 12] + (midi / 12 - 2);
         }

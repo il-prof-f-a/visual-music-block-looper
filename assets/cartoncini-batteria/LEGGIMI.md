@@ -49,9 +49,10 @@ quando arriva il note-off, non la lunghezza del campione.
 
 ## Icone
 
-Le 22 percussioni aggiuntive (MIDI 60–81) usano le tavole fornite, ritagliate in
-`assets/icone-batteria/<stile>/`. Le 25 voci della batteria base (MIDI 35–59) sono icone vettoriali
-disegnate dal generatore, perché le tavole non le contenevano.
+Le immagini senza testo fornite nel kit iconografico sono in `assets/icone-batteria/<stile>/`:
+20 strumenti base per stile (MIDI 35–59) e tutte le 22 percussioni aggiuntive (MIDI 60–81).
+I cinque strumenti base assenti in ciascuna categoria restano completati dalle icone vettoriali
+del generatore. `GeneraIcone` crea solo file mancanti e non sovrascrive le immagini fornite.
 
 Per sostituire un'icona basta mettere un PNG con lo stesso nome nella cartella dello stile e
 rigenerare i cartoncini:
@@ -61,4 +62,5 @@ dotnet test src/Tests/Tests.csproj -c Release --filter Name=GeneraCartonciniBatt
 ```
 
 I nomi delle icone sono nello `slug` di `indice.csv` (per esempio `kick.png`, `snare.png`,
-`crash-1.png`).
+`crash-1.png`). Il dettaglio della nota stampato sui cartoncini segue la convenzione Ableton,
+per esempio `B0 · MIDI 35`, `C1 · MIDI 36` e `C#1 · MIDI 37`.

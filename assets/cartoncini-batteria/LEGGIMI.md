@@ -47,6 +47,24 @@ colore, ma dalla riga e dal cartoncino `CH`.
 Le note della batteria sono one-shot naturali nel Drum Rack: la durata del cartoncino decide solo
 quando arriva il note-off, non la lunghezza del campione.
 
+## Sequenze Jamstix 4 Free
+
+I sei cartoncini arancioni nella cartella `jamstix-4-free/` inviano le note MIDI che Jamstix usa
+per selezionare le proprie sezioni. Ogni riquadro bianco mostra l'icona del drum kit, la nota e
+la funzione della sequenza. Il QR mantiene il protocollo delle note con MIDI esplicito:
+`VMBL1;N;<midi-36>;<midi>`.
+
+| Cartoncino | Nota Ableton | MIDI | Sequenza |
+|---|---:|---:|---|
+| `jamstix-intro.png` | C2 | 48 | Suona l'introduzione, poi passa alla strofa |
+| `jamstix-strofa.png` | D2 | 50 | Groove base continuo |
+| `jamstix-ritornello.png` | E2 | 52 | Groove più energico |
+| `jamstix-fill.png` | F2 | 53 | Rullata e ritorno alla sezione |
+| `jamstix-bridge.png` | G2 | 55 | Variazione ritmica |
+| `jamstix-finale.png` | A2 | 57 | Esegue la chiusura e termina |
+
+Il generatore è `GeneratoreSequenzeJamstix` in `src/Tests/GeneratoreSequenzeJamstix.cs`.
+
 ## Icone
 
 Le immagini senza testo fornite nel kit iconografico sono in `assets/icone-batteria/<stile>/`:

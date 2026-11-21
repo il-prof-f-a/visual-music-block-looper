@@ -55,10 +55,18 @@ namespace VisualMusicBlockLooper.Core
         private static bool TryParseAccordo(string[] campi, out PayloadCartoncino payload)
         {
             payload = null;
-            if (campi.Length != 4
+            if ((campi.Length != 4 && campi.Length != 5)
                 || !TryParseNumero(campi[2], out int fondamentale)
                 || fondamentale < 0 || fondamentale > 11
                 || !TryParseTipoAccordo(campi[3], out TipoAccordo tipo))
+            {
+                return false;
+            }
+
+            int trasposizioneOttave = 0;
+            if (campi.Length == 5
+                && (!TryParseNumero(campi[4], out trasposizioneOttave)
+                    || trasposizioneOttave < 0 || trasposizioneOttave > 1))
             {
                 return false;
             }
@@ -67,7 +75,8 @@ namespace VisualMusicBlockLooper.Core
             {
                 Tipo = TipoCartoncino.Accordo,
                 Fondamentale = fondamentale,
-                Accordo = tipo
+                Accordo = tipo,
+                TrasposizioneOttave = trasposizioneOttave
             };
             return true;
         }

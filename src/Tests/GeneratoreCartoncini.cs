@@ -91,23 +91,31 @@ namespace VisualMusicBlockLooper.Tests
         };
 
         /// <summary>
-        /// Crea un cartoncino di accordo: il corpo usa il colore del fondamentale a partire da Do3,
-        /// quindi Do+ è colorato come Do3. Il payload è la codifica compatta VMBL1;A;pc;tipo.
+        /// Crea un cartoncino di accordo. La trasposizione 0 usa chiave di basso e payload storico;
+        /// la trasposizione 1 usa chiave di violino e suona l'accordo un'ottava più in alto.
         /// </summary>
         public static Bitmap CartoncinoAccordo(int fondamentale, TipoAccordo tipo, int passi = 2,
-            double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
+            double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault, int trasposizioneOttave = 0)
         {
             if (fondamentale < 0 || fondamentale > 11)
             {
                 throw new ArgumentOutOfRangeException(nameof(fondamentale));
             }
+            if (trasposizioneOttave < 0 || trasposizioneOttave > 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(trasposizioneOttave));
+            }
 
             int pc = fondamentale % 12;
             string etichetta = NomiNote[pc] + Accordi.Simbolo(tipo);
-            Color corpo = ColoriNote.DaMidi(Accordi.MidiBase + pc);
+            int midiFondamentale = Accordi.MidiBase + pc + 12 * trasposizioneOttave;
+            Color corpo = ColoriNote.DaMidi(midiFondamentale);
             IReadOnlyList<int> note = Accordi.Note(pc, tipo);
-            Action<Graphics, RectangleF> disegnaAccordo = (g, area) => DisegnaPentagrammaAccordo(g, pc, tipo, note, area);
-            return Disegna($"VMBL1;A;{pc};{Accordi.Codice(tipo)}", corpo, etichetta,
+            Action<Graphics, RectangleF> disegnaAccordo = (g, area) =>
+                DisegnaPentagrammaAccordo(g, pc, tipo, note, area, trasposizioneOttave);
+            string payload = $"VMBL1;A;{pc};{Accordi.Codice(tipo)}" +
+                (trasposizioneOttave == 0 ? string.Empty : $";{trasposizioneOttave}");
+            return Disegna(payload, corpo, etichetta,
                 passi, passoMm, altezzaMm, ErrorCorrectionLevel.L,
                 disegnaIllustrazione: disegnaAccordo, altezzaDisegnoIllustrazione: 1f);
         }
@@ -160,7 +168,7 @@ namespace VisualMusicBlockLooper.Tests
             }
         }
 
-        /// <summary>Genera tutti i cartoncini di accordo e i 16 cartoncini di canale in una cartella.</summary>
+        /// <summary>Genera i cartoncini degli accordi nelle due ottave e i 16 cartoncini di canale.</summary>
         public static void GeneraAccordiECanali(string cartella, double passoMm = PassoMmDefault,
             double altezzaMm = AltezzaMmDefault, int passi = PassiDefault)
         {
@@ -184,10 +192,33 @@ namespace VisualMusicBlockLooper.Tests
                 }
             }
 
+            GeneraAccordiChiaveViolino(Path.Combine(cartella, "chiave-violino"), passoMm, altezzaMm, passi);
+
             for (int canale = 1; canale <= 16; canale++)
             {
                 Salva(CartoncinoCanale(canale, passi, passoMm, altezzaMm),
                     Path.Combine(cartella, $"canale-{canale:00}.png"));
+            }
+        }
+
+        /// <summary>Genera la serie dei 96 accordi in chiave di violino, trasposti un'ottava sopra.</summary>
+        public static void GeneraAccordiChiaveViolino(string cartella, double passoMm = PassoMmDefault,
+            double altezzaMm = AltezzaMmDefault, int passi = PassiDefault)
+        {
+            Directory.CreateDirectory(cartella);
+            foreach (string vecchio in Directory.GetFiles(cartella, "accordo-*.png"))
+            {
+                File.Delete(vecchio);
+            }
+
+            for (int pc = 0; pc < 12; pc++)
+            {
+                foreach (TipoAccordo tipo in QualitaStampate)
+                {
+                    string nome = $"accordo-{SuffissiFileNote[pc]}-{SuffissoFile(tipo)}.png";
+                    Salva(CartoncinoAccordo(pc, tipo, passi, passoMm, altezzaMm, trasposizioneOttave: 1),
+                        Path.Combine(cartella, nome));
+                }
             }
         }
 
@@ -754,7 +785,7 @@ namespace VisualMusicBlockLooper.Tests
 
         /// <summary>Disegna sul pentagramma tutte le note dell'accordo, nello stesso stile delle note singole.</summary>
         private static void DisegnaPentagrammaAccordo(Graphics g, int fondamentale, TipoAccordo tipo,
-            IReadOnlyList<int> noteMidi, RectangleF area)
+            IReadOnlyList<int> noteMidi, RectangleF area, int trasposizioneOttave)
         {
             if (noteMidi == null || noteMidi.Count == 0 || area.Width <= 0 || area.Height <= 0)
             {
@@ -772,6 +803,7 @@ namespace VisualMusicBlockLooper.Tests
                 float passoDiatonico = mm;
                 float passoRigo = 2 * mm;
                 float lineaBassa = area.Y + area.Height * 0.73f;
+                int gradoLineaBassa = trasposizioneOttave == 0 ? 18 : 30; // Sol2 basso, Mi4 violino.
                 float xSinistra = area.X + mm;
                 float xDestra = area.Right - mm;
                 float xNote = area.X + area.Width * 0.78f;
@@ -787,9 +819,11 @@ namespace VisualMusicBlockLooper.Tests
                         g.DrawLine(lineaRigo, xSinistra, y, xDestra, y);
                     }
 
-                    // Le voci partono da Do3; la chiave di basso mantiene la maggior parte dei suoni sul rigo.
-                    string chiaveDiBasso = char.ConvertFromUtf32(0x1D122);
-                    using (Font fontChiave = new Font("Segoe UI Symbol", 9.5f * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
+                    bool chiaveViolino = trasposizioneOttave > 0;
+                    string simboloChiave = char.ConvertFromUtf32(chiaveViolino ? 0x1D11E : 0x1D122);
+                    float altezzaChiaveMm = chiaveViolino ? 15f : 9.5f;
+                    float yChiave = lineaBassa - (chiaveViolino ? 12f : 10f) * mm;
+                    using (Font fontChiave = new Font("Segoe UI Symbol", altezzaChiaveMm * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
                     using (StringFormat formatoChiave = new StringFormat
                     {
                         Alignment = StringAlignment.Center,
@@ -799,21 +833,22 @@ namespace VisualMusicBlockLooper.Tests
                     {
                         RectangleF areaChiave = new RectangleF(
                             area.X + mm * 0.3f,
-                            lineaBassa - mm * 10,
+                            yChiave,
                             mm * 9,
-                            mm * 12);
-                        g.DrawString(chiaveDiBasso, fontChiave, nero, areaChiave, formatoChiave);
+                            (chiaveViolino ? 15f : 12f) * mm);
+                        g.DrawString(simboloChiave, fontChiave, nero, areaChiave, formatoChiave);
                     }
 
                     int[] passiDiatonici = PassiDiatoniciAccordo(tipo);
-                    int midiFondamentale = Accordi.MidiBase + fondamentale;
+                    int midiFondamentale = Accordi.MidiBase + fondamentale + 12 * trasposizioneOttave;
                     int gradoFondamentale = (midiFondamentale / 12 - 1) * 7 + GradiDiatonici[fondamentale];
                     var note = noteMidi
                         .Select((midi, indice) =>
                         {
                             int grado = gradoFondamentale + passiDiatonici[indice];
                             int naturale = (grado / 7 + 1) * 12 + SemitoniNaturali[grado % 7];
-                            return new { Grado = grado, Alterazione = midi - naturale };
+                            int midiTrasposto = midi + 12 * trasposizioneOttave;
+                            return new { Grado = grado, Alterazione = midiTrasposto - naturale };
                         })
                         .OrderBy(nota => nota.Grado)
                         .ToList();
@@ -843,7 +878,7 @@ namespace VisualMusicBlockLooper.Tests
                             bool secondaAdiacente = gradoPrecedente != int.MinValue && nota.Grado == gradoPrecedente + 1;
                             float spostamento = secondaAdiacente && !testaPrecedenteSpostata ? spostamentoSeconda : 0;
                             float x = xNote + spostamento;
-                            int offset = nota.Grado - 18; // La linea inferiore in chiave di basso è Sol2.
+                            int offset = nota.Grado - gradoLineaBassa;
                             float y = lineaBassa - offset * passoDiatonico;
 
                             if (offset >= 10)

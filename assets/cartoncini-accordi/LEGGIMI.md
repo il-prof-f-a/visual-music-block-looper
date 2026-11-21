@@ -41,10 +41,17 @@ Il corpo del cartoncino usa il colore spettrale del fondamentale **nel terzo reg
 Do+ è colorato come Do3, Sol7 come Sol3, ecc. Il colore non viene letto dalla telecamera:
 la guida lo ricalcola dal QR.
 
+La serie alternativa in `chiave-violino/` contiene gli stessi 96 accordi scritti in chiave di
+violino e trasposti di un'ottava. Il suo QR aggiunge il campo `;1`, per esempio
+`VMBL1;A;0;+;1`: Do+ suona MIDI 60-64-67 (Do4-Mi4-Sol4). I payload storici a quattro campi
+continuano a suonare dall'ottava Do3. Il colore dei cartoncini alternativi segue il fondamentale
+nel quarto registro.
+
 Nel rettangolo bianco a destra tutte le note dell'accordo sono disegnate insieme sul pentagramma,
-con chiave di basso e teste di nota vuote come nei cartoncini cromatici. Diesis e bemolli sono
-raggruppati all'inizio del rigo, in corrispondenza delle note alterate, anziché accanto alle teste.
-La grafia segue gli intervalli dell'accordo e può usare anche doppi diesis o doppi bemolli.
+con chiave di basso nella serie principale e chiave di violino nella serie alternativa, e teste di
+nota vuote come nei cartoncini cromatici. Diesis e bemolli sono raggruppati all'inizio del rigo,
+in corrispondenza delle note alterate, anziché accanto alle teste. La grafia segue gli intervalli
+dell'accordo e può usare anche doppi diesis o doppi bemolli.
 Gli accordi di settima mostrano tutte e quattro le note.
 
 Sulla griglia il cartoncino si usa come una nota: la colonna dà l'attacco, la larghezza dà la

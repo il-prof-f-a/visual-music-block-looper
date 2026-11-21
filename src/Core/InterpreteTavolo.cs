@@ -212,10 +212,12 @@ namespace VisualMusicBlockLooper.Core
                 int idClip = n.Payload.IdClip;
                 if (accordo)
                 {
-                    // Il cartoncino porta la classe di altezza; la voce parte da Do3 e il colore
-                    // resta quello del terzo registro, come richiesto per il materiale stampato.
-                    noteMidi = Accordi.Note(n.Payload.Fondamentale, n.Payload.Accordo).ToArray();
-                    idClip = Accordi.MidiBase + n.Payload.Fondamentale - 36;
+                    // I payload storici partono da Do3; la quinta voce opzionale alza l'accordo di ottava.
+                    noteMidi = Accordi.Note(n.Payload.Fondamentale, n.Payload.Accordo)
+                        .Select(midi => midi + 12 * n.Payload.TrasposizioneOttave)
+                        .ToArray();
+                    idClip = Accordi.MidiBase + n.Payload.Fondamentale
+                        + 12 * n.Payload.TrasposizioneOttave - 36;
                 }
                 else if (n.Payload.NotaMidi >= 0)
                 {

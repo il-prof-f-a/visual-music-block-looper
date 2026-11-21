@@ -82,6 +82,9 @@ namespace VisualMusicBlockLooper.Core
         /// <summary>Qualità dell'accordo (solo per Tipo = Accordo).</summary>
         public TipoAccordo Accordo { get; set; }
 
+        /// <summary>Ottave di trasposizione dell'accordo: 0 usa la voce storica da Do3, 1 la alza di 12 semitoni.</summary>
+        public int TrasposizioneOttave { get; set; }
+
         /// <summary>Nome breve dello strumento (solo per Impostazione = Strumento).</summary>
         public string Strumento { get; set; }
     }

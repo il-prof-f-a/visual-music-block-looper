@@ -41,6 +41,10 @@ Il corpo del cartoncino usa il colore spettrale del fondamentale **nel terzo reg
 Do+ è colorato come Do3, Sol7 come Sol3, ecc. Il colore non viene letto dalla telecamera:
 la guida lo ricalcola dal QR.
 
+Nel rettangolo bianco a destra le note dell'accordo sono stampate una per riga, con la relativa
+ottava. Per esempio, Do+ mostra `Do3`, `Mi3`, `Sol3`; gli accordi di settima mostrano tutte e
+quattro le note.
+
 Sulla griglia il cartoncino si usa come una nota: la colonna dà l'attacco, la larghezza dà la
 durata. Tutte le note dell'accordo partono e si spengono insieme.
 

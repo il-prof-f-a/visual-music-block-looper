@@ -488,6 +488,8 @@ namespace VisualMusicBlockLooper.Tests
         private static void DisegnaDettaglio(Graphics g, string testo, RectangleF area)
         {
             g.TextRenderingHint = TextRenderingHint.AntiAlias;
+            string[] note = testo.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            string testoSuRighe = string.Join(Environment.NewLine, note);
             using (StringFormat formato = new StringFormat
             {
                 Alignment = StringAlignment.Center,
@@ -495,14 +497,14 @@ namespace VisualMusicBlockLooper.Tests
                 FormatFlags = StringFormatFlags.NoWrap
             })
             {
-                float punti = 12f;
+                float punti = note.Length > 3 ? 18f : 20f;
                 Font font;
                 do
                 {
                     font = new Font("Arial", punti, FontStyle.Bold, GraphicsUnit.Point);
-                    SizeF misura = g.MeasureString(testo, font, new SizeF(float.MaxValue, float.MaxValue), formato);
+                    SizeF misura = g.MeasureString(testoSuRighe, font, new SizeF(float.MaxValue, float.MaxValue), formato);
                     bool entra = misura.Width * 1.08f <= area.Width && misura.Height <= area.Height;
-                    if (entra || punti <= 4f)
+                    if (entra || punti <= 8f)
                     {
                         break;
                     }
@@ -514,7 +516,7 @@ namespace VisualMusicBlockLooper.Tests
                 using (font)
                 using (Brush penna = new SolidBrush(Color.Black))
                 {
-                    g.DrawString(testo, font, penna, area, formato);
+                    g.DrawString(testoSuRighe, font, penna, area, formato);
                 }
             }
         }

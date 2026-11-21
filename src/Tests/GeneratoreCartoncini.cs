@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.IO;
@@ -73,6 +74,7 @@ namespace VisualMusicBlockLooper.Tests
         public static readonly string[] NomiNote = { "Do", "Do♯", "Re", "Re♯", "Mi", "Fa", "Fa♯", "Sol", "Sol♯", "La", "La♯", "Si" };
 
         private static readonly string[] SuffissiFileNote = { "do", "do-diesis", "re", "re-diesis", "mi", "fa", "fa-diesis", "sol", "sol-diesis", "la", "la-diesis", "si" };
+        private static readonly int[] GradiDiatonici = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 };
 
         /// <summary>Qualità stampate per ogni fondamentale: le quattro richieste e le combinazioni principali.</summary>
         public static readonly TipoAccordo[] QualitaStampate =
@@ -102,10 +104,11 @@ namespace VisualMusicBlockLooper.Tests
             int pc = fondamentale % 12;
             string etichetta = NomiNote[pc] + Accordi.Simbolo(tipo);
             Color corpo = ColoriNote.DaMidi(Accordi.MidiBase + pc);
-            string dettaglio = string.Join(" ", Accordi.Note(pc, tipo)
-                .Select(midi => NomiNote[midi % 12] + (midi / 12 - 1)));
+            IReadOnlyList<int> note = Accordi.Note(pc, tipo);
+            Action<Graphics, RectangleF> disegnaAccordo = (g, area) => DisegnaPentagrammaAccordo(g, note, area);
             return Disegna($"VMBL1;A;{pc};{Accordi.Codice(tipo)}", corpo, etichetta,
-                passi, passoMm, altezzaMm, ErrorCorrectionLevel.L, dettaglio);
+                passi, passoMm, altezzaMm, ErrorCorrectionLevel.L,
+                disegnaIllustrazione: disegnaAccordo, altezzaDisegnoIllustrazione: 1f);
         }
 
         /// <summary>Crea un cartoncino CANALE per la fascia destra, con illustrazione per i canali 1-15.</summary>
@@ -287,7 +290,7 @@ namespace VisualMusicBlockLooper.Tests
         /// </summary>
         public static Bitmap Disegna(string payload, Color colore, string etichetta, int passi, double passoMm, double altezzaMm,
             ErrorCorrectionLevel? livelloEcc = null, string dettaglio = null, string percorsoIcona = null,
-            Action<Graphics, RectangleF> disegnaIllustrazione = null)
+            Action<Graphics, RectangleF> disegnaIllustrazione = null, float altezzaDisegnoIllustrazione = 0.78f)
         {
             if (passi < PassiMinimi)
             {
@@ -331,7 +334,7 @@ namespace VisualMusicBlockLooper.Tests
                     bool haIcona = !string.IsNullOrEmpty(percorsoIcona) && File.Exists(percorsoIcona);
                     if (disegnaIllustrazione != null)
                     {
-                        float altezzaIllustrazione = hArea * 0.78f;
+                        float altezzaIllustrazione = hArea * altezzaDisegnoIllustrazione;
                         disegnaIllustrazione(g, new RectangleF(xArea, yArea, wArea, altezzaIllustrazione));
                     }
                     else if (haIcona)
@@ -518,6 +521,136 @@ namespace VisualMusicBlockLooper.Tests
                 {
                     g.DrawString(testoSuRighe, font, penna, area, formato);
                 }
+            }
+        }
+
+        /// <summary>Disegna sul pentagramma tutte le note dell'accordo, nello stesso stile delle note singole.</summary>
+        private static void DisegnaPentagrammaAccordo(Graphics g, IReadOnlyList<int> noteMidi, RectangleF area)
+        {
+            if (noteMidi == null || noteMidi.Count == 0 || area.Width <= 0 || area.Height <= 0)
+            {
+                return;
+            }
+
+            GraphicsState stato = g.Save();
+            try
+            {
+                g.SetClip(area);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
+                float mm = (float)(Dpi / 25.4);
+                float passoDiatonico = mm;
+                float passoRigo = 2 * mm;
+                float lineaBassa = area.Y + area.Height * 0.73f;
+                float xSinistra = area.X + mm;
+                float xDestra = area.Right - mm;
+                float xNote = area.X + area.Width * 0.69f;
+                using (Pen lineaRigo = new Pen(Color.FromArgb(31, 31, 31), Math.Max(1f, 0.13f * mm)))
+                using (Pen lineaAggiuntiva = new Pen(Color.Black, Math.Max(1f, 0.17f * mm)))
+                using (Pen contornoNota = new Pen(Color.Black, Math.Max(1f, 0.33f * mm)))
+                using (SolidBrush riempimentoNota = new SolidBrush(Color.White))
+                using (SolidBrush nero = new SolidBrush(Color.Black))
+                {
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float y = lineaBassa - i * passoRigo;
+                        g.DrawLine(lineaRigo, xSinistra, y, xDestra, y);
+                    }
+
+                    // Le voci partono da Do3; la chiave di basso mantiene la maggior parte dei suoni sul rigo.
+                    string chiaveDiBasso = char.ConvertFromUtf32(0x1D122);
+                    using (Font fontChiave = new Font("Segoe UI Symbol", 9.5f * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
+                    using (StringFormat formatoChiave = new StringFormat
+                    {
+                        Alignment = StringAlignment.Center,
+                        LineAlignment = StringAlignment.Center,
+                        FormatFlags = StringFormatFlags.NoWrap
+                    })
+                    {
+                        RectangleF areaChiave = new RectangleF(
+                            area.X + mm * 0.3f,
+                            lineaBassa - mm * 10,
+                            mm * 9,
+                            mm * 12);
+                        g.DrawString(chiaveDiBasso, fontChiave, nero, areaChiave, formatoChiave);
+                    }
+
+                    var note = noteMidi
+                        .Select(midi => new
+                        {
+                            Grado = (midi / 12 - 1) * 7 + GradiDiatonici[midi % 12],
+                            Diesis = midi % 12 == 1 || midi % 12 == 3 || midi % 12 == 6 || midi % 12 == 8 || midi % 12 == 10
+                        })
+                        .OrderBy(nota => nota.Grado)
+                        .ToList();
+
+                    // Nei cluster di seconde le teste devono restare distinguibili anche quando
+                    // due note adiacenti occupano posizioni verticali molto vicine.
+                    float spostamentoSeconda = 3.4f * mm;
+                    int gradoPrecedente = int.MinValue;
+                    bool testaPrecedenteSpostata = false;
+                    using (Font fontDiesis = new Font("Segoe UI Symbol", 4.8f * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
+                    using (StringFormat formatoDiesis = new StringFormat
+                    {
+                        Alignment = StringAlignment.Center,
+                        LineAlignment = StringAlignment.Center,
+                        FormatFlags = StringFormatFlags.NoWrap
+                    })
+                    {
+                        foreach (var nota in note)
+                        {
+                            bool secondaAdiacente = gradoPrecedente != int.MinValue && nota.Grado == gradoPrecedente + 1;
+                            float spostamento = secondaAdiacente && !testaPrecedenteSpostata ? spostamentoSeconda : 0;
+                            float x = xNote + spostamento;
+                            int offset = nota.Grado - 18; // La linea inferiore in chiave di basso è Sol2.
+                            float y = lineaBassa - offset * passoDiatonico;
+
+                            if (offset >= 10)
+                            {
+                                for (int ledger = 10; ledger <= offset; ledger += 2)
+                                {
+                                    float yLedger = lineaBassa - ledger * passoDiatonico;
+                                    g.DrawLine(lineaAggiuntiva, x - 2 * mm, yLedger, x + 2 * mm, yLedger);
+                                }
+                            }
+                            else if (offset <= -2)
+                            {
+                                for (int ledger = -2; ledger >= offset; ledger -= 2)
+                                {
+                                    float yLedger = lineaBassa - ledger * passoDiatonico;
+                                    g.DrawLine(lineaAggiuntiva, x - 2 * mm, yLedger, x + 2 * mm, yLedger);
+                                }
+                            }
+
+                            if (nota.Diesis)
+                            {
+                                RectangleF areaDiesis = new RectangleF(x - 5.2f * mm, y - 3.5f * mm, 3.2f * mm, 7 * mm);
+                                g.DrawString("♯", fontDiesis, nero, areaDiesis, formatoDiesis);
+                            }
+
+                            using (GraphicsPath rombo = new GraphicsPath())
+                            {
+                                rombo.AddPolygon(new[]
+                                {
+                                    new PointF(x - 1.6f * mm, y),
+                                    new PointF(x, y - 1.05f * mm),
+                                    new PointF(x + 1.6f * mm, y),
+                                    new PointF(x, y + 1.05f * mm)
+                                });
+                                g.FillPath(riempimentoNota, rombo);
+                                g.DrawPath(contornoNota, rombo);
+                            }
+
+                            gradoPrecedente = nota.Grado;
+                            testaPrecedenteSpostata = spostamento > 0;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                g.Restore(stato);
             }
         }
 

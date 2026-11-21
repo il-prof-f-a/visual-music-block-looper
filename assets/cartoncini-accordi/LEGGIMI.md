@@ -42,8 +42,10 @@ Do+ è colorato come Do3, Sol7 come Sol3, ecc. Il colore non viene letto dalla t
 la guida lo ricalcola dal QR.
 
 Nel rettangolo bianco a destra tutte le note dell'accordo sono disegnate insieme sul pentagramma,
-con chiave di basso, teste di nota vuote e diesis come nei cartoncini cromatici. Gli accordi di
-settima mostrano tutte e quattro le note.
+con chiave di basso e teste di nota vuote come nei cartoncini cromatici. Diesis e bemolli sono
+raggruppati all'inizio del rigo, in corrispondenza delle note alterate, anziché accanto alle teste.
+La grafia segue gli intervalli dell'accordo e può usare anche doppi diesis o doppi bemolli.
+Gli accordi di settima mostrano tutte e quattro le note.
 
 Sulla griglia il cartoncino si usa come una nota: la colonna dà l'attacco, la larghezza dà la
 durata. Tutte le note dell'accordo partono e si spengono insieme.

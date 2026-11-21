@@ -75,6 +75,7 @@ namespace VisualMusicBlockLooper.Tests
 
         private static readonly string[] SuffissiFileNote = { "do", "do-diesis", "re", "re-diesis", "mi", "fa", "fa-diesis", "sol", "sol-diesis", "la", "la-diesis", "si" };
         private static readonly int[] GradiDiatonici = { 0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6 };
+        private static readonly int[] SemitoniNaturali = { 0, 2, 4, 5, 7, 9, 11 };
 
         /// <summary>Qualità stampate per ogni fondamentale: le quattro richieste e le combinazioni principali.</summary>
         public static readonly TipoAccordo[] QualitaStampate =
@@ -105,7 +106,7 @@ namespace VisualMusicBlockLooper.Tests
             string etichetta = NomiNote[pc] + Accordi.Simbolo(tipo);
             Color corpo = ColoriNote.DaMidi(Accordi.MidiBase + pc);
             IReadOnlyList<int> note = Accordi.Note(pc, tipo);
-            Action<Graphics, RectangleF> disegnaAccordo = (g, area) => DisegnaPentagrammaAccordo(g, note, area);
+            Action<Graphics, RectangleF> disegnaAccordo = (g, area) => DisegnaPentagrammaAccordo(g, pc, tipo, note, area);
             return Disegna($"VMBL1;A;{pc};{Accordi.Codice(tipo)}", corpo, etichetta,
                 passi, passoMm, altezzaMm, ErrorCorrectionLevel.L,
                 disegnaIllustrazione: disegnaAccordo, altezzaDisegnoIllustrazione: 1f);
@@ -525,7 +526,8 @@ namespace VisualMusicBlockLooper.Tests
         }
 
         /// <summary>Disegna sul pentagramma tutte le note dell'accordo, nello stesso stile delle note singole.</summary>
-        private static void DisegnaPentagrammaAccordo(Graphics g, IReadOnlyList<int> noteMidi, RectangleF area)
+        private static void DisegnaPentagrammaAccordo(Graphics g, int fondamentale, TipoAccordo tipo,
+            IReadOnlyList<int> noteMidi, RectangleF area)
         {
             if (noteMidi == null || noteMidi.Count == 0 || area.Width <= 0 || area.Height <= 0)
             {
@@ -545,7 +547,7 @@ namespace VisualMusicBlockLooper.Tests
                 float lineaBassa = area.Y + area.Height * 0.73f;
                 float xSinistra = area.X + mm;
                 float xDestra = area.Right - mm;
-                float xNote = area.X + area.Width * 0.69f;
+                float xNote = area.X + area.Width * 0.78f;
                 using (Pen lineaRigo = new Pen(Color.FromArgb(31, 31, 31), Math.Max(1f, 0.13f * mm)))
                 using (Pen lineaAggiuntiva = new Pen(Color.Black, Math.Max(1f, 0.17f * mm)))
                 using (Pen contornoNota = new Pen(Color.Black, Math.Max(1f, 0.33f * mm)))
@@ -576,22 +578,33 @@ namespace VisualMusicBlockLooper.Tests
                         g.DrawString(chiaveDiBasso, fontChiave, nero, areaChiave, formatoChiave);
                     }
 
+                    int[] passiDiatonici = PassiDiatoniciAccordo(tipo);
+                    int midiFondamentale = Accordi.MidiBase + fondamentale;
+                    int gradoFondamentale = (midiFondamentale / 12 - 1) * 7 + GradiDiatonici[fondamentale];
                     var note = noteMidi
-                        .Select(midi => new
+                        .Select((midi, indice) =>
                         {
-                            Grado = (midi / 12 - 1) * 7 + GradiDiatonici[midi % 12],
-                            Diesis = midi % 12 == 1 || midi % 12 == 3 || midi % 12 == 6 || midi % 12 == 8 || midi % 12 == 10
+                            int grado = gradoFondamentale + passiDiatonici[indice];
+                            int naturale = (grado / 7 + 1) * 12 + SemitoniNaturali[grado % 7];
+                            return new { Grado = grado, Alterazione = midi - naturale };
                         })
                         .OrderBy(nota => nota.Grado)
                         .ToList();
 
                     // Nei cluster di seconde le teste devono restare distinguibili anche quando
                     // due note adiacenti occupano posizioni verticali molto vicine.
-                    float spostamentoSeconda = 3.4f * mm;
+                    float spostamentoSeconda = 2.3f * mm;
                     int gradoPrecedente = int.MinValue;
                     bool testaPrecedenteSpostata = false;
-                    using (Font fontDiesis = new Font("Segoe UI Symbol", 4.8f * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
-                    using (StringFormat formatoDiesis = new StringFormat
+                    var noteAlterate = note.Where(nota => nota.Alterazione != 0).OrderBy(nota => nota.Grado).ToList();
+                    var colonneAlterazioni = new Dictionary<int, float>();
+                    for (int i = 0; i < noteAlterate.Count; i++)
+                    {
+                        colonneAlterazioni[noteAlterate[i].Grado] = area.X + (8.4f + i * 1.6f) * mm;
+                    }
+
+                    using (Font fontAlterazione = new Font("Segoe UI Symbol", 3.2f * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
+                    using (StringFormat formatoAlterazione = new StringFormat
                     {
                         Alignment = StringAlignment.Center,
                         LineAlignment = StringAlignment.Center,
@@ -623,12 +636,6 @@ namespace VisualMusicBlockLooper.Tests
                                 }
                             }
 
-                            if (nota.Diesis)
-                            {
-                                RectangleF areaDiesis = new RectangleF(x - 5.2f * mm, y - 3.5f * mm, 3.2f * mm, 7 * mm);
-                                g.DrawString("♯", fontDiesis, nero, areaDiesis, formatoDiesis);
-                            }
-
                             using (GraphicsPath rombo = new GraphicsPath())
                             {
                                 rombo.AddPolygon(new[]
@@ -642,6 +649,18 @@ namespace VisualMusicBlockLooper.Tests
                                 g.DrawPath(contornoNota, rombo);
                             }
 
+                            if (nota.Alterazione != 0)
+                            {
+                                float xAlterazione = colonneAlterazioni[nota.Grado];
+                                RectangleF areaAlterazione = new RectangleF(
+                                    xAlterazione - 1.2f * mm,
+                                    y - 2.2f * mm,
+                                    2.4f * mm,
+                                    4.4f * mm);
+                                g.DrawString(SimboloAlterazione(nota.Alterazione), fontAlterazione, nero,
+                                    areaAlterazione, formatoAlterazione);
+                            }
+
                             gradoPrecedente = nota.Grado;
                             testaPrecedenteSpostata = spostamento > 0;
                         }
@@ -651,6 +670,34 @@ namespace VisualMusicBlockLooper.Tests
             finally
             {
                 g.Restore(stato);
+            }
+        }
+
+        private static int[] PassiDiatoniciAccordo(TipoAccordo tipo)
+        {
+            switch (tipo)
+            {
+                case TipoAccordo.SospesaSeconda: return new[] { 0, 1, 4 };
+                case TipoAccordo.SospesaQuarta: return new[] { 0, 3, 4 };
+                case TipoAccordo.Sesta:
+                case TipoAccordo.MinoreSesta: return new[] { 0, 2, 4, 5 };
+                case TipoAccordo.Settima:
+                case TipoAccordo.MinoreSettima:
+                case TipoAccordo.MaggioreSettima:
+                case TipoAccordo.DiminuitoSettima: return new[] { 0, 2, 4, 6 };
+                default: return new[] { 0, 2, 4 };
+            }
+        }
+
+        private static string SimboloAlterazione(int alterazione)
+        {
+            switch (alterazione)
+            {
+                case -2: return char.ConvertFromUtf32(0x1D12B); // Doppio bemolle
+                case -1: return "♭";
+                case 1: return "♯";
+                case 2: return char.ConvertFromUtf32(0x1D12A); // Doppio diesis
+                default: return string.Empty;
             }
         }
 

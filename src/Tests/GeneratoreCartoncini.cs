@@ -220,8 +220,235 @@ namespace VisualMusicBlockLooper.Tests
         public static Bitmap CartoncinoSpeciale(string payload, string etichetta, int passi = 2,
             double passoMm = PassoMmDefault, double altezzaMm = AltezzaMmDefault)
         {
+            Action<Graphics, RectangleF> illustrazione = (g, area) => DisegnaIllustrazioneSpeciale(g, payload, area);
             return Disegna(payload, ColoreSpeciale, etichetta, passi, passoMm, altezzaMm,
-                ErrorCorrectionLevel.L);
+                ErrorCorrectionLevel.L, disegnaIllustrazione: illustrazione, altezzaDisegnoIllustrazione: 1f);
+        }
+
+        private static void DisegnaIllustrazioneSpeciale(Graphics g, string payload, RectangleF area)
+        {
+            string[] parti = (payload ?? string.Empty).Split(';');
+            if (parti.Length < 4 || parti[0] != "VMBL1" || parti[1] != "S")
+            {
+                return;
+            }
+
+            if (parti[2] == "MISURA" && int.TryParse(parti[3], out int battiti))
+            {
+                DisegnaTempoInPentagramma(g, area, battiti);
+            }
+            else if (parti[2] == "LINK" && int.TryParse(parti[3], out int righe))
+            {
+                DisegnaLinkRighe(g, area, righe);
+            }
+            else if (parti[2] == "AB" && parti.Length >= 5
+                && int.TryParse(parti[3], out int inizio) && int.TryParse(parti[4], out int fine))
+            {
+                DisegnaLoopMisure(g, area, Math.Max(1, fine - inizio + 1));
+            }
+        }
+
+        private static void DisegnaTempoInPentagramma(Graphics g, RectangleF area, int battiti)
+        {
+            GraphicsState stato = g.Save();
+            try
+            {
+                g.SetClip(area);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
+                float mm = (float)(Dpi / 25.4);
+                float centroY = area.Y + area.Height * 0.5f;
+                float passoRigo = 2f * mm;
+                float lineaAlta = centroY - 2f * passoRigo;
+                using (Pen rigo = new Pen(Color.FromArgb(35, 35, 35), Math.Max(1f, 0.14f * mm)))
+                using (SolidBrush nero = new SolidBrush(Color.Black))
+                using (Font chiave = new Font("Segoe UI Symbol", 9.5f * 72f / 25.4f, FontStyle.Regular, GraphicsUnit.Point))
+                using (Font cifra = new Font("Times New Roman", 16f, FontStyle.Bold, GraphicsUnit.Point))
+                using (StringFormat centrato = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                })
+                {
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float y = lineaAlta + i * passoRigo;
+                        g.DrawLine(rigo, area.X + mm, y, area.Right - mm, y);
+                    }
+
+                    string chiaveDiViolino = char.ConvertFromUtf32(0x1D11E);
+                    RectangleF areaChiave = new RectangleF(
+                        area.X + 0.4f * mm,
+                        centroY - 6f * mm,
+                        7f * mm,
+                        12f * mm);
+                    g.DrawString(chiaveDiViolino, chiave, nero, areaChiave, centrato);
+
+                    float xCifra = area.X + area.Width * 0.70f;
+                    float distanza = 2f * mm;
+                    float altezzaCifra = 5f * mm;
+                    g.DrawString(battiti.ToString(), cifra, nero,
+                        new RectangleF(xCifra - 3f * mm, centroY - distanza - altezzaCifra / 2f,
+                            6f * mm, altezzaCifra), centrato);
+                    g.DrawString("4", cifra, nero,
+                        new RectangleF(xCifra - 3f * mm, centroY + distanza - altezzaCifra / 2f,
+                            6f * mm, altezzaCifra), centrato);
+                }
+            }
+            finally
+            {
+                g.Restore(stato);
+            }
+        }
+
+        private static void DisegnaLinkRighe(Graphics g, RectangleF area, int righe)
+        {
+            GraphicsState stato = g.Save();
+            try
+            {
+                g.SetClip(area);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
+                Color inchiostro = Color.FromArgb(69, 53, 74);
+                Color accento = Color.FromArgb(139, 94, 145);
+                float cx = area.X + area.Width / 2f;
+                float cy = area.Y + area.Height * 0.23f;
+                using (Pen contornoLink = new Pen(inchiostro, 4.2f))
+                using (Pen riga = new Pen(inchiostro, 2.5f))
+                using (Pen collegamento = new Pen(accento, 2.2f))
+                using (SolidBrush nodo = new SolidBrush(accento))
+                using (SolidBrush nero = new SolidBrush(inchiostro))
+                using (Font etichetta = new Font("Segoe UI", 10f, FontStyle.Bold, GraphicsUnit.Point))
+                using (StringFormat centrato = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                })
+                {
+                    GraphicsState statoLink = g.Save();
+                    try
+                    {
+                        g.TranslateTransform(cx, cy);
+                        g.RotateTransform(-28f);
+                        using (GraphicsPath primoAnello = CreaRettangoloArrotondato(new RectangleF(-45, -16, 62, 32), 16))
+                        using (GraphicsPath secondoAnello = CreaRettangoloArrotondato(new RectangleF(-17, -16, 62, 32), 16))
+                        {
+                            g.DrawPath(contornoLink, primoAnello);
+                            g.DrawPath(contornoLink, secondoAnello);
+                        }
+                    }
+                    finally
+                    {
+                        g.Restore(statoLink);
+                    }
+
+                    float xInizio = area.X + area.Width * 0.22f;
+                    float xFine = area.Right - area.Width * 0.22f;
+                    float yInizio = area.Y + area.Height * 0.47f;
+                    float yFine = area.Y + area.Height * 0.78f;
+                    float passo = righe <= 1 ? 0 : (yFine - yInizio) / (righe - 1);
+                    float yPrimo = righe <= 1 ? (yInizio + yFine) / 2f : yInizio;
+                    float yUltimo = righe <= 1 ? yPrimo : yFine;
+                    float xStaffa = xInizio - 9f;
+                    if (righe > 1)
+                    {
+                        g.DrawLine(collegamento, xStaffa, yPrimo, xStaffa, yUltimo);
+                    }
+
+                    for (int i = 0; i < righe; i++)
+                    {
+                        float y = righe <= 1 ? yPrimo : yInizio + i * passo;
+                        g.DrawLine(riga, xInizio, y, xFine, y);
+                        g.DrawLine(collegamento, xStaffa, y, xInizio - 4f, y);
+                        g.FillEllipse(nodo, xFine - 3.5f, y - 3.5f, 7f, 7f);
+                    }
+
+                    string testoRighe = righe == 1 ? "1 RIGA" : righe + " RIGHE";
+                    g.DrawString(testoRighe, etichetta, nero,
+                        new RectangleF(area.X + 4, area.Y + area.Height * 0.79f,
+                            area.Width - 8, area.Height * 0.18f), centrato);
+                }
+            }
+            finally
+            {
+                g.Restore(stato);
+            }
+        }
+
+        private static void DisegnaLoopMisure(Graphics g, RectangleF area, int misure)
+        {
+            GraphicsState stato = g.Save();
+            try
+            {
+                g.SetClip(area);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+
+                Color inchiostro = Color.FromArgb(69, 53, 74);
+                float cx = area.X + area.Width / 2f;
+                float cy = area.Y + area.Height * 0.34f;
+                float raggio = Math.Min(area.Width * 0.28f, area.Height * 0.21f);
+                RectangleF cerchio = new RectangleF(cx - raggio, cy - raggio, 2f * raggio, 2f * raggio);
+                using (Pen linea = new Pen(inchiostro, 5f))
+                using (SolidBrush riempimento = new SolidBrush(inchiostro))
+                using (SolidBrush testo = new SolidBrush(inchiostro))
+                using (Font font = new Font("Segoe UI", 10f, FontStyle.Bold, GraphicsUnit.Point))
+                using (StringFormat centrato = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                })
+                {
+                    const float angoloFine = 325f;
+                    g.DrawArc(linea, cerchio, 35f, 290f);
+
+                    double radianti = angoloFine * Math.PI / 180.0;
+                    float puntaX = cx + raggio * (float)Math.Cos(radianti);
+                    float puntaY = cy + raggio * (float)Math.Sin(radianti);
+                    float tangenteX = -(float)Math.Sin(radianti);
+                    float tangenteY = (float)Math.Cos(radianti);
+                    float baseX = puntaX - tangenteX * 15f;
+                    float baseY = puntaY - tangenteY * 15f;
+                    float normaleX = -tangenteY;
+                    float normaleY = tangenteX;
+                    using (GraphicsPath freccia = new GraphicsPath())
+                    {
+                        freccia.AddPolygon(new[]
+                        {
+                            new PointF(puntaX, puntaY),
+                            new PointF(baseX + normaleX * 8f, baseY + normaleY * 8f),
+                            new PointF(baseX - normaleX * 8f, baseY - normaleY * 8f)
+                        });
+                        g.FillPath(riempimento, freccia);
+                    }
+
+                    string etichetta = misure == 1 ? "1 MISURA" : misure + " MISURE";
+                    g.DrawString(etichetta, font, testo,
+                        new RectangleF(area.X + 4, area.Y + area.Height * 0.65f,
+                            area.Width - 8, area.Height * 0.22f), centrato);
+                }
+            }
+            finally
+            {
+                g.Restore(stato);
+            }
+        }
+
+        private static GraphicsPath CreaRettangoloArrotondato(RectangleF rettangolo, float raggio)
+        {
+            float diametro = raggio * 2f;
+            var path = new GraphicsPath();
+            path.AddArc(rettangolo.X, rettangolo.Y, diametro, diametro, 180, 90);
+            path.AddArc(rettangolo.Right - diametro, rettangolo.Y, diametro, diametro, 270, 90);
+            path.AddArc(rettangolo.Right - diametro, rettangolo.Bottom - diametro, diametro, diametro, 0, 90);
+            path.AddArc(rettangolo.X, rettangolo.Bottom - diametro, diametro, diametro, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         /// <summary>

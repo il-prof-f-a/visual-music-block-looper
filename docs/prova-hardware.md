@@ -2,23 +2,25 @@
 
 Procedura per la prova con il banco reale: proiettore, webcam, loopMIDI e Ableton Live. Serve a verificare il percorso completo: cartoncino -> webcam -> riconoscimento -> note MIDI -> Ableton, con clock Master e Slave e tap-tempo.
 
-Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGGIMI.md`).
+Il materiale stampabile è suddiviso in `assets/cartoncini-note/`, `assets/cartoncini-setting/`,
+`assets/cartoncini-canale/`, `assets/cartoncini-accordi/` e `assets/cartoncini-batteria/`. Ogni
+categoria ha il proprio indice o file LEGGIMI.
 
 ## 1. Requisiti
 
 | Elemento | Note |
 |---|---|
 | Windows 10/11 a 64 bit | L'app è net472. Nei progetti non è impostato `PlatformTarget` (compilazione AnyCPU di default). |
-| loopMIDI | Driver MIDI virtuale. Creare due porte con nome esatto **`VMBL`** (usata dall'app in uscita e in ingresso) e, solo per i test automatici, **`VMBL Test`**. |
+| loopMIDI | Driver MIDI virtuale. Con il file di configurazione fornito creare le porte **`VMBL`** (uscita dell'app) e **`VMBL-DAW`** (ingresso dell'app); per i soli test hardware è facoltativa **`VMBL Test`**. |
 | Ableton Live | Con preferenze MIDI accessibili (sezione Link/Tempo/MIDI). |
 | Webcam | All'avvio si apre la webcam indicata in `configurazione.json` (la prima, se il file non c'è). Si cambia dalla lista "Webcam" della finestra di controllo. Non deve essere usata da altre app (Teams, OBS, Zoom). |
 | Proiettore | Su secondo schermo, meglio in modalità "solo secondo schermo" (estendi). |
-| Cartoncini | Stampati a 100% da `assets/cartoncini/` (6 colori x 8 clip, 5 comandi, 22 speciali per misura, collegamento e A-B). |
+| Cartoncini | Stampati al 100% dalle cartelle `assets/cartoncini-*` (note, impostazioni, canali, accordi e batteria). |
 
 ## 2. Installazione loopMIDI
 
 1. Installare loopMIDI.
-2. Creare la porta **`VMBL`**. Il nome deve essere esattamente `VMBL`: l'app lo cerca con `GetByName` di DryWetMIDI (primo dispositivo con quel nome). Se non lo trova, l'avviso elenca le porte disponibili.
+2. Creare le porte **`VMBL`** e **`VMBL-DAW`**. I nomi devono corrispondere a `mappatura-default.json`: l'app cerca ogni porta con `GetByName` di DryWetMIDI. Se una manca, l'avviso elenca le porte disponibili.
 3. Facoltativo, solo per i test automatici di hardware: creare la porta **`VMBL Test`**. I test di categoria `Hardware` (`MidiIntegrazioneTests`) vengono saltati se questa porta manca (messaggio: "Porta MIDI 'VMBL Test' non presente").
 4. Lasciare loopMIDI aperto durante tutta la prova.
 
@@ -37,7 +39,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 1. Compilare la soluzione (o usare l'eseguibile già compilato). L'eseguibile è `VisualMusicBlockLooper.App.exe` nella cartella di output di `src/App` (es. `src/App/bin/Debug/net472/`).
 2. Tenere nella stessa cartella dell'exe il file `mappatura-default.json` (copiato automaticamente dal build). Il file `calibrazione.txt` viene salvato nella stessa cartella.
 3. Avviare l'exe. Nella finestra di controllo leggere la riga delle porte:
-   - `MIDI uscita: VMBL | ingresso: VMBL` senza "(non disponibile)": porte aperte.
+   - `MIDI uscita: VMBL | ingresso: VMBL-DAW` senza "(non disponibile)": porte aperte.
    - Riga di avviso "Webcam non trovata: modalità simulazione": la camera non è stata aperta (vedi sezione 10).
 
 ### Scelta della webcam e `configurazione.json`
@@ -77,7 +79,7 @@ Il materiale stampabile è in `assets/cartoncini/` (vedi `assets/cartoncini/LEGG
 
 La mappatura di default è in `assets/config/mappatura-default.json`:
 
-- Porte: uscita e ingresso **`VMBL`**.
+- Porte dal file fornito: uscita **`VMBL`**, ingresso **`VMBL-DAW`**.
 - Velocity **100**.
 - Canale MIDI per traccia: traccia 0 (Rosso) = canale 0 (in Ableton canale **1**), traccia 1 (Arancione) = canale 2, ..., traccia 5 (Viola) = canale 6. Il file usa canali 0-based, Ableton li mostra 1-based.
 - Nota per clip: **36 + idClip** (clip 0 = nota 36 = C1, clip 7 = nota 43). In `NotaPerClip` ci sono override per i clip 0, 1 e 9 con gli stessi valori di default.
@@ -124,12 +126,12 @@ Il bordo colorato descrive le celle effettivamente suonate. Per la prova con car
 4. Premere **Ferma** (o `VMBL1;C;STOP`): invia MIDI Stop, Ableton si ferma e le note in corso vengono spente.
 5. Osservare il BPM nella riga di stato: il clock è inviato in continuo anche da fermo.
 
-Nota: lo stesso nome di porta è usato in uscita e in ingresso, quindi ciò che l'app invia rientra nel suo ingresso. In Master il clock ricevuto è ignorato (nessun doppio tick). L'ingresso MIDI dell'app gestisce solo clock, Start, Stop e Continue: le note ricevute non hanno effetto sul motore.
+In Master, abilita Sync sull'ingresso Ableton **VMBL**, che riceve il clock inviato dall'app. L'ingresso dell'app resta sulla porta **VMBL-DAW**; in Master il clock esterno eventualmente ricevuto viene ignorato. L'ingresso MIDI dell'app gestisce solo clock, Start, Stop e Continue: le note ricevute non hanno effetto sul motore.
 
 ### Slave (Ableton guida il clock)
 
 1. All'avvio l'app è già in **Slave**: la riga di stato lo mostra senza premere altro. Il pulsante **Master / Slave** alterna i due modi (il cambio ferma la riproduzione).
-2. In Ableton, preferenze MIDI: abilitare l'**uscita** verso **VMBL** con sincronizzazione (Sync On). Ableton invia clock e Start/Stop alla porta.
+2. In Ableton, preferenze MIDI: abilitare l'**uscita** verso **VMBL-DAW** con sincronizzazione (Sync On). Ableton invia clock e Start/Stop all'ingresso dell'app.
 3. Avviare la riproduzione in Ableton: l'app riceve Start e segue i tick (6 tick = 1 step).
 4. Fermare la riproduzione in Ableton: l'app riceve Stop e spegne le note.
 5. Se il clock si interrompe per più di 500 ms, l'app ferma la riproduzione e spegne le note (timeout). Verificarlo togliendo il clock in Ableton a metà.
@@ -209,7 +211,7 @@ Misura suggerita (con registrazione audio):
 | Sintomo | Causa probabile | Azione |
 |---|---|---|
 | "Porta MIDI di uscita non disponibile" | Porta `VMBL` assente in loopMIDI o nome diverso. In questo caso l'app gira in modalità silenziosa. | Creare/rinominare la porta `VMBL` in loopMIDI, riavviare l'app. |
-| "Porta MIDI di ingresso non disponibile" | Porta `VMBL` in ingresso assente. | Come sopra. |
+| "Porta MIDI di ingresso non disponibile" | Porta `VMBL-DAW` in ingresso assente. | Creare o rinominare la porta `VMBL-DAW` in loopMIDI e riavviare l'app. |
 | "Webcam non trovata: modalità simulazione" | Camera non aperta (indice 0). Usata da un'altra app o scollegata. | Chiudere le altre app che usano la camera, ricollegare, riavviare. |
 | "Calibrazione mancante: premi Calibra" | Nessun file `calibrazione.txt` accanto all'exe. | Eseguire la calibrazione (sezione 5). |
 | "Calibrazione salvata non valida ... ripetere" | `calibrazione.txt` corrotto o con valori non validi. | Eliminare il file e ripetere la calibrazione. |
@@ -217,7 +219,7 @@ Misura suggerita (con registrazione audio):
 | Il proiettore non ha l'area bianca corretta | La calibrazione è stata fatta con il proiettore spostato. | Ripetere la calibrazione dopo aver fissato il proiettore. |
 | Cartoncini riconosciuti a intermittenza | Luce ambiente o riflessi, messa a fuoco. | Ridurre la luce, correggere la messa a fuoco, ripetere la prova. |
 | Colore sbagliato o non riconosciuto | Vedi sezione 9 (proiettore sovraesposto, saturazione bassa). | Vedi tabella della sezione 9. |
-| Ableton non parte o non segue il clock | Sync non abilitato sulla porta `VMBL`. | Verificare le preferenze MIDI di Ableton (sezione 8). |
+| Ableton non parte o non segue il clock | Sync non abilitato sulla porta pertinente alla modalità. | Verificare le preferenze MIDI di Ableton: ingresso `VMBL` in Master, uscita `VMBL-DAW` in Slave (sezione 8). |
 
 ## 12. Modello a righe e cartoncini speciali
 
@@ -230,7 +232,7 @@ Il tavolo non ha più «sei tracce con un colore fisso per riga». Il modello è
 
 ### Cartoncini speciali e dove posarli
 
-Sono 22 cartoncini (`assets/cartoncini/speciale-*.png`). Si posano nella colonna a sinistra della griglia, con il centro del cartoncino nella zona giusta:
+Sono 22 cartoncini (`assets/cartoncini-setting/speciale-*.png`). Si posano nella colonna a sinistra della griglia, con il centro del cartoncino nella zona giusta:
 
 | Zona | Cartoncini | Valori |
 |---|---|---|
@@ -260,7 +262,7 @@ Senza cartoncini speciali (o con cartoncini non validi) vale il **default**: **4
 
 ### Scala fisica dei cartoncini
 
-La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step proiettato è circa il 16% più stretto. I PNG committati restano a **30 mm per passo**. Per allineare la scala fisica ricalcolare `VMBL_PASSO_MM` (circa 30 x 0,84, quindi **circa 25 mm** invece di 30 mm) e rigenerare il materiale, come indicato in `assets/cartoncini/LEGGIMI.md`. Il valore da usare va verificato sul tavolo, con un righello e con la proiezione reale: **da verificare sul tavolo**.
+La griglia occupa il 67% della larghezza del tavolo, non più l'80%: lo step proiettato è circa il 16% più stretto. I PNG committati restano a **30 mm per passo**. Per allineare la scala fisica ricalcolare `VMBL_PASSO_MM` (circa 30 x 0,84, quindi **circa 25 mm** invece di 30 mm) e rigenerare il materiale, come indicato nel LEGGIMI della categoria interessata in `assets/`. Il valore da usare va verificato sul tavolo, con un righello e con la proiezione reale: **da verificare sul tavolo**.
 
 ### Cosa mostra la proiezione
 

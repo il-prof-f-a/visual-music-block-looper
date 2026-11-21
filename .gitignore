@@ -30,5 +30,9 @@ project.fragment.lock.json
 *.nuget.props
 *.nuget.targets
 
-# Superpowers / tooling locale
-.superpowers/
+# Local agent notes and plans. Keep these files on disk, but never track them.
+/.superpower/
+/.superpowers/
+/docs/superpowers/
+/docs/handoff-memoria-unificata.md
+/docs/esportazione-skills-sessione.md
